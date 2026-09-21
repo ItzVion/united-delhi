@@ -1,14 +1,19 @@
 # United Delhi
 
-A cross-platform Delhi DTC bus tracking app.
+A cross-platform Delhi DTC bus tracking app built with Expo and React Native.
 
-## Planned V1 features
+## Current status
 
-- Live bus tracking map
-- Nearest bus stop discovery
-- Route search
-- Server-side handling of Delhi Open Transit Data API credentials
+- Expo mobile app scaffold committed
+- Initial dark UI with route/stop search field
+- Foreground location permission and location refresh
+- Live map and DTC realtime backend integration planned next
 
-## Project status
+## Development
 
-🚧 Initial setup
+```bash
+npm install
+npx expo start
+```
+
+Never place the DTC API key in the mobile app. It will be used only by the backend as an environment variable.
