@@ -69,12 +69,6 @@ async function getRealtimeVehicles() {
     throw error;
   }
 
-  /* unreachable */
-  const buffer = new Uint8Array(await upstream.arrayBuffer());
-  const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(buffer);
-  return feed.entity.map(entityToVehicle).filter(Boolean).filter(vehicle => vehicle.id);
-}
-
 async function saveVehicles(vehicles) {
   if (!pool || vehicles.length === 0) return;
   const client = await pool.connect();
