@@ -70,7 +70,7 @@ async function request<T>(path: string, timeoutMs = 10000): Promise<T> {
 
 export const api = {
   status: () => request<{ realtime: string; database: string }>('/api/status'),
-  vehicles: () => request<{ status: string; count: number; vehicles: Vehicle[]; reason?: string }>('/api/realtime/vehicles'),
+  vehicles: () => request<{ status: string; count: number; vehicles: Vehicle[]; reason?: string }>('/api/realtime/vehicles', 30000),
   nearbyStops: (lat: number, lon: number, limit = 10) => request<{ status: string; stops: Stop[]; reason?: string }>(`/api/stops/nearby?lat=${lat}&lon=${lon}&limit=${limit}`),
   search: (q: string) => request<{ status: string; results: SearchResult[] }>(`/api/search?q=${encodeURIComponent(q)}`),
   stop: (id: string) => request<{ status: string; stop: Stop; routes: Route[] }>(`/api/stops/${encodeURIComponent(id)}`),
