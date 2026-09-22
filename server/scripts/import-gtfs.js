@@ -7,7 +7,7 @@ import pg from 'pg';
 import { parse } from 'csv-parse/sync';
 
 const { Pool } = pg;
-const GTFS_URL = 'https://otd.delhi.gov.in/data/static/GTFS.zip';
+const GTFS_URL = 'https://otd.delhi.gov.in/data/static/';
 const arg = process.argv[2];
 let dir = arg;
 let tempDir = null;
@@ -20,7 +20,14 @@ if (!dir || arg === '--download') {
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'united-delhi-gtfs-'));
   const zipPath = path.join(tempDir, 'GTFS.zip');
   console.log('Downloading Delhi OTD GTFS static data...');
-  const response = await fetch(GTFS_URL);
+  const page = await fetch(GTFS_URL);
+  if (!page.ok) throw new Error(`OTD static data page failed with HTTP ${page.status}`);
+  const html = await page.text();
+  const match = html.match(/(?:href|src)=["']([^"']+\.zip(?:\?[^"']*)?)["']/i);
+  if (!match) throw new Error('Could not find the OTD GTFS ZIP download link on the static data page');
+  const zipUrl = new URL(match[1], GTFS_URL).toString();
+  console.log(`Downloading GTFS from ${zipUrl}`);
+  const response = await fetch(zipUrl);
   if (!response.ok) throw new Error(`GTFS download failed with HTTP ${response.status}`);
   fs.writeFileSync(zipPath, Buffer.from(await response.arrayBuffer()));
   new AdmZip(zipPath).extractAllTo(tempDir, true);
