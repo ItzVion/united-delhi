@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 
 const { Pool } = pg;
 const app = express();
-const port = Number(process.env.PORT || 10000);
+const port = Number(process.env.PORT || 10000); // Render auto-deploy trigger
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
   : null;
