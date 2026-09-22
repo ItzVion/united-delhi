@@ -23,14 +23,46 @@ export default function HomeScreen() {
   const [loadingNearby, setLoadingNearby] = useState(false);
 
   const requestLocation = useCallback(async () => {
-    setLocationStatus('Requesting location permission…');
+    setLocationStatus('Checking location permission…');
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== 'granted') { setLocationStatus('Location permission denied. Enable it to see nearby stops.'); return; }
-      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setLocation(current); setLocationStatus('');
-      mapRef.current?.animateToRegion({ latitude:current.coords.latitude, longitude:current.coords.longitude, latitudeDelta:0.03, longitudeDelta:0.03 }, 400);
-    } catch { setLocationStatus('Could not get your location. Showing all of Delhi instead.'); }
+      const existing = await Location.getForegroundPermissionsAsync();
+      let permission = existing;
+
+      if (permission.status !== 'granted') {
+        setLocationStatus('Allow location permission on your phone…');
+        permission = await Promise.race([
+          Location.requestForegroundPermissionsAsync(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Location permission request timed out')), 8000))
+        ]);
+      }
+
+      if (permission.status !== 'granted') {
+        setLocationStatus('Location permission is off. Tap Retry and allow it.');
+        return;
+      }
+
+      setLocationStatus('Getting your location…');
+      const current = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Location request timed out')), 10000))
+      ]);
+
+      setLocation(current);
+      setLocationStatus('');
+      mapRef.current?.animateToRegion({
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+        latitudeDelta: 0.03,
+        longitudeDelta: 0.03
+      }, 400);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      setLocationStatus(
+        message.includes('permission') || message.includes('timed out')
+          ? 'Location unavailable. Tap Retry, or enable Location permission in Android Settings.'
+          : 'Could not get your location. Showing all of Delhi instead.'
+      );
+    }
   }, []);
 
   const loadNearbyStops = useCallback(async (lat:number,lon:number) => {
