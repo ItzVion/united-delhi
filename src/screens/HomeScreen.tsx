@@ -56,7 +56,7 @@ export default function HomeScreen() {
     <Pressable style={styles.searchBar} onPress={()=>navigation.navigate('Search')}><Text style={styles.searchPlaceholder}>Search a bus or stop</Text></Pressable>
     <View style={styles.mapWrap}>
       <MapView ref={mapRef} style={styles.map} initialRegion={DELHI_REGION} showsUserLocation showsMyLocationButton={false}>
-        {vehicles.map(v=><Marker key={v.id} coordinate={{latitude:v.latitude,longitude:v.longitude}} title={v.routeId?\`Route ${v.routeId}\`:'DTC bus'} description={\`Updated ${new Date(v.observedAt).toLocaleTimeString()}\`} pinColor={colors.accent}/>)}
+        {vehicles.map(v=><Marker key={v.id} coordinate={{latitude:v.latitude,longitude:v.longitude}} title={v.routeId?`Route ${v.routeId}`:'DTC bus'} description={`Updated ${new Date(v.observedAt).toLocaleTimeString()}`} pinColor={colors.accent}/>)}
         {nearbyStops.map(s=><Marker key={s.stop_id} coordinate={{latitude:s.latitude,longitude:s.longitude}} title={s.name} pinColor={colors.warning} onPress={()=>navigation.navigate('StopDetails',{stopId:s.stop_id,stopName:s.name})}/>)}
       </MapView>
       {locationStatus?<View style={styles.mapOverlay}><Text style={styles.mapOverlayText}>{locationStatus}</Text><Pressable style={styles.retryButton} onPress={requestLocation}><Text style={styles.retryButtonText}>Retry</Text></Pressable></View>:null}
