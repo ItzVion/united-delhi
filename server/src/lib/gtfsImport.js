@@ -3,6 +3,7 @@ import path from 'node:path';
 import { parse } from 'csv-parse/sync';
 
 export function readGtfsCsv(dir, filename) {
+  if (!fs.existsSync(path.join(dir, filename))) throw new Error(`Missing GTFS file: ${filename}`);
   const filePath = path.join(dir, filename);
   return parse(fs.readFileSync(filePath, 'utf8'), {
     columns: true,
