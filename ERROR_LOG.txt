@@ -1,0 +1,8 @@
+Known environment issue from previous development:
+- GitHub Codespaces + Expo Go produced connection failures because the Expo server was running inside a remote environment. The project later bundled successfully on a local Windows machine.
+- Codespaces also showed missing Linux shared-library messages for React Native DevTools. These were environment issues.
+- npm reported moderate dependency audit findings in prior installs. They were not fixed with npm audit --force because blindly forcing upgrades can break Expo compatibility.
+
+Current repository status:
+- This repository contains a clean app scaffold and backend boundary.
+- Production DTC GTFS loading and production protobuf vehicle decoding must be completed before claiming live bus tracking.

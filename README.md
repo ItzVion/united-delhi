@@ -1,19 +1,15 @@
 # United Delhi
 
-A cross-platform Delhi DTC bus tracking app built with Expo and React Native.
+Delhi DTC bus tracking app built with Expo React Native.
 
-## Current status
+## Current state
 
-- Expo mobile app scaffold committed
-- Initial dark UI with route/stop search field
-- Foreground location permission and location refresh
-- Live map and DTC realtime backend integration planned next
+The repository is intentionally kept free of private credentials. The mobile app can request location permission, while the DTC API integration belongs in the backend.
 
-## Development
+Official Delhi Open Transit Data documentation:
+https://otd.delhi.gov.in/documentation/
 
-```bash
-npm install
-npx expo start
-```
+The official realtime endpoint is documented as:
+https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb?key=YOUR_PRIVATE_KEY
 
-Never place the DTC API key in the mobile app. It will be used only by the backend as an environment variable.
+Static GTFS data and realtime access require the relevant OTD access steps. The official documentation warns that stop_times.txt is only a rough constant-speed estimate, so the app must label scheduled ETAs as estimates.
