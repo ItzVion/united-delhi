@@ -1,16 +1,32 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import AdmZip from 'adm-zip';
 import pg from 'pg';
 import { parse } from 'csv-parse/sync';
 
 const { Pool } = pg;
-const dir = process.argv[2];
+const GTFS_URL = 'https://otd.delhi.gov.in/data/static/GTFS.zip';
+const arg = process.argv[2];
+let dir = arg;
+let tempDir = null;
 
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
-if (!dir) throw new Error('Usage: npm run import:gtfs -- C:\\path\\to\\extracted\\gtfs');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
+if (!dir || arg === '--download') {
+  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'united-delhi-gtfs-'));
+  const zipPath = path.join(tempDir, 'GTFS.zip');
+  console.log('Downloading Delhi OTD GTFS static data...');
+  const response = await fetch(GTFS_URL);
+  if (!response.ok) throw new Error(`GTFS download failed with HTTP ${response.status}`);
+  fs.writeFileSync(zipPath, Buffer.from(await response.arrayBuffer()));
+  new AdmZip(zipPath).extractAllTo(tempDir, true);
+  dir = tempDir;
+  console.log('GTFS downloaded and extracted.');
+}
 
 function readCsv(name) {
   const file = path.join(dir, name);
@@ -71,4 +87,5 @@ try {
 } finally {
   client.release();
   await pool.end();
+  if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
 }
