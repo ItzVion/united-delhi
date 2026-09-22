@@ -53,7 +53,7 @@ async function getRealtimeVehicles() {
   }
 
   const url = `https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb?key=${encodeURIComponent(process.env.DTC_API_KEY)}`;
-  const upstream = await fetch(url, { headers: { accept: 'application/x-protobuf' } });
+  const upstream = await fetch(url, { headers: { accept: 'application/x-protobuf' }, signal: AbortSignal.timeout(15000) });
   if (!upstream.ok) throw new Error(`OTD returned HTTP ${upstream.status}`);
 
   const buffer = new Uint8Array(await upstream.arrayBuffer());
