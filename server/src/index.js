@@ -2,6 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import pg from 'pg';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 
 const { Pool } = pg;
@@ -13,6 +15,10 @@ const pool = process.env.DATABASE_URL
 
 app.use(cors());
 app.use(express.json({ limit: '64kb' }));
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use('/demo', express.static(path.resolve(__dirname, '../../demo')));
 
 const ok = (value) => value !== undefined && value !== null && value !== '';
 
