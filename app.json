@@ -1,1 +1,24 @@
-{"expo":{"name":"United Delhi","slug":"united-delhi","version":"1.0.0","orientation":"portrait","userInterfaceStyle":"automatic","splash":{"resizeMode":"contain"},"ios":{"supportsTablet":true},"android":{"adaptiveIcon":{"backgroundColor":"#0B1220"}},"web":{"bundler":"metro"}}}
+{
+  "expo": {
+    "name": "United Delhi",
+    "slug": "united-delhi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": { "resizeMode": "contain", "backgroundColor": "#0B1220" },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.uniteddelhi.app",
+      "infoPlist": { "NSLocationWhenInUseUsageDescription": "United Delhi uses your location to find nearby DTC bus stops and estimate when to leave to catch your bus." }
+    },
+    "android": {
+      "package": "com.uniteddelhi.app",
+      "adaptiveIcon": { "backgroundColor": "#0B1220" },
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+    },
+    "web": { "bundler": "metro" },
+    "plugins": [
+      ["expo-location", { "locationWhenInUsePermission": "United Delhi uses your location to find nearby DTC bus stops and estimate when to leave to catch your bus." }]
+    ]
+  }
+}
