@@ -128,8 +128,19 @@ app.get('/api/status', (_req, res) => {
 
 app.get('/api/realtime/vehicles', async (_req, res) => {
   try {
-    const vehicles = await getRealtimeVehicles();
-    await saveVehicles(vehicles);
+    const vehicles = await Promise.race([
+      getRealtimeVehicles(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Realtime request exceeded 20 seconds')), 20000)
+      )
+    ]);
+
+    if (pool && vehicles.length > 0) {
+      saveVehicles(vehicles).catch(error =>
+        console.error('Failed to save realtime vehicles:', error)
+      );
+    }
+
     res.json({ status: 'OK', count: vehicles.length, vehicles });
   } catch (error) {
     const status = error?.code === 'NO_API_KEY' ? 503 : 502;
