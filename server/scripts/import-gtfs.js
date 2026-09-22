@@ -7,7 +7,7 @@ import pg from 'pg';
 import { parse } from 'csv-parse/sync';
 
 const { Pool } = pg;
-const GTFS_URL = 'https://otd.delhi.gov.in/data/static/';
+const GTFS_PAGE_URL = 'https://otd.delhi.gov.in/data/static/';
 const arg = process.argv[2];
 let dir = arg;
 let tempDir = null;
@@ -16,23 +16,57 @@ if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
-if (!dir || arg === '--download') {
+async function downloadGtfs() {
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'united-delhi-gtfs-'));
   const zipPath = path.join(tempDir, 'GTFS.zip');
-  console.log('Downloading Delhi OTD GTFS static data...');
-  const page = await fetch(GTFS_URL);
+
+  console.log('Opening Delhi OTD static-data page...');
+  const page = await fetch(GTFS_PAGE_URL);
   if (!page.ok) throw new Error(`OTD static data page failed with HTTP ${page.status}`);
   const html = await page.text();
+
+  // The OTD page intentionally hides the ZIP URL behind a form/button.
+  // Try the common API/static asset patterns used by the site.
+  const candidates = [
+    'https://otd.delhi.gov.in/api/static/GTFS.zip',
+    'https://otd.delhi.gov.in/api/static/gtfs.zip',
+    'https://otd.delhi.gov.in/data/static/GTFS.zip',
+    'https://otd.delhi.gov.in/static/data/GTFS.zip',
+    'https://otd.delhi.gov.in/static/assets/GTFS.zip'
+  ];
+
+  for (const url of candidates) {
+    try {
+      const response = await fetch(url, { redirect: 'follow' });
+      if (response.ok) {
+        console.log(`Downloading GTFS from ${url}`);
+        fs.writeFileSync(zipPath, Buffer.from(await response.arrayBuffer()));
+        new AdmZip(zipPath).extractAllTo(tempDir, true);
+        return tempDir;
+      }
+    } catch {}
+  }
+
+  // Fall back to a same-origin ZIP link if the page exposes one in raw HTML.
   const match = html.match(/(?:href|src)=["']([^"']+\.zip(?:\?[^"']*)?)["']/i);
-  if (!match) throw new Error('Could not find the OTD GTFS ZIP download link on the static data page');
-  const zipUrl = new URL(match[1], GTFS_URL).toString();
-  console.log(`Downloading GTFS from ${zipUrl}`);
-  const response = await fetch(zipUrl);
-  if (!response.ok) throw new Error(`GTFS download failed with HTTP ${response.status}`);
-  fs.writeFileSync(zipPath, Buffer.from(await response.arrayBuffer()));
-  new AdmZip(zipPath).extractAllTo(tempDir, true);
-  dir = tempDir;
-  console.log('GTFS downloaded and extracted.');
+  if (match) {
+    const zipUrl = new URL(match[1], GTFS_PAGE_URL).toString();
+    const response = await fetch(zipUrl, { redirect: 'follow' });
+    if (response.ok) {
+      console.log(`Downloading GTFS from ${zipUrl}`);
+      fs.writeFileSync(zipPath, Buffer.from(await response.arrayBuffer()));
+      new AdmZip(zipPath).extractAllTo(tempDir, true);
+      return tempDir;
+    }
+  }
+
+  throw new Error(
+    'OTD static GTFS download is gated by the website form/session. Download the ZIP once from the OTD Static Data page and run: npm run import:gtfs -- C:\\path\\to\\extracted\\gtfs'
+  );
+}
+
+if (!dir || arg === '--download') {
+  dir = await downloadGtfs();
 }
 
 function readCsv(name) {
