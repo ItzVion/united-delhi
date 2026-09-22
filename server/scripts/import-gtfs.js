@@ -69,15 +69,34 @@ try {
   const trips = readCsv('trips.txt');
   for (const trip of trips) tripRoutes.set(trip.trip_id, trip.route_id);
 
+  const routeStops = new Map();
   for (const row of stopTimes) {
     const routeId = tripRoutes.get(row.trip_id);
     if (!routeId || !row.stop_id || !row.stop_sequence) continue;
+    const key = `${routeId}\\x1f${row.stop_id}`;
+    const sequence = Number(row.stop_sequence);
+    const existing = routeStops.get(key);
+    if (existing === undefined || sequence < existing.stopSequence) {
+      routeStops.set(key, { routeId, stopId: row.stop_id, stopSequence: sequence });
+    }
+  }
+
+  const rows = [...routeStops.values()];
+  for (let i = 0; i < rows.length; i += 500) {
+    const chunk = rows.slice(i, i + 500);
+    const values = [];
+    const placeholders = chunk.map((row, index) => {
+      const base = index * 3;
+      values.push(row.routeId, row.stopId, row.stopSequence);
+      return `($${base + 1},$${base + 2},$${base + 3})`;
+    }).join(',');
     await client.query(
-      `INSERT INTO route_stops(route_id,stop_id,stop_sequence) VALUES($1,$2,$3)
+      `INSERT INTO route_stops(route_id,stop_id,stop_sequence) VALUES ${placeholders}
        ON CONFLICT(route_id,stop_id) DO UPDATE SET stop_sequence=LEAST(route_stops.stop_sequence,EXCLUDED.stop_sequence)`,
-      [routeId, row.stop_id, Number(row.stop_sequence)]
+      values
     );
   }
+
 
   await client.query('COMMIT');
   console.log(`Imported ${stops.length} stops and ${routes.length} routes.`);
