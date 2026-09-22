@@ -49,7 +49,7 @@ export default function HomeScreen() {
   useEffect(()=>{loadVehicles();const interval=setInterval(loadVehicles,20000);return()=>clearInterval(interval);},[loadVehicles]);
 
   const freshnessTone=vehiclesFreshness.state==='ok'?'ok':vehiclesFreshness.state==='loading'?'muted':'danger';
-  const freshnessLabel=vehiclesFreshness.state==='ok'?\`${vehicles.length} live buses\`:vehiclesFreshness.state==='loading'?'Loading live buses…':'Live buses unavailable';
+  const freshnessLabel=vehiclesFreshness.state==='ok'?`${vehicles.length} live buses`:vehiclesFreshness.state==='loading'?'Loading live buses…':'Live buses unavailable';
 
   return <SafeAreaView style={styles.safe}>
     <View style={styles.header}><Text style={styles.brand}>United Delhi</Text><StatusPill label={freshnessLabel} tone={freshnessTone}/></View>
