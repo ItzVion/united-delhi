@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import pg from 'pg';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
+import { spawn } from 'node:child_process';
 
 const { Pool } = pg;
 const app = express();
@@ -192,4 +193,33 @@ app.get('/api/search', async (req, res) => {
   res.json({ status: 'OK', results: result.rows });
 });
 
+async function ensureStaticData() {
+  if (!pool) return;
+  const result = await pool.query(`
+    SELECT
+      (SELECT COUNT(*) FROM stops) AS stops,
+      (SELECT COUNT(*) FROM routes) AS routes,
+      (SELECT COUNT(*) FROM route_stops) AS route_stops
+  `);
+  const counts = result.rows[0];
+  if (Number(counts.stops) >= 1000 && Number(counts.routes) >= 500 && Number(counts.route_stops) >= 10000) {
+    return;
+  }
+
+  console.log('Static GTFS data is missing/incomplete; importing the pinned OTD-derived dataset...');
+  await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['scripts/import-gtfs.js'], {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: 'inherit'
+    });
+    child.on('error', reject);
+    child.on('exit', code => {
+      if (code === 0) resolve();
+      else reject(new Error(`GTFS import exited with code ${code}`));
+    });
+  });
+}
+
+await ensureStaticData();
 app.listen(port, () => console.log(`United Delhi API listening on :${port}`));
