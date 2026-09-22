@@ -55,19 +55,29 @@ async function getRealtimeVehicles() {
   const url = `https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb?key=${encodeURIComponent(process.env.DTC_API_KEY)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
-  let upstream;
+
   try {
-    upstream = await fetch(url, { headers: { accept: 'application/x-protobuf' }, signal: controller.signal });
-    if (!upstream.ok) throw new Error(`OTD returned HTTP ${upstream.status}`);
+    const upstream = await fetch(url, {
+      headers: { accept: 'application/x-protobuf' },
+      signal: controller.signal
+    });
+
+    if (!upstream.ok) {
+      throw new Error(`OTD returned HTTP ${upstream.status}`);
+    }
+
     const buffer = new Uint8Array(await upstream.arrayBuffer());
-    clearTimeout(timer);
     const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(buffer);
     return feed.entity.map(entityToVehicle).filter(Boolean).filter(vehicle => vehicle.id);
   } catch (error) {
-    clearTimeout(timer);
-    if (error?.name === 'AbortError') throw new Error('OTD realtime feed timed out after 15 seconds');
+    if (error?.name === 'AbortError') {
+      throw new Error('OTD realtime feed timed out after 15 seconds');
+    }
     throw error;
+  } finally {
+    clearTimeout(timer);
   }
+}
 
 async function saveVehicles(vehicles) {
   if (!pool || vehicles.length === 0) return;
