@@ -20,7 +20,8 @@ export default function HomeScreen() {
   const [nearbyStops, setNearbyStops] = useState<Stop[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [vehiclesFreshness, setVehiclesFreshness] = useState<{state:'loading'|'ok'|'stale'|'unavailable';reason?:string}>({state:'loading'});
-  const [loadingNearby, setLoadingNearby] = useState(false);
+  const [loadingNearby, setLoadingNearby] = useState(true);
+  const [locationReady, setLocationReady] = useState(false);
 
   const requestLocation = useCallback(async () => {
     setLocationStatus('Checking location permission…');
@@ -48,6 +49,7 @@ export default function HomeScreen() {
       ]);
 
       setLocation(current);
+      setLocationReady(true);
       setLocationStatus('');
       mapRef.current?.animateToRegion({
         latitude: current.coords.latitude,
@@ -76,7 +78,10 @@ export default function HomeScreen() {
     catch(error){setVehiclesFreshness({state:'unavailable',reason:(error as Error).message});}
   }, []);
 
-  useEffect(()=>{requestLocation();},[requestLocation]);
+  useEffect(()=>{
+    loadNearbyStops(DELHI_REGION.latitude, DELHI_REGION.longitude);
+    requestLocation();
+  },[requestLocation,loadNearbyStops]);
   useEffect(()=>{if(location) loadNearbyStops(location.coords.latitude,location.coords.longitude);},[location,loadNearbyStops]);
   useEffect(()=>{loadVehicles();const interval=setInterval(loadVehicles,20000);return()=>clearInterval(interval);},[loadVehicles]);
 
@@ -87,7 +92,7 @@ export default function HomeScreen() {
     <View style={styles.header}><Text style={styles.brand}>United Delhi</Text><StatusPill label={freshnessLabel} tone={freshnessTone}/></View>
     <Pressable style={styles.searchBar} onPress={()=>navigation.navigate('Search')}><Text style={styles.searchPlaceholder}>Search a bus or stop</Text></Pressable>
     <View style={styles.mapWrap}>
-      <MapView ref={mapRef} style={styles.map} initialRegion={DELHI_REGION} showsUserLocation showsMyLocationButton={false}>
+      <MapView ref={mapRef} style={styles.map} initialRegion={DELHI_REGION} mapType="standard" showsUserLocation={locationReady} showsMyLocationButton={false}>
         {vehicles.map(v=><Marker key={v.id} coordinate={{latitude:v.latitude,longitude:v.longitude}} title={v.routeId?`Route ${v.routeId}`:'DTC bus'} description={`Updated ${new Date(v.observedAt).toLocaleTimeString()}`} pinColor={colors.accent}/>)}
         {nearbyStops.map(s=><Marker key={s.stop_id} coordinate={{latitude:s.latitude,longitude:s.longitude}} title={s.name} pinColor={colors.warning} onPress={()=>navigation.navigate('StopDetails',{stopId:s.stop_id,stopName:s.name})}/>)}
       </MapView>
