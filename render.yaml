@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: united-delhi-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DTC_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
