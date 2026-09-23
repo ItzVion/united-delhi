@@ -1,12 +1,18 @@
 export const colors = {
-  background: '#0B1220',
-  surface: '#172235',
-  surfaceAlt: '#182C3B',
-  border: '#22304A',
-  text: '#FFFFFF',
-  textMuted: '#A8B2C5',
-  accent: '#35C48B',
-  accentDark: '#071B13',
-  warning: '#F5A524',
-  danger: '#F05252'
+  background: '#F7F9FC',
+  surface: '#FFFFFF',
+  surfaceAlt: '#EEF4FF',
+  border: '#E1E7EF',
+  text: '#142033',
+  textMuted: '#687386',
+  accent: '#1769E0',
+  accentDark: '#FFFFFF',
+  accentSoft: '#EAF2FF',
+  success: '#16834B',
+  successSoft: '#E9F7EF',
+  warning: '#D97706',
+  warningSoft: '#FFF4E5',
+  danger: '#C93434',
+  dangerSoft: '#FDECEC',
+  mapRoad: '#FFFFFF'
 };
