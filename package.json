@@ -9,7 +9,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test \"src/lib/__tests__/*.test.ts\""
+    "test": "node --experimental-strip-types --test \"src/lib/__tests__/*.test.ts\"",
+    "build:apk": "eas build -p android --profile preview"
   },
   "dependencies": {
     "@react-navigation/native": "^7.1.20",
