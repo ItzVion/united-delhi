@@ -5,7 +5,7 @@ import { colors } from '../theme';
 type Tone = 'ok' | 'warning' | 'danger' | 'muted';
 
 const toneColor: Record<Tone, string> = {
-  ok: colors.accent,
+  ok: colors.success,
   warning: colors.warning,
   danger: colors.danger,
   muted: colors.textMuted
