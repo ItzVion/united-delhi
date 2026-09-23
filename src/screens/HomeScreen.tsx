@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
+type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api, Stop, Vehicle } from '../api/client';
