@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
-type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api, Stop, Vehicle } from '../api/client';
@@ -10,159 +9,240 @@ import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 
-const DELHI_REGION: Region = { latitude: 28.6139, longitude: 77.209, latitudeDelta: 0.15, longitudeDelta: 0.15 };
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
+type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
+const DELHI_REGION: Region = { latitude: 28.6139, longitude: 77.209, latitudeDelta: 0.15, longitudeDelta: 0.15 };
 
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
   const mapRef = useRef<WebView | null>(null);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
-  const [locationStatus, setLocationStatus] = useState('Requesting location…');
+  const [locationStatus, setLocationStatus] = useState('Finding your location…');
   const [nearbyStops, setNearbyStops] = useState<Stop[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [vehiclesFreshness, setVehiclesFreshness] = useState<{state:'loading'|'ok'|'stale'|'unavailable';reason?:string}>({state:'loading'});
+  const [vehiclesFreshness, setVehiclesFreshness] = useState<'loading' | 'ok' | 'unavailable'>('loading');
   const [loadingNearby, setLoadingNearby] = useState(true);
-  const [locationReady, setLocationReady] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   const requestLocation = useCallback(async () => {
-    setLocationStatus('Checking location permission…');
     try {
       const existing = await Location.getForegroundPermissionsAsync();
-      let permission = existing;
-
+      const permission = existing.status === 'granted'
+        ? existing
+        : await Promise.race([
+            Location.requestForegroundPermissionsAsync(),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
+          ]);
       if (permission.status !== 'granted') {
-        setLocationStatus('Allow location permission on your phone…');
-        permission = await Promise.race([
-          Location.requestForegroundPermissionsAsync(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Location permission request timed out')), 8000))
-        ]);
-      }
-
-      if (permission.status !== 'granted') {
-        setLocationStatus('Location permission is off. Tap Retry and allow it.');
+        setLocationStatus('Location is off. Showing Delhi.');
         return;
       }
 
-      setLocationStatus('Getting your location…');
-
-      // Use a recent cached location immediately so the app does not sit on
-      // the location screen while Android acquires a fresh GPS fix.
-      const lastKnown = await Location.getLastKnownPositionAsync({
-        maxAge: 5 * 60 * 1000,
-        requiredAccuracy: 2000
-      });
-
+      const lastKnown = await Location.getLastKnownPositionAsync({ maxAge: 5 * 60 * 1000, requiredAccuracy: 2000 });
       if (lastKnown) {
         setLocation(lastKnown);
-        setLocationReady(true);
         setLocationStatus('');
-        
       }
 
       try {
         const current = await Promise.race([
           Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Location request timed out')), 10000))
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
         ]);
-
         setLocation(current);
-        setLocationReady(true);
         setLocationStatus('');
-        
-      } catch (error) {
-        if (lastKnown) {
-          setLocationStatus('');
-          return;
-        }
-        throw error;
+      } catch {
+        if (!lastKnown) setLocationStatus('Could not get GPS. Showing Delhi.');
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '';
-      setLocationStatus(
-        message.includes('permission') || message.includes('timed out')
-          ? 'Location unavailable. Tap Retry, or enable Location permission in Android Settings.'
-          : 'Could not get your location. Showing all of Delhi instead.'
-      );
+    } catch {
+      setLocationStatus('Location unavailable. Showing Delhi.');
     }
   }, []);
 
-  const loadNearbyStops = useCallback(async (lat:number,lon:number) => {
+  const loadNearbyStops = useCallback(async (lat: number, lon: number) => {
     setLoadingNearby(true);
-    try { const result=await api.nearbyStops(lat,lon,12); setNearbyStops(result.status==='OK'?result.stops:[]); }
-    catch { setNearbyStops([]); } finally { setLoadingNearby(false); }
+    try {
+      const result = await api.nearbyStops(lat, lon, 8);
+      setNearbyStops(result.status === 'OK' ? result.stops : []);
+    } catch {
+      setNearbyStops([]);
+    } finally {
+      setLoadingNearby(false);
+    }
   }, []);
 
   const loadVehicles = useCallback(async () => {
-    try { const result=await api.vehicles(); if(result.status==='OK'){setVehicles(result.vehicles);setVehiclesFreshness({state:'ok'});} else setVehiclesFreshness({state:'unavailable',reason:result.reason}); }
-    catch(error){setVehiclesFreshness({state:'unavailable',reason:(error as Error).message});}
+    try {
+      const result = await api.vehicles();
+      if (result.status === 'OK') {
+        setVehicles(result.vehicles);
+        setVehiclesFreshness('ok');
+      } else {
+        setVehiclesFreshness('unavailable');
+      }
+    } catch {
+      setVehiclesFreshness('unavailable');
+    }
   }, []);
 
-  useEffect(()=>{
-    loadNearbyStops(DELHI_REGION.latitude, DELHI_REGION.longitude);
+  useEffect(() => {
     requestLocation();
-  },[requestLocation,loadNearbyStops]);
-  useEffect(()=>{if(location) loadNearbyStops(location.coords.latitude,location.coords.longitude);},[location,loadNearbyStops]);
-  useEffect(()=>{loadVehicles();const interval=setInterval(loadVehicles,20000);return()=>clearInterval(interval);},[loadVehicles]);
+    loadNearbyStops(DELHI_REGION.latitude, DELHI_REGION.longitude);
+  }, [requestLocation, loadNearbyStops]);
 
-  const freshnessTone=vehiclesFreshness.state==='ok'?'ok':vehiclesFreshness.state==='loading'?'muted':'danger';
-  const freshnessLabel=vehiclesFreshness.state==='ok'?`${vehicles.length} live buses`:vehiclesFreshness.state==='loading'?'Loading live buses…':'Live buses unavailable';
+  useEffect(() => {
+    if (location) loadNearbyStops(location.coords.latitude, location.coords.longitude);
+  }, [location, loadNearbyStops]);
 
-  return <SafeAreaView style={styles.safe}>
-    <View style={styles.header}><Text style={styles.brand}>United Delhi</Text><StatusPill label={freshnessLabel} tone={freshnessTone}/></View>
-    <Pressable style={styles.searchBar} onPress={()=>navigation.navigate('Search')}><Text style={styles.searchPlaceholder}>Search a bus or stop</Text></Pressable>
-    <View style={styles.mapWrap}>
-      <WebView
-        ref={mapRef}
-        style={styles.map}
-        originWhitelist={['*']}
-        javaScriptEnabled
-        domStorageEnabled
-        source={{ html: buildMapHtml(DELHI_REGION, location, nearbyStops, vehicles) }}
-        onMessage={(event) => {
-          try {
-            const message = JSON.parse(event.nativeEvent.data);
-            if (message.type === 'stop') {
-              const stop = nearbyStops.find(s => s.stop_id === message.stopId);
-              if (stop) navigation.navigate('StopDetails', { stopId: stop.stop_id, stopName: stop.name });
-            }
-          } catch {}
-        }}
-      />
-      <View pointerEvents="none" style={styles.mapAttribution}>
-        <Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text>
+  useEffect(() => {
+    loadVehicles();
+    const interval = setInterval(loadVehicles, 30000);
+    return () => clearInterval(interval);
+  }, [loadVehicles]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    const payload = {
+      center: {
+        lat: location?.coords.latitude ?? DELHI_REGION.latitude,
+        lon: location?.coords.longitude ?? DELHI_REGION.longitude
+      },
+      stops: nearbyStops.map(s => ({ id: s.stop_id, name: s.name, lat: s.latitude, lon: s.longitude })),
+      buses: vehicles.slice(0, 250).map(v => ({ id: v.id, route: v.routeId, lat: v.latitude, lon: v.longitude })),
+      location: location ? { lat: location.coords.latitude, lon: location.coords.longitude } : null
+    };
+    mapRef.current?.injectJavaScript(`window.updateMap(${JSON.stringify(payload)}); true;`);
+  }, [mapReady, location, nearbyStops, vehicles]);
+
+  const freshnessLabel = vehiclesFreshness === 'ok'
+    ? `${vehicles.length} live buses`
+    : vehiclesFreshness === 'loading'
+      ? 'Loading live buses'
+      : 'Live buses unavailable';
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.brand}>UNITED DELHI</Text>
+          <Text style={styles.tagline}>Move better around Delhi</Text>
+        </View>
+        <StatusPill label={freshnessLabel} tone={vehiclesFreshness === 'ok' ? 'ok' : vehiclesFreshness === 'unavailable' ? 'danger' : 'muted'} />
       </View>
-      {locationStatus ? <View style={styles.mapOverlay}><Text style={styles.mapOverlayText}>{locationStatus}</Text><Pressable style={styles.retryButton} onPress={requestLocation}><Text style={styles.retryButtonText}>Retry</Text></Pressable></View> : null}
-    </View>
-    <View style={styles.listHeader}><Text style={styles.listTitle}>Nearby stops</Text>{loadingNearby?<ActivityIndicator color={colors.accent}/>:null}</View>
-    <FlatList data={nearbyStops} keyExtractor={item=>item.stop_id} contentContainerStyle={styles.list} ListEmptyComponent={!loadingNearby?<Text style={styles.emptyText}>No nearby stops found yet.</Text>:null}
-      renderItem={({item})=><Pressable style={styles.stopCard} onPress={()=>navigation.navigate('StopDetails',{stopId:item.stop_id,stopName:item.name})}><Text style={styles.stopName}>{item.name}</Text>{item.distance_m!==undefined?<Text style={styles.stopDistance}>{Math.round(item.distance_m)} m away</Text>:null}</Pressable>}/>
-  </SafeAreaView>;
-}
-function buildMapHtml(region: Region, location: Location.LocationObject | null, stops: Stop[], buses: Vehicle[]) {
-  const centerLat = location?.coords.latitude ?? region.latitude;
-  const centerLon = location?.coords.longitude ?? region.longitude;
-  const stopData = JSON.stringify(stops.map(s => ({ id:s.stop_id, name:s.name, lat:s.latitude, lon:s.longitude }))).replace(/</g, '\\u003c');
-  const busData = JSON.stringify(buses.map(v => ({ id:v.id, route:v.routeId, lat:v.latitude, lon:v.longitude, observed:v.observedAt }))).replace(/</g, '\\u003c');
-  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>html,body,#map{margin:0;width:100%;height:100%;background:#e8eef2} .stop{font-size:20px} .bus{font-size:18px}</style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
-  const map=L.map('map',{zoomControl:true}).setView([${centerLat},${centerLon}],14);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
-  const stops=${stopData}; const buses=${busData};
-  stops.forEach(s=>L.marker([s.lat,s.lon]).addTo(map).bindPopup('<b>'+escapeHtml(s.name)+'</b><br><button onclick="openStop(\\''+s.id+'\\')">View stop</button>'));
-  buses.forEach(v=>L.marker([v.lat,v.lon],{icon:L.divIcon({className:'bus',html:'🚌',iconSize:[28,28],iconAnchor:[14,14]})}).addTo(map).bindPopup((v.route?'Route '+escapeHtml(v.route):'DTC bus')));
-  ${location ? `L.circleMarker([${centerLat},${centerLon}],{radius:8}).addTo(map).bindPopup('Your location');` : ''}
-  function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}
-  function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-  </script></body></html>`;
+
+      <Pressable style={styles.searchBar} onPress={() => navigation.navigate('Search')}>
+        <Text style={styles.searchIcon}>⌕</Text>
+        <Text style={styles.searchPlaceholder}>Search routes, stops or places</Text>
+      </Pressable>
+
+      <View style={styles.chips}>
+        <Pressable style={[styles.chip, styles.chipActive]}><Text style={styles.chipActiveText}>Buses</Text></Pressable>
+        <Pressable style={styles.chip} onPress={() => navigation.navigate('Search')}><Text style={styles.chipText}>Routes</Text></Pressable>
+        <Pressable style={styles.chip} onPress={() => location && loadNearbyStops(location.coords.latitude, location.coords.longitude)}><Text style={styles.chipText}>Nearby</Text></Pressable>
+      </View>
+
+      <View style={styles.mapWrap}>
+        <WebView
+          ref={mapRef}
+          style={styles.map}
+          originWhitelist={['*']}
+          javaScriptEnabled
+          domStorageEnabled
+          cacheEnabled
+          source={{ html: buildMapHtml() }}
+          onLoadEnd={() => setMapReady(true)}
+          onMessage={(event) => {
+            try {
+              const message = JSON.parse(event.nativeEvent.data);
+              if (message.type === 'stop') {
+                const stop = nearbyStops.find(s => s.stop_id === message.stopId);
+                if (stop) navigation.navigate('StopDetails', { stopId: stop.stop_id, stopName: stop.name });
+              }
+            } catch {}
+          }}
+        />
+        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap</Text></View>
+        <View style={styles.mapBadge}><Text style={styles.mapBadgeText}>{vehicles.length > 0 ? `${Math.min(vehicles.length, 250)} buses on map` : 'No live buses yet'}</Text></View>
+        {locationStatus ? (
+          <Pressable style={styles.locationNotice} onPress={requestLocation}>
+            <Text style={styles.locationNoticeText}>{locationStatus}</Text>
+            <Text style={styles.locationRetry}>Retry</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Quick access</Text>
+      </View>
+      <View style={styles.quickGrid}>
+        <Pressable style={styles.quickCard} onPress={() => navigation.navigate('Search')}>
+          <Text style={styles.quickIcon}>⌕</Text><Text style={styles.quickTitle}>Route search</Text><Text style={styles.quickSub}>500+ routes</Text>
+        </Pressable>
+        <Pressable style={styles.quickCard} onPress={() => location && loadNearbyStops(location.coords.latitude, location.coords.longitude)}>
+          <Text style={[styles.quickIcon, { color: colors.success }]}>●</Text><Text style={styles.quickTitle}>Nearby stops</Text><Text style={styles.quickSub}>Around you</Text>
+        </Pressable>
+        <View style={styles.quickCard}>
+          <Text style={[styles.quickIcon, { color: colors.warning }]}>●</Text><Text style={styles.quickTitle}>Live buses</Text><Text style={styles.quickSub}>{vehicles.length || 0} currently reporting</Text>
+        </View>
+        <View style={styles.quickCard}>
+          <Text style={[styles.quickIcon, { color: colors.accent }]}>i</Text><Text style={styles.quickTitle}>Network status</Text><Text style={styles.quickSub}>{vehiclesFreshness === 'ok' ? 'Realtime connected' : 'Realtime unavailable'}</Text>
+        </View>
+      </View>
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Nearby stops</Text>
+        {loadingNearby ? <ActivityIndicator color={colors.accent} size="small" /> : null}
+      </View>
+      <FlatList
+        data={nearbyStops}
+        keyExtractor={item => item.stop_id}
+        contentContainerStyle={styles.list}
+        ListEmptyComponent={!loadingNearby ? <Text style={styles.emptyText}>No nearby stops found.</Text> : null}
+        renderItem={({ item }) => (
+          <Pressable style={styles.stopCard} onPress={() => navigation.navigate('StopDetails', { stopId: item.stop_id, stopName: item.name })}>
+            <View style={styles.stopPin}><Text style={styles.stopPinText}>●</Text></View>
+            <View style={styles.stopInfo}>
+              <Text style={styles.stopName} numberOfLines={1}>{item.name}</Text>
+              <Text style={styles.stopDistance}>{item.distance_m !== undefined ? `${Math.round(item.distance_m)} m away` : 'Nearby'}</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        )}
+      />
+    </SafeAreaView>
+  );
 }
 
-const styles=StyleSheet.create({
- safe:{flex:1,backgroundColor:colors.background},header:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingHorizontal:20,paddingTop:12},
- brand:{color:colors.text,fontSize:28,fontWeight:'800'},searchBar:{marginHorizontal:20,marginTop:14,height:48,borderRadius:14,backgroundColor:colors.surface,justifyContent:'center',paddingHorizontal:16},
- searchPlaceholder:{color:colors.textMuted,fontSize:15},mapWrap:{marginTop:14,marginHorizontal:20,height:260,borderRadius:22,overflow:'hidden'},map:{flex:1},
- mapAttribution:{position:"absolute",right:8,bottom:6,backgroundColor:"rgba(255,255,255,0.85)",paddingHorizontal:6,paddingVertical:2,borderRadius:4},mapAttributionText:{color:"#333",fontSize:9},mapOverlay:{position:'absolute',left:12,right:12,bottom:12,backgroundColor:'rgba(11,18,32,0.9)',borderRadius:14,padding:12,gap:8},
- mapOverlayText:{color:colors.text,fontSize:13,lineHeight:18},retryButton:{alignSelf:'flex-start',backgroundColor:colors.accent,borderRadius:10,paddingHorizontal:12,paddingVertical:6},
- retryButtonText:{color:colors.accentDark,fontWeight:'700',fontSize:12},listHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginHorizontal:20,marginTop:18,marginBottom:8},
- listTitle:{color:colors.text,fontSize:17,fontWeight:'700'},list:{paddingHorizontal:20,paddingBottom:24,gap:10},emptyText:{color:colors.textMuted,fontSize:14},
- stopCard:{backgroundColor:colors.surface,borderRadius:14,padding:14,marginBottom:10,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},
- stopName:{color:colors.text,fontSize:15,fontWeight:'600',flexShrink:1},stopDistance:{color:colors.textMuted,fontSize:13}
+function buildMapHtml() {
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>html,body,#map{margin:0;width:100%;height:100%;background:#eef2f6} .leaflet-control-zoom{border:0!important;box-shadow:0 2px 10px rgba(20,32,51,.14)!important}.leaflet-control-zoom a{border:0!important;color:#142033!important}.stop-label{font:700 11px system-ui,sans-serif;color:#142033;background:#fff;border:1px solid #e1e7ef;border-radius:10px;padding:4px 7px;box-shadow:0 2px 7px rgba(20,32,51,.12)}.bus-label{font:800 11px system-ui,sans-serif;color:#fff;background:#1769e0;border-radius:8px;padding:3px 6px;border:2px solid #fff;box-shadow:0 2px 6px rgba(20,32,51,.18)}</style></head><body><div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
+const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5}).setView([28.6139,77.209],13);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,keepBuffer:2,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
+const stopLayer=L.layerGroup().addTo(map); const busLayer=L.layerGroup().addTo(map); let userLayer=L.layerGroup().addTo(map); let hasCentered=false;
+window.updateMap=function(data){
+  stopLayer.clearLayers(); busLayer.clearLayers(); userLayer.clearLayers();
+  const stopIcon=L.divIcon({className:'',html:'<div class="stop-label">● Stop</div>',iconSize:[55,24],iconAnchor:[8,12]});
+  data.stops.forEach(s=>L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup('<b>'+escapeHtml(s.name)+'</b><br><button onclick="openStop(\\''+s.id+'\\')">View stop</button>'));
+  data.buses.forEach(v=>L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label">'+escapeHtml(v.route||'BUS')+'</div>',iconSize:[52,24],iconAnchor:[26,12]})}).addTo(busLayer).bindPopup(escapeHtml(v.route||'Live bus')));
+  if(data.location){L.circleMarker([data.location.lat,data.location.lon],{radius:8,color:'#1769e0',weight:3,fillColor:'#fff',fillOpacity:1}).addTo(userLayer); if(!hasCentered){map.setView([data.location.lat,data.location.lon],14);hasCentered=true;}}
+};
+function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}
+function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+</script></body></html>`;
+}
+
+const styles = StyleSheet.create({
+  safe:{flex:1,backgroundColor:colors.background},
+  header:{paddingHorizontal:20,paddingTop:10,paddingBottom:4,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
+  brand:{fontSize:23,fontWeight:'900',letterSpacing:1,color:colors.text},tagline:{fontSize:12,color:colors.textMuted,marginTop:2},
+  searchBar:{marginHorizontal:20,marginTop:12,height:52,borderRadius:17,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,flexDirection:'row',alignItems:'center',paddingHorizontal:15},
+  searchIcon:{fontSize:27,color:colors.text,marginRight:8,marginTop:-3},searchPlaceholder:{fontSize:15,color:colors.textMuted},
+  chips:{flexDirection:'row',gap:8,paddingHorizontal:20,paddingTop:10,paddingBottom:8},chip:{paddingHorizontal:17,paddingVertical:9,borderRadius:999,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},chipActive:{backgroundColor:colors.accent,borderColor:colors.accent},chipText:{color:colors.text,fontWeight:'700',fontSize:13},chipActiveText:{color:'#fff',fontWeight:'800',fontSize:13},
+  mapWrap:{marginHorizontal:16,height:285,borderRadius:20,overflow:'hidden',backgroundColor:'#eef2f6',borderWidth:1,borderColor:colors.border},map:{flex:1},
+  mapAttribution:{position:'absolute',right:8,bottom:7,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:6,paddingVertical:2,borderRadius:4},mapAttributionText:{fontSize:8,color:'#4a5568'},mapBadge:{position:'absolute',left:10,top:10,backgroundColor:'rgba(255,255,255,.95)',paddingHorizontal:9,paddingVertical:6,borderRadius:10},mapBadgeText:{fontSize:11,fontWeight:'700',color:colors.text},locationNotice:{position:'absolute',left:12,right:12,bottom:12,backgroundColor:'#fff',borderRadius:12,padding:10,borderWidth:1,borderColor:colors.border,flexDirection:'row',justifyContent:'space-between'},locationNoticeText:{color:colors.textMuted,fontSize:12},locationRetry:{color:colors.accent,fontWeight:'800',fontSize:12},
+  sectionHeader:{paddingHorizontal:20,paddingTop:15,paddingBottom:8,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{fontSize:18,fontWeight:'800',color:colors.text},
+  quickGrid:{paddingHorizontal:20,flexDirection:'row',flexWrap:'wrap',gap:10},quickCard:{width:'48%',minHeight:86,borderRadius:15,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,padding:12},quickIcon:{fontSize:18,color:colors.accent,fontWeight:'900'},quickTitle:{fontSize:14,fontWeight:'800',color:colors.text,marginTop:5},quickSub:{fontSize:11,color:colors.textMuted,marginTop:2},
+  list:{paddingHorizontal:20,paddingBottom:30},stopCard:{backgroundColor:colors.surface,borderRadius:15,borderWidth:1,borderColor:colors.border,padding:12,marginBottom:8,flexDirection:'row',alignItems:'center'},stopPin:{width:34,height:34,borderRadius:17,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},stopPinText:{color:colors.accent,fontSize:13},stopInfo:{flex:1,marginLeft:10},stopName:{fontSize:14,fontWeight:'800',color:colors.text},stopDistance:{fontSize:12,color:colors.textMuted,marginTop:2},chevron:{fontSize:26,color:colors.textMuted,marginLeft:8},emptyText:{color:colors.textMuted,fontSize:13,paddingBottom:20}
 });
