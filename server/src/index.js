@@ -80,6 +80,48 @@ async function getRealtimeVehicles() {
   }
 }
 
+// Background cache: poll DTC on a fixed interval instead of on every request.
+// A slow/flaky DTC response then never blocks or fails a user's request -
+// they always get whatever the last good snapshot was.
+const realtimeCache = {
+  vehicles: [],
+  status: 'INIT',
+  reason: null,
+  fetchedAt: null
+};
+
+async function refreshRealtimeCache() {
+  try {
+    const vehicles = await getRealtimeVehicles();
+    realtimeCache.vehicles = vehicles;
+    realtimeCache.status = 'OK';
+    realtimeCache.reason = null;
+    realtimeCache.fetchedAt = new Date().toISOString();
+
+    if (pool && vehicles.length > 0) {
+      saveVehicles(vehicles).catch(error =>
+        console.error('Failed to save realtime vehicles:', error)
+      );
+    }
+  } catch (error) {
+    if (!realtimeCache.fetchedAt) {
+      realtimeCache.status = 'UNAVAILABLE';
+    }
+    realtimeCache.reason = error instanceof Error ? error.message : 'Realtime request failed';
+    console.error('Realtime poll failed:', realtimeCache.reason);
+  }
+}
+
+function startRealtimePolling() {
+  if (!process.env.DTC_API_KEY) {
+    realtimeCache.status = 'UNAVAILABLE';
+    realtimeCache.reason = 'DTC_API_KEY is not configured';
+    return;
+  }
+  refreshRealtimeCache();
+  setInterval(refreshRealtimeCache, 12000);
+}
+
 async function saveVehicles(vehicles) {
   if (!pool || vehicles.length === 0) return;
   const client = await pool.connect();
@@ -131,31 +173,22 @@ app.get('/api/status', (_req, res) => {
   });
 });
 
-app.get('/api/realtime/vehicles', async (_req, res) => {
-  try {
-    const vehicles = await Promise.race([
-      getRealtimeVehicles(),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Realtime request exceeded 20 seconds')), 20000)
-      )
-    ]);
-
-    if (pool && vehicles.length > 0) {
-      saveVehicles(vehicles).catch(error =>
-        console.error('Failed to save realtime vehicles:', error)
-      );
-    }
-
-    res.json({ status: 'OK', count: vehicles.length, vehicles });
-  } catch (error) {
-    const status = error?.code === 'NO_API_KEY' ? 503 : 502;
-    res.status(status).json({
+app.get('/api/realtime/vehicles', (_req, res) => {
+  if (realtimeCache.status === 'UNAVAILABLE' && realtimeCache.vehicles.length === 0) {
+    return res.status(503).json({
       status: 'UNAVAILABLE',
       count: 0,
       vehicles: [],
-      reason: error instanceof Error ? error.message : 'Realtime request failed'
+      reason: realtimeCache.reason || 'Realtime feed not yet available'
     });
   }
+
+  res.json({
+    status: 'OK',
+    count: realtimeCache.vehicles.length,
+    vehicles: realtimeCache.vehicles,
+    fetchedAt: realtimeCache.fetchedAt
+  });
 });
 
 app.get('/api/stops/nearby', async (req, res) => {
@@ -234,4 +267,5 @@ async function ensureStaticData() {
 }
 
 await ensureStaticData();
+startRealtimePolling();
 app.listen(port, () => console.log(`United Delhi API listening on :${port}`));
