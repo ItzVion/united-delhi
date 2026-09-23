@@ -18,6 +18,7 @@ export interface Route {
 export interface Vehicle {
   id: string;
   routeId: string | null;
+  routeShortName: string | null;
   tripId: string | null;
   stopId: string | null;
   latitude: number;
