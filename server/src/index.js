@@ -220,6 +220,115 @@ app.get('/api/stops/nearby', async (req, res) => {
   res.json({ status: 'OK', stops: result.rows });
 });
 
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = value => (value * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+app.get('/api/stops/:id/arrivals', async (req, res) => {
+  if (!pool) return res.status(503).json({ status: 'UNAVAILABLE', arrivals: [], reason: 'DATABASE_URL is not configured' });
+
+  try {
+    const stopId = String(req.params.id);
+    const result = await pool.query(
+      `SELECT route_id FROM route_stops WHERE stop_id = $1`,
+      [stopId]
+    );
+    const routeIds = new Set(result.rows.map(row => String(row.route_id)));
+    const now = Date.now();
+    const arrivals = realtimeCache.vehicles
+      .filter(vehicle => vehicle.routeId && routeIds.has(String(vehicle.routeId)));
+
+    const stop = await pool.query(`SELECT latitude, longitude FROM stops WHERE stop_id = $1`, [stopId]);
+    if (stop.rows.length === 0) {
+      return res.status(404).json({ status: 'NOT_FOUND', arrivals: [], reason: 'Stop not found' });
+    }
+    const stopLat = Number(stop.rows[0].latitude);
+    const stopLon = Number(stop.rows[0].longitude);
+
+    const output = arrivals.map(({ vehicle }) => {
+      const distanceMeters = haversineMeters(vehicle.latitude, vehicle.longitude, stopLat, stopLon);
+      const speed = Number(vehicle.speedMps);
+      const observedAt = Date.parse(vehicle.observedAt);
+      const observedAgeSeconds = Number.isFinite(observedAt) ? Math.max(0, Math.round((now - observedAt) / 1000)) : 0;
+      const canEstimate = Number.isFinite(speed) && speed > 0.5 && observedAgeSeconds <= 180;
+      return {
+        vehicleId: vehicle.id,
+        routeId: vehicle.routeId,
+        distanceMeters: Math.round(distanceMeters),
+        etaSeconds: canEstimate ? Math.max(0, Math.round(distanceMeters / speed)) : null,
+        source: canEstimate ? 'live-data-estimate' : 'live-position-no-speed',
+        observedAgeSeconds,
+        confidence: canEstimate ? 'medium' : 'low'
+      };
+    })
+      .sort((a, b) => a.distanceMeters - b.distanceMeters)
+      .slice(0, 20);
+
+    res.json({ status: 'OK', arrivals: output });
+  } catch (error) {
+    console.error('Failed to load stop arrivals:', error);
+    res.status(500).json({ status: 'ERROR', arrivals: [], reason: 'Failed to load arrivals' });
+  }
+});
+
+app.get('/api/stops/:id', async (req, res) => {
+  if (!pool) return res.status(503).json({ status: 'UNAVAILABLE', reason: 'DATABASE_URL is not configured' });
+  try {
+    const stopId = String(req.params.id);
+    const stopResult = await pool.query(
+      `SELECT stop_id, name, latitude, longitude FROM stops WHERE stop_id = $1`,
+      [stopId]
+    );
+    if (stopResult.rows.length === 0) {
+      return res.status(404).json({ status: 'NOT_FOUND', reason: 'Stop not found' });
+    }
+    const routesResult = await pool.query(
+      `SELECT r.route_id, r.short_name, r.long_name, rs.stop_sequence
+       FROM route_stops rs
+       JOIN routes r ON r.route_id = rs.route_id
+       WHERE rs.stop_id = $1
+       ORDER BY r.short_name NULLS LAST, r.route_id`,
+      [stopId]
+    );
+    res.json({ status: 'OK', stop: stopResult.rows[0], routes: routesResult.rows });
+  } catch (error) {
+    console.error('Failed to load stop:', error);
+    res.status(500).json({ status: 'ERROR', reason: 'Failed to load stop' });
+  }
+});
+
+app.get('/api/routes/:id', async (req, res) => {
+  if (!pool) return res.status(503).json({ status: 'UNAVAILABLE', reason: 'DATABASE_URL is not configured' });
+  try {
+    const routeId = String(req.params.id);
+    const routeResult = await pool.query(
+      `SELECT route_id, short_name, long_name FROM routes WHERE route_id = $1`,
+      [routeId]
+    );
+    if (routeResult.rows.length === 0) {
+      return res.status(404).json({ status: 'NOT_FOUND', reason: 'Route not found' });
+    }
+    const stopsResult = await pool.query(
+      `SELECT s.stop_id, s.name, s.latitude, s.longitude, rs.stop_sequence
+       FROM route_stops rs
+       JOIN stops s ON s.stop_id = rs.stop_id
+       WHERE rs.route_id = $1
+       ORDER BY rs.stop_sequence, s.name`,
+      [routeId]
+    );
+    const vehicles = realtimeCache.vehicles.filter(vehicle => String(vehicle.routeId || '') === routeId);
+    res.json({ status: 'OK', route: routeResult.rows[0], stops: stopsResult.rows, vehicles });
+  } catch (error) {
+    console.error('Failed to load route:', error);
+    res.status(500).json({ status: 'ERROR', reason: 'Failed to load route' });
+  }
+});
+
 app.get('/api/search', async (req, res) => {
   if (!pool) return res.status(503).json({ status: 'UNAVAILABLE', results: [], reason: 'DATABASE_URL is not configured' });
   const q = String(req.query.q || '').trim();

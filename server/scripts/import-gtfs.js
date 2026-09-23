@@ -40,6 +40,7 @@ if (!dir || arg === '--download') {
   dir = await downloadGtfs();
 }
 
+console.log('Parsing GTFS files...');
 const stops = parseStops(readGtfsCsv(dir, 'stops.txt'));
 const routes = parseRoutes(readGtfsCsv(dir, 'routes.txt'));
 const stopTimes = readGtfsCsv(dir, 'stop_times.txt');
@@ -49,51 +50,75 @@ const client = await pool.connect();
 try {
   await client.query('BEGIN');
 
-  for (const row of routes) {
+  // Batch insert routes in chunks of 300 rows (900 parameters)
+  const ROUTE_CHUNK_SIZE = 300;
+  for (let i = 0; i < routes.length; i += ROUTE_CHUNK_SIZE) {
+    const chunk = routes.slice(i, i + ROUTE_CHUNK_SIZE);
+    const values = [];
+    const placeholders = chunk.map((row, index) => {
+      const base = index * 3;
+      values.push(row.routeId, row.shortName, row.longName);
+      return `($${base + 1},$${base + 2},$${base + 3})`;
+    }).join(',');
+
     await client.query(
-      `INSERT INTO routes(route_id, short_name, long_name) VALUES($1,$2,$3)
+      `INSERT INTO routes(route_id, short_name, long_name) VALUES ${placeholders}
        ON CONFLICT(route_id) DO UPDATE SET
          short_name=EXCLUDED.short_name,
          long_name=EXCLUDED.long_name,
          updated_at=NOW()`,
-      [row.routeId, row.shortName, row.longName]
+      values
     );
   }
+  console.log(`Successfully upserted ${routes.length} routes.`);
 
-  for (const row of stops) {
+  // Batch insert stops in chunks of 300 rows (1200 parameters)
+  const STOP_CHUNK_SIZE = 300;
+  for (let i = 0; i < stops.length; i += STOP_CHUNK_SIZE) {
+    const chunk = stops.slice(i, i + STOP_CHUNK_SIZE);
+    const values = [];
+    const placeholders = chunk.map((row, index) => {
+      const base = index * 4;
+      values.push(row.stopId, row.name, row.lat, row.lon);
+      return `($${base + 1},$${base + 2},$${base + 3},$${base + 4})`;
+    }).join(',');
+
     await client.query(
-      `INSERT INTO stops(stop_id,name,latitude,longitude) VALUES($1,$2,$3,$4)
+      `INSERT INTO stops(stop_id, name, latitude, longitude) VALUES ${placeholders}
        ON CONFLICT(stop_id) DO UPDATE SET
          name=EXCLUDED.name,
          latitude=EXCLUDED.latitude,
          longitude=EXCLUDED.longitude,
          updated_at=NOW()`,
-      [row.stopId, row.name, row.lat, row.lon]
+      values
     );
   }
+  console.log(`Successfully upserted ${stops.length} stops.`);
 
   await client.query('DELETE FROM route_stops');
 
+  // Batch insert route_stops in chunks of 300 rows (900 parameters)
   const rows = buildRouteStops(trips, stopTimes);
-  for (let i = 0; i < rows.length; i += 500) {
-    const chunk = rows.slice(i, i + 500);
+  const ROUTE_STOP_CHUNK_SIZE = 300;
+  for (let i = 0; i < rows.length; i += ROUTE_STOP_CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + ROUTE_STOP_CHUNK_SIZE);
     const values = [];
     const placeholders = chunk.map((row, index) => {
       const base = index * 3;
       values.push(row.routeId, row.stopId, row.stopSequence);
-      return `(${base + 1},${base + 2},${base + 3})`;
+      return `($${base + 1},$${base + 2},$${base + 3})`;
     }).join(',');
 
     await client.query(
-      `INSERT INTO route_stops(route_id,stop_id,stop_sequence) VALUES ${placeholders}
-       ON CONFLICT(route_id,stop_id)
-       DO UPDATE SET stop_sequence=LEAST(route_stops.stop_sequence,EXCLUDED.stop_sequence)`,
+      `INSERT INTO route_stops(route_id, stop_id, stop_sequence) VALUES ${placeholders}
+       ON CONFLICT(route_id, stop_id)
+       DO UPDATE SET stop_sequence=LEAST(route_stops.stop_sequence, EXCLUDED.stop_sequence)`,
       values
     );
   }
 
   await client.query('COMMIT');
-  console.log(`Imported ${stops.length} stops, ${routes.length} routes and ${rows.length} route-stop links.`);
+  console.log(`Import completed successfully: ${stops.length} stops, ${routes.length} routes, and ${rows.length} route-stop links.`);
 } catch (error) {
   await client.query('ROLLBACK');
   throw error;
