@@ -43,20 +43,48 @@ export default function HomeScreen() {
       }
 
       setLocationStatus('Getting your location…');
-      const current = await Promise.race([
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Location request timed out')), 10000))
-      ]);
 
-      setLocation(current);
-      setLocationReady(true);
-      setLocationStatus('');
-      mapRef.current?.animateToRegion({
-        latitude: current.coords.latitude,
-        longitude: current.coords.longitude,
-        latitudeDelta: 0.03,
-        longitudeDelta: 0.03
-      }, 400);
+      // Use a recent cached location immediately so the app does not sit on
+      // the location screen while Android acquires a fresh GPS fix.
+      const lastKnown = await Location.getLastKnownPositionAsync({
+        maxAge: 5 * 60 * 1000,
+        requiredAccuracy: 2000
+      });
+
+      if (lastKnown) {
+        setLocation(lastKnown);
+        setLocationReady(true);
+        setLocationStatus('');
+        mapRef.current?.animateToRegion({
+          latitude: lastKnown.coords.latitude,
+          longitude: lastKnown.coords.longitude,
+          latitudeDelta: 0.03,
+          longitudeDelta: 0.03
+        }, 400);
+      }
+
+      try {
+        const current = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Location request timed out')), 10000))
+        ]);
+
+        setLocation(current);
+        setLocationReady(true);
+        setLocationStatus('');
+        mapRef.current?.animateToRegion({
+          latitude: current.coords.latitude,
+          longitude: current.coords.longitude,
+          latitudeDelta: 0.03,
+          longitudeDelta: 0.03
+        }, 400);
+      } catch (error) {
+        if (lastKnown) {
+          setLocationStatus('');
+          return;
+        }
+        throw error;
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       setLocationStatus(
