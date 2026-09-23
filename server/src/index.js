@@ -36,6 +36,7 @@ function entityToVehicle(entity) {
   return {
     id: String(descriptor.id || vehicle.id || entity.id || ''),
     routeId: ok(trip.routeId) ? String(trip.routeId) : null,
+    routeShortName: null,
     tripId: ok(trip.tripId) ? String(trip.tripId) : null,
     stopId: ok(vehicle.stopId) ? String(vehicle.stopId) : null,
     latitude: lat,
@@ -69,7 +70,26 @@ async function getRealtimeVehicles() {
 
     const buffer = new Uint8Array(await upstream.arrayBuffer());
     const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(buffer);
-    return feed.entity.map(entityToVehicle).filter(Boolean).filter(vehicle => vehicle.id);
+    const vehicles = feed.entity.map(entityToVehicle).filter(Boolean).filter(vehicle => vehicle.id);
+
+    // GTFS-RT trip.routeId is the internal route_id (for example 2227),
+    // while users should see the public DTC route number (for example 741).
+    // Resolve the internal ID to routes.short_name once per realtime refresh.
+    if (pool && vehicles.length > 0) {
+      const routeIds = [...new Set(vehicles.map(vehicle => vehicle.routeId).filter(Boolean))];
+      if (routeIds.length > 0) {
+        const result = await pool.query(
+          `SELECT route_id, short_name FROM routes WHERE route_id = ANY($1::text[])`,
+          [routeIds]
+        );
+        const routeNames = new Map(result.rows.map(row => [String(row.route_id), row.short_name ? String(row.short_name) : null]));
+        for (const vehicle of vehicles) {
+          vehicle.routeShortName = vehicle.routeId ? routeNames.get(String(vehicle.routeId)) || null : null;
+        }
+      }
+    }
+
+    return vehicles;
   } catch (error) {
     if (error?.name === 'AbortError') {
       throw new Error('OTD realtime feed timed out after 15 seconds');
