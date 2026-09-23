@@ -108,7 +108,19 @@ export default function HomeScreen() {
         lon: location?.coords.longitude ?? DELHI_REGION.longitude
       },
       stops: nearbyStops.map(s => ({ id: s.stop_id, name: s.name, lat: s.latitude, lon: s.longitude })),
-      buses: vehicles.slice(0, 250).map(v => ({ id: v.id, route: v.routeShortName || v.routeId, lat: v.latitude, lon: v.longitude })),
+      buses: [...vehicles]
+        .sort((a, b) => {
+          const centerLat = location?.coords.latitude ?? DELHI_REGION.latitude;
+          const centerLon = location?.coords.longitude ?? DELHI_REGION.longitude;
+          const distance = (v: Vehicle) => {
+            const dLat = v.latitude - centerLat;
+            const dLon = (v.longitude - centerLon) * Math.cos(centerLat * Math.PI / 180);
+            return dLat * dLat + dLon * dLon;
+          };
+          return distance(a) - distance(b);
+        })
+        .slice(0, 250)
+        .map(v => ({ id: v.id, route: v.routeShortName || v.routeId, lat: v.latitude, lon: v.longitude })),
       location: location ? { lat: location.coords.latitude, lon: location.coords.longitude } : null
     };
     mapRef.current?.injectJavaScript(`window.updateMap(${JSON.stringify(payload)}); true;`);
