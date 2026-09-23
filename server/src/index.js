@@ -107,6 +107,10 @@ async function saveVehicles(vehicles) {
   }
 }
 
+app.get('/', (_req, res) => {
+  res.status(200).json({ ok: true, service: 'united-delhi-api' });
+});
+
 app.get('/health', async (_req, res) => {
   let database = 'not_configured';
   if (pool) {
