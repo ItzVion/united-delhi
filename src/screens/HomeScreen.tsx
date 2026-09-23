@@ -147,10 +147,9 @@ export default function HomeScreen() {
         <Text style={styles.searchPlaceholder}>Search routes, stops or places</Text>
       </Pressable>
 
-      <View style={styles.chips}>
-        <Pressable style={[styles.chip, styles.chipActive]}><Text style={styles.chipActiveText}>Buses</Text></Pressable>
-        <Pressable style={styles.chip} onPress={() => navigation.navigate('Search')}><Text style={styles.chipText}>Routes</Text></Pressable>
-        <Pressable style={styles.chip} onPress={() => location && loadNearbyStops(location.coords.latitude, location.coords.longitude)}><Text style={styles.chipText}>Nearby</Text></Pressable>
+      <View style={styles.helperRow}>
+        <Text style={styles.helperText}>Live buses near you</Text>
+        <Pressable onPress={requestLocation}><Text style={styles.locationLink}>Use my location</Text></Pressable>
       </View>
 
       <View style={styles.mapWrap}>
@@ -183,22 +182,23 @@ export default function HomeScreen() {
         ) : null}
       </View>
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Quick access</Text>
-      </View>
-      <View style={styles.quickGrid}>
-        <Pressable style={styles.quickCard} onPress={() => navigation.navigate('Search')}>
-          <Text style={styles.quickIcon}>⌕</Text><Text style={styles.quickTitle}>Route search</Text><Text style={styles.quickSub}>500+ routes</Text>
+      <View style={styles.actionRow}>
+        <Pressable style={styles.actionButton} onPress={() => navigation.navigate('Search')}>
+          <Text style={styles.actionIcon}>⌕</Text>
+          <View style={styles.actionCopy}>
+            <Text style={styles.actionTitle}>Find a route</Text>
+            <Text style={styles.actionSub}>Search buses and stops</Text>
+          </View>
+          <Text style={styles.actionArrow}>›</Text>
         </Pressable>
-        <Pressable style={styles.quickCard} onPress={() => location && loadNearbyStops(location.coords.latitude, location.coords.longitude)}>
-          <Text style={[styles.quickIcon, { color: colors.success }]}>●</Text><Text style={styles.quickTitle}>Nearby stops</Text><Text style={styles.quickSub}>Around you</Text>
+        <Pressable style={styles.actionButton} onPress={() => location && loadNearbyStops(location.coords.latitude, location.coords.longitude)}>
+          <Text style={[styles.actionIcon, { color: colors.success }]}>●</Text>
+          <View style={styles.actionCopy}>
+            <Text style={styles.actionTitle}>Nearby stops</Text>
+            <Text style={styles.actionSub}>Stops around you</Text>
+          </View>
+          <Text style={styles.actionArrow}>›</Text>
         </Pressable>
-        <View style={styles.quickCard}>
-          <Text style={[styles.quickIcon, { color: colors.warning }]}>●</Text><Text style={styles.quickTitle}>Live buses</Text><Text style={styles.quickSub}>{vehicles.length || 0} currently reporting</Text>
-        </View>
-        <View style={styles.quickCard}>
-          <Text style={[styles.quickIcon, { color: colors.accent }]}>i</Text><Text style={styles.quickTitle}>Network status</Text><Text style={styles.quickSub}>{vehiclesFreshness === 'ok' ? 'Realtime connected' : 'Realtime unavailable'}</Text>
-        </View>
       </View>
 
       <View style={styles.sectionHeader}>
@@ -251,10 +251,10 @@ const styles = StyleSheet.create({
   brand:{fontSize:23,fontWeight:'900',letterSpacing:1,color:colors.text},tagline:{fontSize:12,color:colors.textMuted,marginTop:2},
   searchBar:{marginHorizontal:20,marginTop:12,height:52,borderRadius:17,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,flexDirection:'row',alignItems:'center',paddingHorizontal:15},
   searchIcon:{fontSize:27,color:colors.text,marginRight:8,marginTop:-3},searchPlaceholder:{fontSize:15,color:colors.textMuted},
-  chips:{flexDirection:'row',gap:8,paddingHorizontal:20,paddingTop:10,paddingBottom:8},chip:{paddingHorizontal:17,paddingVertical:9,borderRadius:999,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},chipActive:{backgroundColor:colors.accent,borderColor:colors.accent},chipText:{color:colors.text,fontWeight:'700',fontSize:13},chipActiveText:{color:'#fff',fontWeight:'800',fontSize:13},
-  mapWrap:{marginHorizontal:16,height:285,borderRadius:20,overflow:'hidden',backgroundColor:'#eef2f6',borderWidth:1,borderColor:colors.border},map:{flex:1},
+  helperRow:{paddingHorizontal:20,paddingTop:10,paddingBottom:8,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},helperText:{fontSize:13,color:colors.textMuted,fontWeight:'600'},locationLink:{fontSize:13,color:colors.accent,fontWeight:'800'},
+  mapWrap:{marginHorizontal:16,height:315,borderRadius:20,overflow:'hidden',backgroundColor:'#eef2f6',borderWidth:1,borderColor:colors.border},map:{flex:1},
   mapAttribution:{position:'absolute',right:8,bottom:7,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:6,paddingVertical:2,borderRadius:4},mapAttributionText:{fontSize:8,color:'#4a5568'},mapBadge:{position:'absolute',left:10,top:10,backgroundColor:'rgba(255,255,255,.95)',paddingHorizontal:9,paddingVertical:6,borderRadius:10},mapBadgeText:{fontSize:11,fontWeight:'700',color:colors.text},locationNotice:{position:'absolute',left:12,right:12,bottom:12,backgroundColor:'#fff',borderRadius:12,padding:10,borderWidth:1,borderColor:colors.border,flexDirection:'row',justifyContent:'space-between'},locationNoticeText:{color:colors.textMuted,fontSize:12},locationRetry:{color:colors.accent,fontWeight:'800',fontSize:12},
-  sectionHeader:{paddingHorizontal:20,paddingTop:15,paddingBottom:8,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{fontSize:18,fontWeight:'800',color:colors.text},
-  quickGrid:{paddingHorizontal:20,flexDirection:'row',flexWrap:'wrap',gap:10},quickCard:{width:'48%',minHeight:86,borderRadius:15,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,padding:12},quickIcon:{fontSize:18,color:colors.accent,fontWeight:'900'},quickTitle:{fontSize:14,fontWeight:'800',color:colors.text,marginTop:5},quickSub:{fontSize:11,color:colors.textMuted,marginTop:2},
+  sectionHeader:{paddingHorizontal:20,paddingTop:16,paddingBottom:8,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{fontSize:19,fontWeight:'800',color:colors.text},
+  actionRow:{paddingHorizontal:20,paddingTop:4,gap:8},actionButton:{minHeight:64,borderRadius:15,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,paddingHorizontal:13,flexDirection:'row',alignItems:'center'},actionIcon:{fontSize:20,color:colors.accent,fontWeight:'900',width:30,textAlign:'center'},actionCopy:{flex:1,marginLeft:7},actionTitle:{fontSize:14,fontWeight:'800',color:colors.text},actionSub:{fontSize:11,color:colors.textMuted,marginTop:2},actionArrow:{fontSize:25,color:colors.textMuted},
   list:{paddingHorizontal:20,paddingBottom:30},stopCard:{backgroundColor:colors.surface,borderRadius:15,borderWidth:1,borderColor:colors.border,padding:12,marginBottom:8,flexDirection:'row',alignItems:'center'},stopPin:{width:34,height:34,borderRadius:17,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},stopPinText:{color:colors.accent,fontSize:13},stopInfo:{flex:1,marginLeft:10},stopName:{fontSize:14,fontWeight:'800',color:colors.text},stopDistance:{fontSize:12,color:colors.textMuted,marginTop:2},chevron:{fontSize:26,color:colors.textMuted,marginLeft:8},emptyText:{color:colors.textMuted,fontSize:13,paddingBottom:20}
 });
