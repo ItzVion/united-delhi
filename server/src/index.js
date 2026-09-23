@@ -162,17 +162,21 @@ app.get('/api/stops/nearby', async (req, res) => {
   if (lat === null || lon === null) return res.status(400).json({ status: 'ERROR', reason: 'lat and lon are required', stops: [] });
 
   const result = await pool.query(
-    `SELECT DISTINCT ON (LOWER(TRIM(name)))
-       stop_id, name, latitude, longitude, distance_m
+    `SELECT stop_id, name, latitude, longitude, distance_m
      FROM (
-       SELECT stop_id, name, latitude, longitude,
-         (6371000 * acos(LEAST(1, GREATEST(-1,
-           sin(radians($1))*sin(radians(latitude)) +
-           cos(radians($1))*cos(radians(latitude))*cos(radians(longitude)-radians($2))
-         )))) AS distance_m
-       FROM stops
-     ) nearby
-     ORDER BY LOWER(TRIM(name)), distance_m
+       SELECT DISTINCT ON (LOWER(TRIM(name)))
+         stop_id, name, latitude, longitude, distance_m
+       FROM (
+         SELECT stop_id, name, latitude, longitude,
+           (6371000 * acos(LEAST(1, GREATEST(-1,
+             sin(radians($1))*sin(radians(latitude)) +
+             cos(radians($1))*cos(radians(latitude))*cos(radians(longitude)-radians($2))
+           )))) AS distance_m
+         FROM stops
+       ) calculated
+       ORDER BY LOWER(TRIM(name)), distance_m
+     ) unique_stops
+     ORDER BY distance_m
      LIMIT $3`,
     [lat, lon, limit]
   );
