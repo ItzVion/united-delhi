@@ -51,25 +51,30 @@ export function buildRouteStops(trips, stopTimes) {
     if (tripId && routeId) tripToRoute.set(tripId, routeId);
   }
 
-  const rows = [];
+  // A route can visit the same stop across many trips. route_stops has a
+  // unique (route_id, stop_id) key, so collapse duplicates before batching
+  // them into a single INSERT. Keep the earliest sequence for that route/stop.
+  const routeStops = new Map();
+
   for (const stopTime of stopTimes) {
     const tripId = String(stopTime.trip_id ?? '').trim();
     const stopId = String(stopTime.stop_id ?? '').trim();
     const routeId = tripToRoute.get(tripId);
     const sequence = Number(stopTime.stop_sequence);
 
-    if (
-      routeId &&
-      stopId &&
-      Number.isFinite(sequence)
-    ) {
-      rows.push({
-        routeId,
-        stopId,
-        stopSequence: sequence
-      });
+    if (routeId && stopId && Number.isFinite(sequence)) {
+      const key = `${routeId}\u0000${stopId}`;
+      const existing = routeStops.get(key);
+
+      if (!existing || sequence < existing.stopSequence) {
+        routeStops.set(key, {
+          routeId,
+          stopId,
+          stopSequence: sequence
+        });
+      }
     }
   }
 
-  return rows;
+  return [...routeStops.values()];
 }
