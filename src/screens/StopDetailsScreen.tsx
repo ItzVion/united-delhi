@@ -1,25 +1,157 @@
-import React,{useCallback,useEffect,useState} from 'react';
-import {ActivityIndicator,Pressable,SafeAreaView,ScrollView,StyleSheet,Text,View} from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
-import {useNavigation,useRoute,RouteProp} from '@react-navigation/native';
-import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {api,Arrival,Route as ApiRoute,Stop} from '../api/client';
-import {colors} from '../theme';
-import {StatusPill} from '../components/StatusPill';
-import {computeSmartLeave,SmartLeaveResult} from '../lib/smartLeave';
-import {formatDuration,haversineMeters,walkingSeconds} from '../lib/geo';
-import type {RootStackParamList} from '../navigation/types';
-type Nav=NativeStackNavigationProp<RootStackParamList,'StopDetails'>; type StopRoute=RouteProp<RootStackParamList,'StopDetails'>;
-export default function StopDetailsScreen(){
- const navigation=useNavigation<Nav>();const {params}=useRoute<StopRoute>();const {stopId,stopName}=params;
- const [stop,setStop]=useState<Stop|null>(null),[routes,setRoutes]=useState<ApiRoute[]>([]),[arrivals,setArrivals]=useState<Arrival[]>([]),[arrivalsReason,setArrivalsReason]=useState<string|null>(null),[loading,setLoading]=useState(true),[smartLeave,setSmartLeave]=useState<SmartLeaveResult|null>(null),[smartLeaveError,setSmartLeaveError]=useState<string|null>(null),[computingSmartLeave,setComputingSmartLeave]=useState(false);
- const load=useCallback(async()=>{setLoading(true);try{const [stopResult,arrivalsResult]=await Promise.all([api.stop(stopId),api.arrivals(stopId)]);if(stopResult.status==='OK'){setStop(stopResult.stop);setRoutes(stopResult.routes);}if(arrivalsResult.status==='OK'){setArrivals(arrivalsResult.arrivals);setArrivalsReason(null);}else{setArrivals([]);setArrivalsReason(arrivalsResult.reason||'Live arrival data is unavailable.');}}catch(error){setArrivalsReason((error as Error).message);}finally{setLoading(false);}},[stopId]);
- useEffect(()=>{load();const interval=setInterval(load,20000);return()=>clearInterval(interval);},[load]);
- const runSmartLeave=useCallback(async()=>{if(!stop)return;setComputingSmartLeave(true);setSmartLeaveError(null);try{const permission=await Location.requestForegroundPermissionsAsync();if(permission.status!=='granted'){setSmartLeaveError('Location permission is needed to estimate your walk to the stop.');return;}const current=await Location.getCurrentPositionAsync({accuracy:Location.Accuracy.Balanced});const distance=haversineMeters(current.coords.latitude,current.coords.longitude,stop.latitude,stop.longitude);const walkSeconds=walkingSeconds(distance);setSmartLeave(computeSmartLeave(arrivals,walkSeconds));}catch{setSmartLeaveError('Could not get your location for Smart Leave.');}finally{setComputingSmartLeave(false);}},[stop,arrivals]);
- return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content}><Pressable onPress={()=>navigation.goBack()}><Text style={styles.back}>Back</Text></Pressable><Text style={styles.title}>{stop?.name||stopName||'Stop'}</Text>{loading?<ActivityIndicator color={colors.accent} style={{marginTop:12}}/>:null}
- <View style={styles.section}><Text style={styles.sectionTitle}>Routes serving this stop</Text>{routes.length===0&&!loading?<Text style={styles.mutedText}>No routes found for this stop yet.</Text>:null}<View style={styles.routeChips}>{routes.map(r=><Pressable key={r.route_id} style={styles.chip} onPress={()=>navigation.navigate('RouteDetails',{routeId:r.route_id,label:r.short_name||r.route_id})}><Text style={styles.chipText}>{r.short_name||r.route_id}</Text></Pressable>)}</View></View>
- <View style={styles.section}><View style={styles.sectionHeaderRow}><Text style={styles.sectionTitle}>Live arrivals</Text><StatusPill label={arrivalsReason?'Unavailable':`${arrivals.length} live`} tone={arrivalsReason?'danger':arrivals.length>0?'ok':'muted'}/></View>{arrivalsReason?<Text style={styles.mutedText}>{arrivalsReason}</Text>:null}{arrivals.length===0&&!arrivalsReason&&!loading?<Text style={styles.mutedText}>No buses on this stop's routes are reporting position right now.</Text>:null}{arrivals.map(a=><View key={a.vehicleId} style={styles.arrivalRow}><Text style={styles.arrivalRoute}>{a.routeId||'Unknown route'}</Text><Text style={styles.arrivalEta}>{a.etaSeconds!==null?formatDuration(a.etaSeconds):`${Math.round(a.distanceMeters)} m away`}</Text><Text style={styles.arrivalMeta}>{a.source==='live-data-estimate'?'Live estimate':'Live position, no speed'} · {a.confidence} confidence · {a.observedAgeSeconds}s old</Text></View>)}</View>
- <View style={styles.section}><Text style={styles.sectionTitle}>Smart Leave</Text><Text style={styles.mutedText}>Combines your walk to this stop, the nearest live bus, and a safety buffer. Never a guess.</Text><Pressable style={styles.smartLeaveButton} onPress={runSmartLeave} disabled={computingSmartLeave}>{computingSmartLeave?<ActivityIndicator color={colors.accentDark}/>:<Text style={styles.smartLeaveButtonText}>When should I leave?</Text>}</Pressable>{smartLeaveError?<Text style={styles.errorText}>{smartLeaveError}</Text>:null}{smartLeave?<View style={styles.smartLeaveResult}>{smartLeave.status==='insufficient-data'?<Text style={styles.smartLeaveHeadline}>Not enough live data</Text>:smartLeave.status==='leave-now'?<Text style={styles.smartLeaveHeadline}>Leave now</Text>:<Text style={styles.smartLeaveHeadline}>Leave in {formatDuration(smartLeave.leaveInSeconds||0)}</Text>}<Text style={styles.mutedText}>{smartLeave.explanation}</Text><Text style={styles.smartLeaveDetail}>Walk time ~{formatDuration(smartLeave.walkingSeconds)} · safety buffer {formatDuration(smartLeave.safetyBufferSeconds)}{smartLeave.arrivalEtaSeconds!==null?` · bus ETA ~${formatDuration(smartLeave.arrivalEtaSeconds)}`:''}</Text></View>:null}</View>
- </ScrollView></SafeAreaView>;
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { api, Arrival, Route as ApiRoute, Stop } from '../api/client';
+import { colors } from '../theme';
+import { StatusPill } from '../components/StatusPill';
+import { computeSmartLeave, SmartLeaveResult } from '../lib/smartLeave';
+import { formatDuration, haversineMeters, walkingSeconds } from '../lib/geo';
+import type { RootStackParamList } from '../navigation/types';
+
+type Nav = NativeStackNavigationProp<RootStackParamList, 'StopDetails'>;
+type StopRoute = RouteProp<RootStackParamList, 'StopDetails'>;
+
+export default function StopDetailsScreen() {
+  const navigation = useNavigation<Nav>();
+  const { params } = useRoute<StopRoute>();
+  const { stopId, stopName } = params;
+  const [stop, setStop] = useState<Stop | null>(null);
+  const [routes, setRoutes] = useState<ApiRoute[]>([]);
+  const [arrivals, setArrivals] = useState<Arrival[]>([]);
+  const [arrivalsReason, setArrivalsReason] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [smartLeave, setSmartLeave] = useState<SmartLeaveResult | null>(null);
+  const [smartLeaveError, setSmartLeaveError] = useState<string | null>(null);
+  const [computingSmartLeave, setComputingSmartLeave] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [stopResult, arrivalsResult] = await Promise.all([api.stop(stopId), api.arrivals(stopId)]);
+      if (stopResult.status === 'OK') {
+        setStop(stopResult.stop);
+        setRoutes(stopResult.routes);
+      }
+      if (arrivalsResult.status === 'OK') {
+        setArrivals(arrivalsResult.arrivals);
+        setArrivalsReason(null);
+      } else {
+        setArrivals([]);
+        setArrivalsReason(arrivalsResult.reason || 'Live arrival data is unavailable.');
+      }
+    } catch (error) {
+      setArrivalsReason((error as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [stopId]);
+
+  useEffect(() => {
+    setLoading(true);
+    load();
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  const runSmartLeave = useCallback(async () => {
+    if (!stop) return;
+    setComputingSmartLeave(true);
+    setSmartLeaveError(null);
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        setSmartLeaveError('Location permission is needed to estimate your walk.');
+        return;
+      }
+      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const distance = haversineMeters(current.coords.latitude, current.coords.longitude, stop.latitude, stop.longitude);
+      setSmartLeave(computeSmartLeave(arrivals, walkingSeconds(distance)));
+    } catch {
+      setSmartLeaveError('Could not get your location for Smart Leave.');
+    } finally {
+      setComputingSmartLeave(false);
+    }
+  }, [stop, arrivals]);
+
+  const title = stop?.name || stopName || 'Bus stop';
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.topBar}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backButton}><Text style={styles.back}>‹</Text></Pressable>
+          <View style={styles.topTitle}><Text style={styles.eyebrow}>BUS STOP</Text><Text style={styles.title} numberOfLines={2}>{title}</Text></View>
+        </View>
+
+        <View style={styles.hero}>
+          <View style={styles.pin}><Text style={styles.pinText}>●</Text></View>
+          <View style={styles.heroText}><Text style={styles.heroTitle}>{title}</Text><Text style={styles.heroSub}>{stop ? 'DTC stop' : 'Loading stop details…'}</Text></View>
+          {arrivalsReason ? <StatusPill label="Live unavailable" tone="danger" /> : <StatusPill label="Live" tone="ok" />}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Buses at this stop</Text><Text style={styles.refreshText}>Updates every 30s</Text></View>
+          {loading ? <ActivityIndicator color={colors.accent} style={{ marginVertical: 18 }} /> : null}
+          {arrivalsReason ? <Text style={styles.muted}>{arrivalsReason}</Text> : null}
+          {!loading && !arrivalsReason && arrivals.length === 0 ? <Text style={styles.muted}>No live buses are reporting on these routes right now.</Text> : null}
+          {arrivals.map((a, index) => (
+            <View key={a.vehicleId} style={styles.arrival}>
+              <View style={[styles.busIcon, { backgroundColor: index % 2 ? colors.accentSoft : colors.warningSoft }]}><Text style={{ color: index % 2 ? colors.accent : colors.warning, fontWeight: '900' }}>BUS</Text></View>
+              <View style={styles.arrivalMain}>
+                <Text style={styles.route}>{a.routeId || 'Unknown route'}</Text>
+                <Text style={styles.arrivalMeta}>{a.source === 'live-data-estimate' ? 'Live estimate' : 'Live position'} · {a.observedAgeSeconds}s old</Text>
+              </View>
+              <View style={styles.etaBox}>
+                <Text style={styles.eta}>{a.etaSeconds !== null ? formatDuration(a.etaSeconds) : `${Math.round(a.distanceMeters)} m`}</Text>
+                <Text style={styles.confidence}>{a.confidence} confidence</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Routes at this stop</Text><Text style={styles.count}>{routes.length}</Text></View>
+          <View style={styles.routeList}>
+            {routes.map(r => (
+              <Pressable key={r.route_id} style={styles.routeCard} onPress={() => navigation.navigate('RouteDetails', { routeId: r.route_id, label: r.short_name || r.route_id })}>
+                <View style={styles.routeNumber}><Text style={styles.routeNumberText}>{r.short_name || r.route_id}</Text></View>
+                <View style={styles.routeText}><Text style={styles.routeName}>{r.long_name || 'DTC route'}</Text><Text style={styles.routeHint}>View route details</Text></View>
+                <Text style={styles.chevron}>›</Text>
+              </Pressable>
+            ))}
+          </View>
+          {!loading && routes.length === 0 ? <Text style={styles.muted}>No routes found for this stop.</Text> : null}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Smart Leave</Text>
+          <Text style={styles.muted}>Estimate when to leave based on your walking time, the nearest live bus and a safety buffer.</Text>
+          <Pressable style={styles.smartButton} onPress={runSmartLeave} disabled={computingSmartLeave}>
+            {computingSmartLeave ? <ActivityIndicator color="#fff" /> : <Text style={styles.smartButtonText}>When should I leave?</Text>}
+          </Pressable>
+          {smartLeaveError ? <Text style={styles.error}>{smartLeaveError}</Text> : null}
+          {smartLeave ? (
+            <View style={styles.smartResult}>
+              <Text style={styles.smartHeadline}>
+                {smartLeave.status === 'insufficient-data' ? 'Not enough live data' : smartLeave.status === 'leave-now' ? 'Leave now' : `Leave in ${formatDuration(smartLeave.leaveInSeconds || 0)}`}
+              </Text>
+              <Text style={styles.muted}>{smartLeave.explanation}</Text>
+              <Text style={styles.detail}>Walk ~{formatDuration(smartLeave.walkingSeconds)} · buffer {formatDuration(smartLeave.safetyBufferSeconds)}{smartLeave.arrivalEtaSeconds !== null ? ` · bus ~${formatDuration(smartLeave.arrivalEtaSeconds)}` : ''}</Text>
+            </View>
+          ) : null}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
 }
-const styles=StyleSheet.create({safe:{flex:1,backgroundColor:colors.background},content:{padding:20,gap:6,paddingBottom:40},back:{color:colors.accent,fontSize:15,fontWeight:'600',marginBottom:6},title:{color:colors.text,fontSize:26,fontWeight:'800',marginBottom:4},section:{backgroundColor:colors.surface,borderRadius:16,padding:16,marginTop:14,gap:8},sectionHeaderRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{color:colors.text,fontSize:16,fontWeight:'700'},mutedText:{color:colors.textMuted,fontSize:13,lineHeight:18},routeChips:{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:4},chip:{backgroundColor:colors.surfaceAlt,borderRadius:999,paddingVertical:6,paddingHorizontal:12},chipText:{color:colors.text,fontWeight:'700',fontSize:13},arrivalRow:{borderTopWidth:1,borderTopColor:colors.border,paddingTop:8,marginTop:6},arrivalRoute:{color:colors.text,fontWeight:'700',fontSize:14},arrivalEta:{color:colors.accent,fontWeight:'800',fontSize:15,marginTop:2},arrivalMeta:{color:colors.textMuted,fontSize:11,marginTop:2},smartLeaveButton:{backgroundColor:colors.accent,borderRadius:12,paddingVertical:13,alignItems:'center',marginTop:6},smartLeaveButtonText:{color:colors.accentDark,fontWeight:'800'},errorText:{color:colors.danger,fontSize:13,marginTop:4},smartLeaveResult:{marginTop:10,gap:4},smartLeaveHeadline:{color:colors.text,fontSize:20,fontWeight:'800'},smartLeaveDetail:{color:colors.textMuted,fontSize:12}});
+
+const styles = StyleSheet.create({
+  safe:{flex:1,backgroundColor:colors.background},content:{padding:18,paddingBottom:40},
+  topBar:{flexDirection:'row',alignItems:'center',marginBottom:14},backButton:{width:42,height:42,alignItems:'center',justifyContent:'center'},back:{fontSize:36,lineHeight:38,color:colors.text},topTitle:{flex:1,marginLeft:4},eyebrow:{fontSize:10,fontWeight:'900',letterSpacing:1,color:colors.accent},title:{fontSize:20,fontWeight:'900',color:colors.text,marginTop:2},
+  hero:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:18,padding:16,flexDirection:'row',alignItems:'center'},pin:{width:48,height:48,borderRadius:24,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},pinText:{fontSize:17,color:colors.accent},heroText:{flex:1,marginLeft:12},heroTitle:{fontSize:16,fontWeight:'900',color:colors.text},heroSub:{fontSize:12,color:colors.textMuted,marginTop:3},
+  section:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:18,padding:15,marginTop:12},sectionHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:8},sectionTitle:{fontSize:17,fontWeight:'900',color:colors.text},refreshText:{fontSize:10,color:colors.textMuted},count:{minWidth:28,textAlign:'center',paddingVertical:4,paddingHorizontal:8,borderRadius:999,backgroundColor:colors.accentSoft,color:colors.accent,fontWeight:'900'},
+  muted:{fontSize:13,lineHeight:19,color:colors.textMuted},arrival:{borderTopWidth:1,borderTopColor:colors.border,paddingVertical:11,flexDirection:'row',alignItems:'center'},busIcon:{width:44,height:44,borderRadius:13,alignItems:'center',justifyContent:'center'},arrivalMain:{flex:1,marginLeft:10},route:{fontSize:16,fontWeight:'900',color:colors.text},arrivalMeta:{fontSize:10,color:colors.textMuted,marginTop:3},etaBox:{alignItems:'flex-end'},eta:{fontSize:15,fontWeight:'900',color:colors.accent},confidence:{fontSize:9,color:colors.textMuted,marginTop:2},
+  routeList:{gap:8},routeCard:{borderWidth:1,borderColor:colors.border,borderRadius:13,padding:10,flexDirection:'row',alignItems:'center'},routeNumber:{minWidth:54,height:38,borderRadius:10,backgroundColor:colors.accent,alignItems:'center',justifyContent:'center',paddingHorizontal:7},routeNumberText:{color:'#fff',fontWeight:'900',fontSize:13},routeText:{flex:1,marginLeft:10},routeName:{fontSize:12,fontWeight:'800',color:colors.text},routeHint:{fontSize:10,color:colors.textMuted,marginTop:3},chevron:{fontSize:25,color:colors.textMuted},
+  smartButton:{marginTop:12,borderRadius:13,backgroundColor:colors.accent,paddingVertical:13,alignItems:'center'},smartButtonText:{color:'#fff',fontWeight:'900'},error:{color:colors.danger,fontSize:12,marginTop:8},smartResult:{marginTop:12,padding:12,borderRadius:13,backgroundColor:colors.accentSoft},smartHeadline:{fontSize:20,fontWeight:'900',color:colors.text},detail:{fontSize:11,color:colors.textMuted,marginTop:7}
+});
