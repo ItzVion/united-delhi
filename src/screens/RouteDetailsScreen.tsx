@@ -52,7 +52,7 @@ export default function RouteDetailsScreen() {
     if (!mapReady) return;
     const payload = {
       stops: stops.map(s => ({ id: s.stop_id, name: s.name, lat: s.latitude, lon: s.longitude })),
-      buses: vehicles.map(v => ({ id: v.id, route: v.routeId, lat: v.latitude, lon: v.longitude }))
+      buses: vehicles.map(v => ({ id: v.id, route: v.routeShortName || v.routeId, lat: v.latitude, lon: v.longitude }))
     };
     mapRef.current?.injectJavaScript(`window.updateRouteMap(${JSON.stringify(payload)}); true;`);
   }, [mapReady, stops, vehicles]);
