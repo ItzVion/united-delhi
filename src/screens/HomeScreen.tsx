@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
-import MapView, { Marker, Region, UrlTile } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api, Stop, Vehicle } from '../api/client';
@@ -14,7 +14,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<WebView | null>(null);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [locationStatus, setLocationStatus] = useState('Requesting location…');
   const [nearbyStops, setNearbyStops] = useState<Stop[]>([]);
@@ -55,12 +55,7 @@ export default function HomeScreen() {
         setLocation(lastKnown);
         setLocationReady(true);
         setLocationStatus('');
-        mapRef.current?.animateToRegion({
-          latitude: lastKnown.coords.latitude,
-          longitude: lastKnown.coords.longitude,
-          latitudeDelta: 0.03,
-          longitudeDelta: 0.03
-        }, 400);
+        
       }
 
       try {
@@ -72,12 +67,7 @@ export default function HomeScreen() {
         setLocation(current);
         setLocationReady(true);
         setLocationStatus('');
-        mapRef.current?.animateToRegion({
-          latitude: current.coords.latitude,
-          longitude: current.coords.longitude,
-          latitudeDelta: 0.03,
-          longitudeDelta: 0.03
-        }, 400);
+        
       } catch (error) {
         if (lastKnown) {
           setLocationStatus('');
@@ -120,23 +110,50 @@ export default function HomeScreen() {
     <View style={styles.header}><Text style={styles.brand}>United Delhi</Text><StatusPill label={freshnessLabel} tone={freshnessTone}/></View>
     <Pressable style={styles.searchBar} onPress={()=>navigation.navigate('Search')}><Text style={styles.searchPlaceholder}>Search a bus or stop</Text></Pressable>
     <View style={styles.mapWrap}>
-      <MapView ref={mapRef} style={styles.map} initialRegion={DELHI_REGION} mapType="none" showsUserLocation={locationReady} showsMyLocationButton={false}>
-        <UrlTile
-          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maximumZ={19}
-          flipY={false}
-        />
-        {vehicles.map(v=><Marker key={v.id} coordinate={{latitude:v.latitude,longitude:v.longitude}} title={v.routeId?`Route ${v.routeId}`:'DTC bus'} description={`Updated ${new Date(v.observedAt).toLocaleTimeString()}`} pinColor={colors.accent}/>)}
-        {nearbyStops.map(s=><Marker key={s.stop_id} coordinate={{latitude:s.latitude,longitude:s.longitude}} title={s.name} pinColor={colors.warning} onPress={()=>navigation.navigate('StopDetails',{stopId:s.stop_id,stopName:s.name})}/>)}
-      </MapView>
-      <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View>
-      {locationStatus?<View style={styles.mapOverlay}><Text style={styles.mapOverlayText}>{locationStatus}</Text><Pressable style={styles.retryButton} onPress={requestLocation}><Text style={styles.retryButtonText}>Retry</Text></Pressable></View>:null}
+      <WebView
+        ref={mapRef}
+        style={styles.map}
+        originWhitelist={['*']}
+        javaScriptEnabled
+        domStorageEnabled
+        source={{ html: buildMapHtml(DELHI_REGION, location, nearbyStops, vehicles) }}
+        onMessage={(event) => {
+          try {
+            const message = JSON.parse(event.nativeEvent.data);
+            if (message.type === 'stop') {
+              const stop = nearbyStops.find(s => s.stop_id === message.stopId);
+              if (stop) navigation.navigate('StopDetails', { stopId: stop.stop_id, stopName: stop.name });
+            }
+          } catch {}
+        }}
+      />
+      <View pointerEvents="none" style={styles.mapAttribution}>
+        <Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text>
+      </View>
+      {locationStatus ? <View style={styles.mapOverlay}><Text style={styles.mapOverlayText}>{locationStatus}</Text><Pressable style={styles.retryButton} onPress={requestLocation}><Text style={styles.retryButtonText}>Retry</Text></Pressable></View> : null}
     </View>
     <View style={styles.listHeader}><Text style={styles.listTitle}>Nearby stops</Text>{loadingNearby?<ActivityIndicator color={colors.accent}/>:null}</View>
     <FlatList data={nearbyStops} keyExtractor={item=>item.stop_id} contentContainerStyle={styles.list} ListEmptyComponent={!loadingNearby?<Text style={styles.emptyText}>No nearby stops found yet.</Text>:null}
       renderItem={({item})=><Pressable style={styles.stopCard} onPress={()=>navigation.navigate('StopDetails',{stopId:item.stop_id,stopName:item.name})}><Text style={styles.stopName}>{item.name}</Text>{item.distance_m!==undefined?<Text style={styles.stopDistance}>{Math.round(item.distance_m)} m away</Text>:null}</Pressable>}/>
   </SafeAreaView>;
 }
+function buildMapHtml(region: Region, location: Location.LocationObject | null, stops: Stop[], buses: Vehicle[]) {
+  const centerLat = location?.coords.latitude ?? region.latitude;
+  const centerLon = location?.coords.longitude ?? region.longitude;
+  const stopData = JSON.stringify(stops.map(s => ({ id:s.stop_id, name:s.name, lat:s.latitude, lon:s.longitude }))).replace(/</g, '\\u003c');
+  const busData = JSON.stringify(buses.map(v => ({ id:v.id, route:v.routeId, lat:v.latitude, lon:v.longitude, observed:v.observedAt }))).replace(/</g, '\\u003c');
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>html,body,#map{margin:0;width:100%;height:100%;background:#e8eef2} .stop{font-size:20px} .bus{font-size:18px}</style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
+  const map=L.map('map',{zoomControl:true}).setView([${centerLat},${centerLon}],14);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+  const stops=${stopData}; const buses=${busData};
+  stops.forEach(s=>L.marker([s.lat,s.lon]).addTo(map).bindPopup('<b>'+escapeHtml(s.name)+'</b><br><button onclick="openStop(\\''+s.id+'\\')">View stop</button>'));
+  buses.forEach(v=>L.marker([v.lat,v.lon],{icon:L.divIcon({className:'bus',html:'🚌',iconSize:[28,28],iconAnchor:[14,14]})}).addTo(map).bindPopup((v.route?'Route '+escapeHtml(v.route):'DTC bus')));
+  ${location ? `L.circleMarker([${centerLat},${centerLon}],{radius:8}).addTo(map).bindPopup('Your location');` : ''}
+  function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}
+  function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  </script></body></html>`;
+}
+
 const styles=StyleSheet.create({
  safe:{flex:1,backgroundColor:colors.background},header:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingHorizontal:20,paddingTop:12},
  brand:{color:colors.text,fontSize:28,fontWeight:'800'},searchBar:{marginHorizontal:20,marginTop:14,height:48,borderRadius:14,backgroundColor:colors.surface,justifyContent:'center',paddingHorizontal:16},
