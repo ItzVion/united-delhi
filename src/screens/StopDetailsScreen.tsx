@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -99,7 +100,7 @@ export default function StopDetailsScreen() {
             <View key={a.vehicleId} style={styles.arrival}>
               <View style={[styles.busIcon, { backgroundColor: index % 2 ? colors.accentSoft : colors.warningSoft }]}><Text style={{ color: index % 2 ? colors.accent : colors.warning, fontWeight: '900' }}>BUS</Text></View>
               <View style={styles.arrivalMain}>
-                <Text style={styles.route}>{a.routeId || 'Unknown route'}</Text>
+                <Text style={styles.route}>{a.routeShortName || a.routeId || 'Unknown route'}</Text>
                 <Text style={styles.arrivalMeta}>{a.source === 'live-data-estimate' ? 'Live estimate' : 'Live position'} · {a.observedAgeSeconds}s old</Text>
               </View>
               <View style={styles.etaBox}>

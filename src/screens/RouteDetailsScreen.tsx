@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -65,12 +66,6 @@ export default function RouteDetailsScreen() {
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton}><Text style={styles.back}>‹</Text></Pressable>
         <View style={styles.topTitle}><Text style={styles.eyebrow}>BUS ROUTE</Text><Text style={styles.title}>{routeName}</Text><Text style={styles.subtitle} numberOfLines={1}>{route?.long_name || 'Delhi Transit Network'}</Text></View>
         <StatusPill label={error ? 'Unavailable' : `${vehicles.length} live`} tone={error ? 'danger' : vehicles.length ? 'ok' : 'muted'} />
-      </View>
-
-      <View style={styles.tabs}>
-        <View style={[styles.tab, styles.tabActive]}><Text style={styles.tabActiveText}>Overview</Text></View>
-        <View style={styles.tab}><Text style={styles.tabText}>Stops {stops.length ? `· ${stops.length}` : ''}</Text></View>
-        <View style={styles.tab}><Text style={styles.tabText}>Live buses</Text></View>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
