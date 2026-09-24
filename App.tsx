@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HomeScreen from './src/screens/HomeScreen';
 import SearchScreen from './src/screens/SearchScreen';
+import PlannerScreen from './src/screens/PlannerScreen';
 import StopDetailsScreen from './src/screens/StopDetailsScreen';
 import RouteDetailsScreen from './src/screens/RouteDetailsScreen';
 import { colors } from './src/theme';
@@ -30,6 +31,7 @@ export default function App() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Search" component={SearchScreen} options={{ presentation: 'modal' }} />
+          <Stack.Screen name="Planner" component={PlannerScreen} />
           <Stack.Screen name="StopDetails" component={StopDetailsScreen} />
           <Stack.Screen name="RouteDetails" component={RouteDetailsScreen} />
         </Stack.Navigator>
