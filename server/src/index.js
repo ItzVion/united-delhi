@@ -784,21 +784,21 @@ app.get('/api/plan', dbRateLimit, async (req, res) => {
     const toLike = '%' + toQuery.replace(/[\\%_]/g, '\\$&') + '%';
 
     const candidates = await pool.query(
-      \`WITH origin AS (
+      `WITH origin AS (
          SELECT stop_id, name, latitude, longitude,
                 CASE WHEN LOWER(name) = LOWER($1) THEN 0 ELSE 1 END AS priority
-         FROM stops WHERE name ILIKE $2 ESCAPE '\\\\'
+         FROM stops WHERE name ILIKE $2 ESCAPE '\\'
          ORDER BY priority, LENGTH(name), name, stop_id LIMIT 5
        ),
        destination AS (
          SELECT stop_id, name, latitude, longitude,
                 CASE WHEN LOWER(name) = LOWER($3) THEN 0 ELSE 1 END AS priority
-         FROM stops WHERE name ILIKE $4 ESCAPE '\\\\'
+         FROM stops WHERE name ILIKE $4 ESCAPE '\\'
          ORDER BY priority, LENGTH(name), name, stop_id LIMIT 5
        )
        SELECT 'origin' AS kind, stop_id, name, latitude, longitude FROM origin
        UNION ALL
-       SELECT 'destination' AS kind, stop_id, name, latitude, longitude FROM destination\`,
+       SELECT 'destination' AS kind, stop_id, name, latitude, longitude FROM destination`,
       [fromQuery, fromLike, toQuery, toLike]
     );
 
@@ -818,7 +818,7 @@ app.get('/api/plan', dbRateLimit, async (req, res) => {
     const destinationIds = destinations.map(row => String(row.stop_id));
 
     const direct = await pool.query(
-      \`WITH matches AS (
+      `WITH matches AS (
          SELECT r.route_id, r.short_name,
                 o.stop_id AS from_stop_id, o.name AS from_stop,
                 d.stop_id AS to_stop_id, d.name AS to_stop,
@@ -834,16 +834,16 @@ app.get('/api/plan', dbRateLimit, async (req, res) => {
          FROM matches
        )
        SELECT route_id, short_name, from_stop_id, from_stop, to_stop_id, to_stop, stop_hops
-       FROM ranked WHERE rn = 1 ORDER BY stop_hops, route_id LIMIT 6\`,
+       FROM ranked WHERE rn = 1 ORDER BY stop_hops, route_id LIMIT 6`,
       [originIds, destinationIds]
     );
 
     const originRoutes = await pool.query(
-      \`SELECT DISTINCT route_id FROM route_stops WHERE stop_id = ANY($1::text[])\`,
+      `SELECT DISTINCT route_id FROM route_stops WHERE stop_id = ANY($1::text[])`,
       [originIds]
     );
     const destinationRoutes = await pool.query(
-      \`SELECT DISTINCT route_id FROM route_stops WHERE stop_id = ANY($1::text[])\`,
+      `SELECT DISTINCT route_id FROM route_stops WHERE stop_id = ANY($1::text[])`,
       [destinationIds]
     );
     const originRouteIds = originRoutes.rows.map(row => String(row.route_id));
@@ -852,7 +852,7 @@ app.get('/api/plan', dbRateLimit, async (req, res) => {
     let transfers = { rows: [] };
     if (originRouteIds.length && destinationRouteIds.length) {
       transfers = await pool.query(
-        \`WITH transfer_candidates AS (
+        `WITH transfer_candidates AS (
            SELECT a.route_id AS first_route_id, b.route_id AS second_route_id,
                   a.stop_id AS transfer_stop_id, t.name AS transfer_stop,
                   a.stop_sequence AS first_transfer_seq, b.stop_sequence AS second_transfer_seq
@@ -879,7 +879,7 @@ app.get('/api/plan', dbRateLimit, async (req, res) => {
            FROM journey_matches
          )
          SELECT * FROM ranked WHERE rn = 1
-         ORDER BY stop_hops, first_route_id, second_route_id LIMIT 6\`,
+         ORDER BY stop_hops, first_route_id, second_route_id LIMIT 6`,
         [originRouteIds, destinationRouteIds, originIds, destinationIds]
       );
     }
@@ -889,7 +889,7 @@ app.get('/api/plan', dbRateLimit, async (req, res) => {
       ...transfers.rows.flatMap(row => [String(row.first_route_id), String(row.second_route_id)])
     ];
     const routeNames = routeIds.length
-      ? await pool.query(\`SELECT route_id, short_name FROM routes WHERE route_id = ANY($1::text[])\`, [routeIds])
+      ? await pool.query(`SELECT route_id, short_name FROM routes WHERE route_id = ANY($1::text[])`, [routeIds])
       : { rows: [] };
     const names = new Map(routeNames.rows.map(row => [
       String(row.route_id),
