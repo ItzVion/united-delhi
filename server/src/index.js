@@ -61,6 +61,17 @@ const dbRateLimit = rateLimit({
   }
 });
 
+const realtimeRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    status: 'RATE_LIMITED',
+    reason: 'Too many realtime-feed requests. Please try again shortly.'
+  }
+});
+
 const healthRateLimit = rateLimit({
   windowMs: 60_000,
   limit: 60,
@@ -368,7 +379,7 @@ app.get('/api/status', (_req, res) => {
   });
 });
 
-app.get('/api/realtime/vehicles', (_req, res) => {
+app.get('/api/realtime/vehicles', realtimeRateLimit, (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (realtimeCache.status === 'UNAVAILABLE' && realtimeCache.vehicles.length === 0) {
     return res.status(503).json({
