@@ -30,7 +30,12 @@ export default function HomeScreen() {
       const existing = await Location.getForegroundPermissionsAsync();
       const permission = existing.status === 'granted'
         ? existing
-        : await Location.requestForegroundPermissionsAsync();
+        : await Promise.race([
+            Location.requestForegroundPermissionsAsync(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('permission-timeout')), 10000)
+            )
+          ]);
       if (permission.status !== 'granted') {
         setLocationStatus('Location is off. Showing Delhi.');
         return;
