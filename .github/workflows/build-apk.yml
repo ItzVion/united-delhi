@@ -36,3 +36,5 @@ jobs:
         run: eas build --platform android --profile preview --non-interactive --wait
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+# Trigger cloud build after EXPO_TOKEN setup.
