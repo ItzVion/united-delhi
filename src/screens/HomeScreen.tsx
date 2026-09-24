@@ -12,6 +12,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
+type MapBounds = { south: number; west: number; north: number; east: number };
 const DELHI_REGION: Region = { latitude: 28.6139, longitude: 77.209, latitudeDelta: 0.15, longitudeDelta: 0.15 };
 
 export default function HomeScreen() {
@@ -24,6 +25,8 @@ export default function HomeScreen() {
   const [vehiclesFreshness, setVehiclesFreshness] = useState<'loading' | 'ok' | 'unavailable'>('loading');
   const [loadingNearby, setLoadingNearby] = useState(true);
   const [mapReady, setMapReady] = useState(false);
+  const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
+  const [recenterNonce, setRecenterNonce] = useState(0);
 
   const requestLocation = useCallback(async () => {
     try {
@@ -61,6 +64,11 @@ export default function HomeScreen() {
       setLocationStatus('Location unavailable. Showing Delhi.');
     }
   }, []);
+
+  const handleUseMyLocation = useCallback(async () => {
+    setRecenterNonce(value => value + 1);
+    await requestLocation();
+  }, [requestLocation]);
 
   const loadNearbyStops = useCallback(async (lat: number, lon: number) => {
     setLoadingNearby(true);
@@ -108,16 +116,27 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (!mapReady) return;
+    const centerLat = mapBounds
+      ? (mapBounds.south + mapBounds.north) / 2
+      : (location?.coords.latitude ?? DELHI_REGION.latitude);
+    const centerLon = mapBounds
+      ? (mapBounds.west + mapBounds.east) / 2
+      : (location?.coords.longitude ?? DELHI_REGION.longitude);
+
+    const visibleVehicles = mapBounds
+      ? vehicles.filter(v =>
+          v.latitude >= mapBounds.south &&
+          v.latitude <= mapBounds.north &&
+          v.longitude >= mapBounds.west &&
+          v.longitude <= mapBounds.east
+        )
+      : vehicles;
+
     const payload = {
-      center: {
-        lat: location?.coords.latitude ?? DELHI_REGION.latitude,
-        lon: location?.coords.longitude ?? DELHI_REGION.longitude
-      },
+      center: { lat: centerLat, lon: centerLon },
       stops: nearbyStops.map(s => ({ id: s.stop_id, name: s.name, lat: s.latitude, lon: s.longitude })),
-      buses: [...vehicles]
+      buses: [...visibleVehicles]
         .sort((a, b) => {
-          const centerLat = location?.coords.latitude ?? DELHI_REGION.latitude;
-          const centerLon = location?.coords.longitude ?? DELHI_REGION.longitude;
           const distance = (v: Vehicle) => {
             const dLat = v.latitude - centerLat;
             const dLon = (v.longitude - centerLon) * Math.cos(centerLat * Math.PI / 180);
@@ -130,7 +149,12 @@ export default function HomeScreen() {
       location: location ? { lat: location.coords.latitude, lon: location.coords.longitude } : null
     };
     mapRef.current?.injectJavaScript(`window.updateMap(${JSON.stringify(payload)}); true;`);
-  }, [mapReady, location, nearbyStops, vehicles]);
+  }, [mapReady, mapBounds, location, nearbyStops, vehicles]);
+
+  useEffect(() => {
+    if (!mapReady || !location || recenterNonce === 0) return;
+    mapRef.current?.injectJavaScript(`window.centerMap(${location.coords.latitude},${location.coords.longitude}); true;`);
+  }, [mapReady, location, recenterNonce]);
 
   const freshnessLabel = vehiclesFreshness === 'ok'
     ? `${vehicles.length} live buses`
@@ -155,7 +179,7 @@ export default function HomeScreen() {
 
       <View style={styles.helperRow}>
         <Text style={styles.helperText}>Live buses near you</Text>
-        <Pressable onPress={requestLocation}><Text style={styles.locationLink}>Use my location</Text></Pressable>
+        <Pressable onPress={handleUseMyLocation}><Text style={styles.locationLink}>Use my location</Text></Pressable>
       </View>
 
       <View style={styles.mapWrap}>
@@ -174,6 +198,16 @@ export default function HomeScreen() {
               if (message.type === 'stop') {
                 const stop = nearbyStops.find(s => s.stop_id === message.stopId);
                 if (stop) navigation.navigate('StopDetails', { stopId: stop.stop_id, stopName: stop.name });
+              } else if (message.type === 'bounds' && message.bounds) {
+                const b = message.bounds;
+                if (
+                  Number.isFinite(b.south) &&
+                  Number.isFinite(b.west) &&
+                  Number.isFinite(b.north) &&
+                  Number.isFinite(b.east)
+                ) {
+                  setMapBounds(b);
+                }
               }
             } catch {}
           }}
@@ -181,7 +215,7 @@ export default function HomeScreen() {
         <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap</Text></View>
         <View style={styles.mapBadge}><Text style={styles.mapBadgeText}>{vehicles.length > 0 ? `${Math.min(vehicles.length, 250)} buses on map` : 'No live buses yet'}</Text></View>
         {locationStatus ? (
-          <Pressable style={styles.locationNotice} onPress={requestLocation}>
+          <Pressable style={styles.locationNotice} onPress={handleUseMyLocation}>
             <Text style={styles.locationNoticeText}>{locationStatus}</Text>
             <Text style={styles.locationRetry}>Retry</Text>
           </Pressable>
@@ -243,6 +277,10 @@ function buildMapHtml() {
 const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5}).setView([28.6139,77.209],13);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,keepBuffer:2,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
 const stopLayer=L.layerGroup().addTo(map); const busLayer=L.layerGroup().addTo(map); let userLayer=L.layerGroup().addTo(map); let hasCentered=false;
+function reportBounds(){ const b=map.getBounds(); window.ReactNativeWebView.postMessage(JSON.stringify({type:'bounds',bounds:{south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()}})); }
+map.on('moveend',reportBounds);
+setTimeout(reportBounds,0);
+window.centerMap=function(lat,lon){ map.setView([lat,lon],14); };
 window.updateMap=function(data){
   stopLayer.clearLayers(); busLayer.clearLayers(); userLayer.clearLayers();
   const stopIcon=L.divIcon({className:'',html:'<div class="stop-label">● Stop</div>',iconSize:[55,24],iconAnchor:[8,12]});
@@ -259,7 +297,7 @@ window.updateMap=function(data){
     L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup(popup);
   });
   data.buses.forEach(v=>L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label">'+escapeHtml(v.route||'BUS')+'</div>',iconSize:[52,24],iconAnchor:[26,12]})}).addTo(busLayer).bindPopup(escapeHtml(v.route||'Live bus')));
-  if(data.location){L.circleMarker([data.location.lat,data.location.lon],{radius:8,color:'#1769e0',weight:3,fillColor:'#fff',fillOpacity:1}).addTo(userLayer); if(!hasCentered){map.setView([data.location.lat,data.location.lon],14);hasCentered=true;}}
+  if(data.location){L.circleMarker([data.location.lat,data.location.lon],{radius:8,color:'#1769e0',weight:3,fillColor:'#fff',fillOpacity:1}).addTo(userLayer); if(!hasCentered){map.setView([data.location.lat,data.location.lon],14);hasCentered=true; reportBounds();}}
 };
 function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}
 function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
