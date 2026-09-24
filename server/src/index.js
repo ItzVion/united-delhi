@@ -769,6 +769,184 @@ app.get('/api/search', dbRateLimit, async (req, res) => {
   }
 });
 
+
+app.get('/api/plan', dbRateLimit, async (req, res) => {
+  if (!pool) return res.status(503).json({ status: 'UNAVAILABLE', options: [], reason: 'DATABASE_URL is not configured' });
+
+  const fromQuery = String(req.query.from || '').trim().slice(0, 80);
+  const toQuery = String(req.query.to || '').trim().slice(0, 80);
+  if (fromQuery.length < 2 || toQuery.length < 2) {
+    return res.status(400).json({ status: 'ERROR', options: [], reason: 'Both from and to are required' });
+  }
+
+  try {
+    const fromLike = '%' + fromQuery.replace(/[\\%_]/g, '\\\\async function ensureStaticData() {') + '%';
+    const toLike = '%' + toQuery.replace(/[\\%_]/g, '\\\\async function ensureStaticData() {') + '%';
+
+    const candidates = await pool.query(
+      \`WITH origin AS (
+         SELECT stop_id, name, latitude, longitude,
+                CASE WHEN LOWER(name) = LOWER($1) THEN 0 ELSE 1 END AS priority
+         FROM stops WHERE name ILIKE $2 ESCAPE '\\\\'
+         ORDER BY priority, LENGTH(name), name, stop_id LIMIT 5
+       ),
+       destination AS (
+         SELECT stop_id, name, latitude, longitude,
+                CASE WHEN LOWER(name) = LOWER($3) THEN 0 ELSE 1 END AS priority
+         FROM stops WHERE name ILIKE $4 ESCAPE '\\\\'
+         ORDER BY priority, LENGTH(name), name, stop_id LIMIT 5
+       )
+       SELECT 'origin' AS kind, stop_id, name, latitude, longitude FROM origin
+       UNION ALL
+       SELECT 'destination' AS kind, stop_id, name, latitude, longitude FROM destination\`,
+      [fromQuery, fromLike, toQuery, toLike]
+    );
+
+    const origins = candidates.rows.filter(row => row.kind === 'origin');
+    const destinations = candidates.rows.filter(row => row.kind === 'destination');
+    if (!origins.length || !destinations.length) {
+      return res.json({
+        status: 'NOT_FOUND',
+        origin: origins[0] || null,
+        destination: destinations[0] || null,
+        options: [],
+        reason: !origins.length ? 'Starting place not found' : 'Destination not found'
+      });
+    }
+
+    const originIds = origins.map(row => String(row.stop_id));
+    const destinationIds = destinations.map(row => String(row.stop_id));
+
+    const direct = await pool.query(
+      \`WITH matches AS (
+         SELECT r.route_id, r.short_name,
+                o.stop_id AS from_stop_id, o.name AS from_stop,
+                d.stop_id AS to_stop_id, d.name AS to_stop,
+                ABS(d.stop_sequence - o.stop_sequence) AS stop_hops
+         FROM route_stops o
+         JOIN route_stops d ON d.route_id = o.route_id
+         JOIN routes r ON r.route_id = o.route_id
+         WHERE o.stop_id = ANY($1::text[])
+           AND d.stop_id = ANY($2::text[])
+           AND d.stop_sequence > o.stop_sequence
+       ), ranked AS (
+         SELECT *, ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY stop_hops, from_stop_id, to_stop_id) rn
+         FROM matches
+       )
+       SELECT route_id, short_name, from_stop_id, from_stop, to_stop_id, to_stop, stop_hops
+       FROM ranked WHERE rn = 1 ORDER BY stop_hops, route_id LIMIT 6\`,
+      [originIds, destinationIds]
+    );
+
+    const originRoutes = await pool.query(
+      \`SELECT DISTINCT route_id FROM route_stops WHERE stop_id = ANY($1::text[])\`,
+      [originIds]
+    );
+    const destinationRoutes = await pool.query(
+      \`SELECT DISTINCT route_id FROM route_stops WHERE stop_id = ANY($1::text[])\`,
+      [destinationIds]
+    );
+    const originRouteIds = originRoutes.rows.map(row => String(row.route_id));
+    const destinationRouteIds = destinationRoutes.rows.map(row => String(row.route_id));
+
+    let transfers = { rows: [] };
+    if (originRouteIds.length && destinationRouteIds.length) {
+      transfers = await pool.query(
+        \`WITH transfer_candidates AS (
+           SELECT a.route_id AS first_route_id, b.route_id AS second_route_id,
+                  a.stop_id AS transfer_stop_id, t.name AS transfer_stop,
+                  a.stop_sequence AS first_transfer_seq, b.stop_sequence AS second_transfer_seq
+           FROM route_stops a
+           JOIN stops t ON t.stop_id = a.stop_id
+           JOIN route_stops b ON b.stop_id = a.stop_id AND b.route_id = ANY($2::text[])
+           WHERE a.route_id = ANY($1::text[]) AND a.route_id <> b.route_id
+         ),
+         journey_matches AS (
+           SELECT tc.*, o.stop_id AS from_stop_id, o.name AS from_stop,
+                  d.stop_id AS to_stop_id, d.name AS to_stop,
+                  ABS(tc.first_transfer_seq - o.stop_sequence)
+                    + ABS(d.stop_sequence - tc.second_transfer_seq) AS stop_hops
+           FROM transfer_candidates tc
+           JOIN route_stops o ON o.route_id = tc.first_route_id AND o.stop_id = ANY($3::text[])
+           JOIN route_stops d ON d.route_id = tc.second_route_id AND d.stop_id = ANY($4::text[])
+           WHERE tc.first_transfer_seq > o.stop_sequence
+             AND d.stop_sequence > tc.second_transfer_seq
+         ), ranked AS (
+           SELECT *, ROW_NUMBER() OVER (
+             PARTITION BY first_route_id, second_route_id
+             ORDER BY stop_hops, transfer_stop_id
+           ) rn
+           FROM journey_matches
+         )
+         SELECT * FROM ranked WHERE rn = 1
+         ORDER BY stop_hops, first_route_id, second_route_id LIMIT 6\`,
+        [originRouteIds, destinationRouteIds, originIds, destinationIds]
+      );
+    }
+
+    const routeIds = [
+      ...direct.rows.map(row => String(row.route_id)),
+      ...transfers.rows.flatMap(row => [String(row.first_route_id), String(row.second_route_id)])
+    ];
+    const routeNames = routeIds.length
+      ? await pool.query(\`SELECT route_id, short_name FROM routes WHERE route_id = ANY($1::text[])\`, [routeIds])
+      : { rows: [] };
+    const names = new Map(routeNames.rows.map(row => [
+      String(row.route_id),
+      String(row.short_name || row.route_id).replace(/(UP|DOWN)$/i, '')
+    ]));
+
+    const makeDuration = hops => Math.max(8, Math.round(Number(hops || 0) * 2.1 + 6));
+    const options = [
+      ...direct.rows.map(row => ({
+        type: 'direct',
+        durationMinutes: makeDuration(row.stop_hops),
+        walkingMinutes: 6,
+        legs: [{
+          routeId: String(row.route_id),
+          routeName: names.get(String(row.route_id)) || String(row.short_name || row.route_id),
+          fromStop: row.from_stop, toStop: row.to_stop,
+          fromStopId: String(row.from_stop_id), toStopId: String(row.to_stop_id)
+        }],
+        transferStop: null
+      })),
+      ...transfers.rows.map(row => ({
+        type: 'one-transfer',
+        durationMinutes: makeDuration(row.stop_hops) + 5,
+        walkingMinutes: 6,
+        legs: [
+          {
+            routeId: String(row.first_route_id),
+            routeName: names.get(String(row.first_route_id)) || String(row.first_route_id),
+            fromStop: row.from_stop, toStop: row.transfer_stop,
+            fromStopId: String(row.from_stop_id), toStopId: String(row.transfer_stop_id)
+          },
+          {
+            routeId: String(row.second_route_id),
+            routeName: names.get(String(row.second_route_id)) || String(row.second_route_id),
+            fromStop: row.transfer_stop, toStop: row.to_stop,
+            fromStopId: String(row.transfer_stop_id), toStopId: String(row.to_stop_id)
+          }
+        ],
+        transferStop: row.transfer_stop
+      }))
+    ].sort((a, b) => a.durationMinutes - b.durationMinutes);
+
+    const unique = [];
+    const seen = new Set();
+    for (const option of options) {
+      const key = option.legs.map(leg => leg.routeId).join('>');
+      if (!seen.has(key)) { seen.add(key); unique.push(option); }
+      if (unique.length === 5) break;
+    }
+
+    res.json({ status: 'OK', origin: origins[0], destination: destinations[0], options: unique });
+  } catch (error) {
+    console.error('Failed to plan journey:', error);
+    res.status(500).json({ status: 'ERROR', options: [], reason: 'Journey planner is temporarily unavailable' });
+  }
+});
+
 async function ensureStaticData() {
   if (!pool) return;
 
