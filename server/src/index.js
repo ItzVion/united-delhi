@@ -780,8 +780,8 @@ app.get('/api/plan', dbRateLimit, async (req, res) => {
   }
 
   try {
-    const fromLike = '%' + fromQuery.replace(/[\\%_]/g, '\\\\async function ensureStaticData() {') + '%';
-    const toLike = '%' + toQuery.replace(/[\\%_]/g, '\\\\async function ensureStaticData() {') + '%';
+    const fromLike = '%' + fromQuery.replace(/[\\%_]/g, '\\$&') + '%';
+    const toLike = '%' + toQuery.replace(/[\\%_]/g, '\\$&') + '%';
 
     const candidates = await pool.query(
       \`WITH origin AS (
