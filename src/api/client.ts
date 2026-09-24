@@ -37,6 +37,7 @@ export interface SearchResult {
 export interface Arrival {
   vehicleId: string;
   routeId: string | null;
+  routeShortName?: string | null;
   distanceMeters: number;
   etaSeconds: number | null;
   source: 'live-data-estimate' | 'live-position-no-speed';
