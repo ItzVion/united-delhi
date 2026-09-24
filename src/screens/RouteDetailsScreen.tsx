@@ -68,12 +68,6 @@ export default function RouteDetailsScreen() {
         <StatusPill label={error ? 'Unavailable' : `${vehicles.length} live`} tone={error ? 'danger' : vehicles.length ? 'ok' : 'muted'} />
       </View>
 
-      <View style={styles.tabs}>
-        <View style={[styles.tab, styles.tabActive]}><Text style={styles.tabActiveText}>Overview</Text></View>
-        <View style={styles.tab}><Text style={styles.tabText}>Stops {stops.length ? `· ${stops.length}` : ''}</Text></View>
-        <View style={styles.tab}><Text style={styles.tabText}>Live buses</Text></View>
-      </View>
-
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <View style={styles.mapWrap}>
