@@ -93,8 +93,12 @@ export default function HomeScreen() {
   }, [requestLocation]);
 
   useEffect(() => {
-    if (location) loadNearbyStops(location.coords.latitude, location.coords.longitude);
-  }, [location, loadNearbyStops]);
+    if (location) {
+      loadNearbyStops(location.coords.latitude, location.coords.longitude);
+    } else if (locationStatus !== 'Finding your location…') {
+      setLoadingNearby(false);
+    }
+  }, [location, locationStatus, loadNearbyStops]);
 
   useEffect(() => {
     loadVehicles();
