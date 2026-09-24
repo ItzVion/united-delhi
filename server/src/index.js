@@ -303,6 +303,7 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/health', async (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   let database = 'not_configured';
   if (pool) {
     try {
@@ -324,6 +325,7 @@ app.get('/health', async (_req, res) => {
 });
 
 app.get('/api/status', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   res.json({
     realtime: process.env.DTC_API_KEY ? 'configured' : 'unavailable',
     database: pool ? 'configured' : 'unavailable',
@@ -333,6 +335,7 @@ app.get('/api/status', (_req, res) => {
 });
 
 app.get('/api/realtime/vehicles', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   if (realtimeCache.status === 'UNAVAILABLE' && realtimeCache.vehicles.length === 0) {
     return res.status(503).json({
       status: 'UNAVAILABLE',
