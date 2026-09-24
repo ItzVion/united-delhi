@@ -14,6 +14,7 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const value = query.trim();
@@ -24,12 +25,16 @@ export default function SearchScreen() {
     }
     let cancelled = false;
     setLoading(true);
+    setError(null);
     const timer = setTimeout(async () => {
       try {
         const result = await api.search(value);
         if (!cancelled) setResults(result.status === 'OK' ? result.results : []);
-      } catch {
-        if (!cancelled) setResults([]);
+      } catch (e) {
+        if (!cancelled) {
+          setResults([]);
+          setError((e as Error).message || 'Search is temporarily unavailable.');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
