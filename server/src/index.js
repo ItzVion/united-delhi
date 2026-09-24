@@ -4,6 +4,7 @@ import cors from 'cors';
 import pg from 'pg';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { spawn } from 'node:child_process';
+import { rateLimit } from 'express-rate-limit';
 
 const { Pool } = pg;
 const app = express();
@@ -37,45 +38,27 @@ app.use((_req, res, next) => {
   next();
 });
 
-function createRateLimiter(windowMs, limit) {
-  const clients = new Map();
+const apiRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: 180,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    status: 'RATE_LIMITED',
+    reason: 'Too many requests. Please try again shortly.'
+  }
+});
 
-  const cleanup = setInterval(() => {
-    const cutoff = Date.now() - windowMs;
-    for (const [key, entry] of clients) {
-      if (entry.startedAt <= cutoff) clients.delete(key);
-    }
-  }, windowMs);
-  cleanup.unref?.();
-
-  return (req, res, next) => {
-    const key = req.ip || req.socket.remoteAddress || 'unknown';
-    const now = Date.now();
-    const current = clients.get(key);
-
-    if (!current || now - current.startedAt >= windowMs) {
-      clients.set(key, { startedAt: now, count: 1 });
-      return next();
-    }
-
-    current.count += 1;
-    if (current.count > limit) {
-      const retryAfter = Math.max(1, Math.ceil((windowMs - (now - current.startedAt)) / 1000));
-      res.setHeader('Retry-After', String(retryAfter));
-      return res.status(429).json({
-        status: 'RATE_LIMITED',
-        reason: 'Too many requests. Please try again shortly.'
-      });
-    }
-
-    next();
-  };
-}
-
-const apiRateLimit = createRateLimiter(60_000, 180);
-const dbRateLimit = createRateLimiter(60_000, 45);
-
-app.use('/api', apiRateLimit);
+const dbRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: 45,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    status: 'RATE_LIMITED',
+    reason: 'Too many database requests. Please try again shortly.'
+  }
+});
 
 const ok = value => value !== undefined && value !== null && value !== '';
 
