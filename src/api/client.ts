@@ -32,6 +32,8 @@ export interface SearchResult {
   type: 'stop' | 'route';
   id: string;
   label: string;
+  fromStop?: string | null;
+  toStop?: string | null;
 }
 
 export interface Arrival {
