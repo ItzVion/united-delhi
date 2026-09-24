@@ -314,7 +314,7 @@ app.get('/health', async (_req, res) => {
     }
   }
 
-  res.status(database === 'error' ? 503 : 200).json({
+  res.status(database === 'ok' ? 200 : 503).json({
     ok: database !== 'error',
     service: 'united-delhi-api',
     database,
