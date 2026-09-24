@@ -708,107 +708,52 @@ app.get('/api/search', dbRateLimit, async (req, res) => {
            short_name NULLS LAST,
            route_id
          LIMIT 30
+       ),
+       stop_matches AS (
+         SELECT 'stop' AS type,
+                stop_id AS id,
+                name AS label,
+                NULL::TEXT AS "fromStop",
+                NULL::TEXT AS "toStop"
+         FROM stops
+         WHERE name ILIKE $1 ESCAPE '\\'
+         ORDER BY name, stop_id
+         LIMIT 20
+       ),
+       route_results AS (
+         SELECT 'route' AS type,
+                r.route_id AS id,
+                CASE
+                  WHEN r.short_name IS NULL OR TRIM(r.short_name) = '' THEN COALESCE(r.long_name, '')
+                  ELSE REGEXP_REPLACE(TRIM(r.short_name), '(UP|DOWN)$', '', 'i')
+                END AS label,
+                (
+                  SELECT s.name
+                  FROM route_stops rs
+                  JOIN stops s ON s.stop_id = rs.stop_id
+                  WHERE rs.route_id = r.route_id
+                  ORDER BY rs.stop_sequence ASC, s.name, s.stop_id
+                  LIMIT 1
+                ) AS "fromStop",
+                (
+                  SELECT s.name
+                  FROM route_stops rs
+                  JOIN stops s ON s.stop_id = rs.stop_id
+                  WHERE rs.route_id = r.route_id
+                  ORDER BY rs.stop_sequence DESC, s.name, s.stop_id
+                  LIMIT 1
+                ) AS "toStop"
+         FROM route_matches r
        )
-       SELECT 'stop' AS type,
-              stop_id AS id,
-              name AS label,
-              NULL::TEXT AS "fromStop",
-              NULL::TEXT AS "toStop"
-       FROM stops
-       WHERE name ILIKE $1 ESCAPE '\\'
-
+       SELECT type, id, label, "fromStop", "toStop"
+       FROM route_results
        UNION ALL
-
-       SELECT 'route' AS type,
-              r.route_id AS id,
-              CASE
-                WHEN r.short_name IS NULL OR TRIM(r.short_name) = '' THEN COALESCE(r.long_name, '')
-                ELSE REGEXP_REPLACE(TRIM(r.short_name), '(UP|DOWN)
-  } catch (error) {
-    console.error('Failed to search transit data:', error);
-    res.status(500).json({
-      status: 'ERROR',
-      results: [],
-      reason: 'Search is temporarily unavailable'
-    });
-  }
-});
-
-async function ensureStaticData() {
-  if (!pool) return;
-
-  const tables = await pool.query(`
-    SELECT
-      to_regclass('public.stops') AS stops_table,
-      to_regclass('public.routes') AS routes_table,
-      to_regclass('public.route_stops') AS route_stops_table
-  `);
-
-  const row = tables.rows[0];
-  const tablesExist = Boolean(row.stops_table && row.routes_table && row.route_stops_table);
-  if (tablesExist) {
-    const countsResult = await pool.query(`
-      SELECT
-        (SELECT COUNT(*) FROM stops) AS stops,
-        (SELECT COUNT(*) FROM routes) AS routes,
-        (SELECT COUNT(*) FROM route_stops) AS route_stops
-    `);
-    const counts = countsResult.rows[0];
-
-    if (
-      Number(counts.stops) >= 1000
-      && Number(counts.routes) >= 500
-      && Number(counts.route_stops) >= 10000
-    ) {
-      return;
-    }
-  }
-
-  console.log('Static GTFS data is missing/incomplete; starting the pinned dataset import...');
-
-  await new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['scripts/import-gtfs.js'], {
-      cwd: process.cwd(),
-      env: process.env,
-      stdio: 'inherit'
-    });
-
-    child.on('error', reject);
-    child.on('exit', code => {
-      if (code === 0) resolve();
-      else reject(new Error(`GTFS import exited with code ${code}`));
-    });
-  });
-}
-
-app.listen(port, () => {
-  console.log(`United Delhi API listening on :${port}`);
-  startRealtimePolling();
-  void ensureStaticData().catch(error => {
-    console.error('Static GTFS bootstrap failed:', error);
-  });
-});
-, '', 'i')
-              END AS label,
-              (
-                SELECT s.name
-                FROM route_stops rs
-                JOIN stops s ON s.stop_id = rs.stop_id
-                WHERE rs.route_id = r.route_id
-                ORDER BY rs.stop_sequence ASC, s.name, s.stop_id
-                LIMIT 1
-              ) AS "fromStop",
-              (
-                SELECT s.name
-                FROM route_stops rs
-                JOIN stops s ON s.stop_id = rs.stop_id
-                WHERE rs.route_id = r.route_id
-                ORDER BY rs.stop_sequence DESC, s.name, s.stop_id
-                LIMIT 1
-              ) AS "toStop"
-       FROM route_matches r
-
-       ORDER BY type, label, id
+       SELECT type, id, label, "fromStop", "toStop"
+       FROM stop_matches
+       ORDER BY
+         CASE WHEN type = 'route' THEN 0 ELSE 1 END,
+         label,
+         id
        LIMIT 50`,
       [like]
     );
