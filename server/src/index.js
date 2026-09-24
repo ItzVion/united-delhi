@@ -746,14 +746,14 @@ app.get('/api/search', dbRateLimit, async (req, res) => {
          FROM route_matches r
        )
        SELECT type, id, label, "fromStop", "toStop"
-       FROM route_results
-       UNION ALL
-       SELECT type, id, label, "fromStop", "toStop"
-       FROM stop_matches
-       ORDER BY
-         CASE WHEN type = 'route' THEN 0 ELSE 1 END,
-         label,
-         id
+       FROM (
+         SELECT type, id, label, "fromStop", "toStop", 0 AS result_order
+         FROM route_results
+         UNION ALL
+         SELECT type, id, label, "fromStop", "toStop", 1 AS result_order
+         FROM stop_matches
+       ) combined
+       ORDER BY result_order, label, id
        LIMIT 50`,
       [like]
     );
