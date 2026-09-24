@@ -769,7 +769,7 @@ app.get('/api/search', dbRateLimit, async (req, res) => {
          FROM stop_matches
        ) combined
        ORDER BY result_order, label, id
-       LIMIT 50`,,
+       LIMIT 50`,
       [like]
     );
 
