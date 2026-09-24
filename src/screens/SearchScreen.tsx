@@ -21,6 +21,7 @@ export default function SearchScreen() {
     if (value.length < 2) {
       setResults([]);
       setLoading(false);
+      setError(null);
       return;
     }
     let cancelled = false;
@@ -77,6 +78,13 @@ export default function SearchScreen() {
         </View>
       ) : null}
 
+      {error ? (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorTitle}>Search unavailable</Text>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+
       <FlatList
         keyboardShouldPersistTaps="handled"
         data={results}
@@ -114,5 +122,6 @@ const styles = StyleSheet.create({
   searchBox:{marginHorizontal:18,height:54,borderRadius:17,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,flexDirection:'row',alignItems:'center',paddingHorizontal:14},
   searchIcon:{fontSize:27,color:colors.text,marginRight:8,marginTop:-3},input:{flex:1,color:colors.text,fontSize:15},clear:{fontSize:26,color:colors.textMuted,paddingHorizontal:4},
   hintCard:{margin:18,padding:16,borderRadius:16,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},hintTitle:{fontSize:16,fontWeight:'800',color:colors.text},hintText:{fontSize:13,color:colors.textMuted,marginTop:4},exampleRow:{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:12},example:{paddingHorizontal:12,paddingVertical:7,borderRadius:999,backgroundColor:colors.accentSoft},exampleText:{fontSize:12,fontWeight:'800',color:colors.accent},
+  errorCard:{marginHorizontal:18,marginTop:10,padding:12,borderRadius:14,backgroundColor:colors.dangerSoft,borderWidth:1,borderColor:colors.danger},errorTitle:{fontSize:13,fontWeight:'900',color:colors.danger},errorText:{fontSize:12,lineHeight:17,color:colors.textMuted,marginTop:2},
   list:{paddingHorizontal:18,paddingTop:12,paddingBottom:30},empty:{paddingVertical:28,paddingHorizontal:8,alignItems:'center'},emptyTitle:{fontSize:16,fontWeight:'900',color:colors.text,textAlign:'center'},emptyText:{fontSize:13,lineHeight:19,color:colors.textMuted,textAlign:'center',marginTop:5},resultsTitle:{fontSize:13,fontWeight:'800',color:colors.textMuted,marginBottom:8},row:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:15,padding:13,marginBottom:8,flexDirection:'row',alignItems:'center'},typeIcon:{width:42,height:42,borderRadius:13,alignItems:'center',justifyContent:'center'},routeIcon:{backgroundColor:colors.accent},stopIcon:{backgroundColor:colors.successSoft},typeIconText:{fontSize:10,fontWeight:'900',color:'#fff'},resultText:{flex:1,marginLeft:11},label:{fontSize:14,fontWeight:'800',color:colors.text},typeLabel:{fontSize:11,color:colors.textMuted,marginTop:3},chevron:{fontSize:26,color:colors.textMuted}
 });
