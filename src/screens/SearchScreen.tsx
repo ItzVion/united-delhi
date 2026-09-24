@@ -91,7 +91,7 @@ export default function SearchScreen() {
         keyExtractor={item => `${item.type}-${item.id}`}
         contentContainerStyle={styles.list}
         ListHeaderComponent={results.length > 0 ? <Text style={styles.resultsTitle}>{results.length} matches</Text> : null}
-        ListEmptyComponent={!loading && query.trim().length >= 2 ? <View style={styles.empty}><Text style={styles.emptyTitle}>No matches</Text><Text style={styles.emptyText}>Try a route number, stop name, or part of a destination.</Text></View> : null}
+        ListEmptyComponent={!loading && !error && query.trim().length >= 2 ? <View style={styles.empty}><Text style={styles.emptyTitle}>No matches</Text><Text style={styles.emptyText}>Try a route number, stop name, or part of a destination.</Text></View> : null}
         renderItem={({ item }) => (
           <Pressable
             style={styles.row}
