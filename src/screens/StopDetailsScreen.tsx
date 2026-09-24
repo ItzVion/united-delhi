@@ -65,7 +65,10 @@ export default function StopDetailsScreen() {
         setSmartLeaveError('Location permission is needed to estimate your walk.');
         return;
       }
-      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const current = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
+      ]);
       const distance = haversineMeters(current.coords.latitude, current.coords.longitude, stop.latitude, stop.longitude);
       setSmartLeave(computeSmartLeave(arrivals, walkingSeconds(distance)));
     } catch {
