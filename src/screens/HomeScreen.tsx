@@ -237,7 +237,18 @@ const stopLayer=L.layerGroup().addTo(map); const busLayer=L.layerGroup().addTo(m
 window.updateMap=function(data){
   stopLayer.clearLayers(); busLayer.clearLayers(); userLayer.clearLayers();
   const stopIcon=L.divIcon({className:'',html:'<div class="stop-label">● Stop</div>',iconSize:[55,24],iconAnchor:[8,12]});
-  data.stops.forEach(s=>L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup('<b>'+escapeHtml(s.name)+'</b><br><button onclick="openStop(\\''+s.id+'\\')">View stop</button>'));
+  data.stops.forEach(s=>{
+    const popup=document.createElement('div');
+    const title=document.createElement('b');
+    title.textContent=s.name;
+    const button=document.createElement('button');
+    button.type='button';
+    button.textContent='View stop';
+    button.style.marginTop='6px';
+    button.addEventListener('click',()=>openStop(s.id));
+    popup.append(title,document.createElement('br'),button);
+    L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup(popup);
+  });
   data.buses.forEach(v=>L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label">'+escapeHtml(v.route||'BUS')+'</div>',iconSize:[52,24],iconAnchor:[26,12]})}).addTo(busLayer).bindPopup(escapeHtml(v.route||'Live bus')));
   if(data.location){L.circleMarker([data.location.lat,data.location.lon],{radius:8,color:'#1769e0',weight:3,fillColor:'#fff',fillOpacity:1}).addTo(userLayer); if(!hasCentered){map.setView([data.location.lat,data.location.lon],14);hasCentered=true;}}
 };
