@@ -8,6 +8,7 @@ import { api, Route as ApiRoute, Stop, Vehicle } from '../api/client';
 import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
+import { displayRouteName } from '../lib/routeDisplay';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'RouteDetails'>;
 type RouteDetailsRoute = RouteProp<RootStackParamList, 'RouteDetails'>;
@@ -53,12 +54,12 @@ export default function RouteDetailsScreen() {
     if (!mapReady) return;
     const payload = {
       stops: stops.map(s => ({ id: s.stop_id, name: s.name, lat: s.latitude, lon: s.longitude })),
-      buses: vehicles.map(v => ({ id: v.id, route: v.routeShortName || v.routeId, lat: v.latitude, lon: v.longitude }))
+      buses: vehicles.map(v => ({ id: v.id, route: displayRouteName(v.routeShortName) || v.routeId, lat: v.latitude, lon: v.longitude }))
     };
     mapRef.current?.injectJavaScript(`window.updateRouteMap(${JSON.stringify(payload)}); true;`);
   }, [mapReady, stops, vehicles]);
 
-  const routeName = route?.short_name || label || routeId;
+  const routeName = displayRouteName(route?.short_name) || displayRouteName(label) || routeId;
 
   return (
     <SafeAreaView style={styles.safe}>
