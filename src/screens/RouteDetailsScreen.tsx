@@ -132,7 +132,18 @@ window.updateRouteMap=function(data){
  const line=data.stops.map(s=>[s.lat,s.lon]);
  if(line.length>1)L.polyline(line,{color:'#1769e0',weight:5,opacity:.9,lineCap:'round'}).addTo(lineLayer);
  const stopIcon=L.divIcon({className:'',html:'<div class="stop-label">●</div>',iconSize:[22,22],iconAnchor:[11,11]});
- data.stops.forEach(s=>L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup('<b>'+escapeHtml(s.name)+'</b><br><button onclick="openStop(\\''+s.id+'\\')">View stop</button>'));
+ data.stops.forEach(s=>{
+   const popup=document.createElement('div');
+   const title=document.createElement('b');
+   title.textContent=s.name;
+   const button=document.createElement('button');
+   button.type='button';
+   button.textContent='View stop';
+   button.style.marginTop='6px';
+   button.addEventListener('click',()=>openStop(s.id));
+   popup.append(title,document.createElement('br'),button);
+   L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup(popup);
+ });
  data.buses.forEach(v=>L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label">'+escapeHtml(v.route||'BUS')+'</div>',iconSize:[50,22],iconAnchor:[25,11]})}).addTo(busLayer).bindPopup(escapeHtml(v.route||'Live bus')));
  if(line.length>1&&!fitted){map.fitBounds(line,{padding:[20,20]});fitted=true;}
 };
