@@ -48,6 +48,7 @@ navigation, map WebViews, and pure utility code.
 - Made the Home map filter live buses to the current visible viewport instead of only the initial location.
 - Made Search display API failures instead of silently showing an empty result state.
 - Restricted GitHub Actions workflows to read-only repository contents and pinned the EAS CLI build version.
+- Added a dedicated 30/minute rate limit to the large realtime-vehicles endpoint.
 - Applied the global API limiter middleware so the general 180/minute limit is actually enforced.
 - Aligned render.yaml service name with the existing Render service.
 
