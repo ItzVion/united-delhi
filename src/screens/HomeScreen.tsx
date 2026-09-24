@@ -9,6 +9,7 @@ import { api, Stop, Vehicle } from '../api/client';
 import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
+import { displayRouteName } from '../lib/routeDisplay';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
@@ -145,7 +146,7 @@ export default function HomeScreen() {
           return distance(a) - distance(b);
         })
         .slice(0, 250)
-        .map(v => ({ id: v.id, route: v.routeShortName || v.routeId, lat: v.latitude, lon: v.longitude })),
+        .map(v => ({ id: v.id, route: displayRouteName(v.routeShortName) || v.routeId, lat: v.latitude, lon: v.longitude })),
       location: location ? { lat: location.coords.latitude, lon: location.coords.longitude } : null
     };
     mapRef.current?.injectJavaScript(`window.updateMap(${JSON.stringify(payload)}); true;`);
