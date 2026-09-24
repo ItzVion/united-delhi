@@ -3,8 +3,9 @@ services:
     name: united-delhi-api
     runtime: node
     rootDir: server
-    buildCommand: npm install && npm run import:gtfs
+    buildCommand: npm ci && npm run import:gtfs
     startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: DTC_API_KEY
         sync: false
