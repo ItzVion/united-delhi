@@ -226,6 +226,19 @@ const realtimeCache = {
 };
 
 let realtimeRefreshInFlight = null;
+let vehicleSaveInFlight = false;
+
+async function persistVehiclesIfIdle(vehicles) {
+  if (!pool || vehicles.length === 0 || vehicleSaveInFlight) return;
+  vehicleSaveInFlight = true;
+  try {
+    await saveVehicles(vehicles);
+  } catch (error) {
+    console.error('Failed to save realtime vehicles:', error);
+  } finally {
+    vehicleSaveInFlight = false;
+  }
+}
 
 async function refreshRealtimeCache() {
   if (realtimeRefreshInFlight) return realtimeRefreshInFlight;
@@ -239,9 +252,7 @@ async function refreshRealtimeCache() {
       realtimeCache.fetchedAt = new Date().toISOString();
 
       if (pool && vehicles.length > 0) {
-        saveVehicles(vehicles).catch(error => {
-          console.error('Failed to save realtime vehicles:', error);
-        });
+        void persistVehiclesIfIdle(vehicles);
       }
     } catch (error) {
       if (!realtimeCache.fetchedAt) {
