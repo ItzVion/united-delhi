@@ -54,7 +54,7 @@ navigation, map WebViews, and pure utility code.
 No application code path intentionally exposes `DTC_API_KEY` or `DATABASE_URL`.
 SQL queries use PostgreSQL parameters.
 The API is read-only from the public client surface.
-Live vehicle labels and map HTML are escaped before insertion into popup/label HTML.
+Visible route/stop values are escaped or inserted with DOM `textContent`; map popup handlers no longer interpolate stop IDs into inline JavaScript.
 
 ## Verification
 
