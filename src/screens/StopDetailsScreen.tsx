@@ -100,7 +100,7 @@ export default function StopDetailsScreen() {
             <View key={a.vehicleId} style={styles.arrival}>
               <View style={[styles.busIcon, { backgroundColor: index % 2 ? colors.accentSoft : colors.warningSoft }]}><Text style={{ color: index % 2 ? colors.accent : colors.warning, fontWeight: '900' }}>BUS</Text></View>
               <View style={styles.arrivalMain}>
-                <Text style={styles.route}>{a.routeId || 'Unknown route'}</Text>
+                <Text style={styles.route}>{a.routeShortName || a.routeId || 'Unknown route'}</Text>
                 <Text style={styles.arrivalMeta}>{a.source === 'live-data-estimate' ? 'Live estimate' : 'Live position'} · {a.observedAgeSeconds}s old</Text>
               </View>
               <View style={styles.etaBox}>
