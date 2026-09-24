@@ -60,6 +60,17 @@ const dbRateLimit = rateLimit({
   }
 });
 
+const healthRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: 60,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    status: 'RATE_LIMITED',
+    reason: 'Too many health checks. Please try again shortly.'
+  }
+});
+
 const ok = value => value !== undefined && value !== null && value !== '';
 
 function numberOrNull(value) {
@@ -302,7 +313,7 @@ app.get('/', (_req, res) => {
   res.status(200).json({ ok: true, service: 'united-delhi-api' });
 });
 
-app.get('/health', async (_req, res) => {
+app.get('/health', healthRateLimit, async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   let database = 'not_configured';
   if (pool) {
