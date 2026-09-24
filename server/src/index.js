@@ -102,6 +102,15 @@ function normalizeBearing(value) {
   return bearing !== null && bearing >= 0 && bearing <= 360 ? bearing : null;
 }
 
+function observedAtFromTimestamp(value) {
+  const seconds = numberOrNull(value);
+  const milliseconds = seconds === null ? NaN : seconds * 1000;
+  if (!Number.isFinite(milliseconds) || milliseconds < 0 || Math.abs(milliseconds) > 8640000000000000) {
+    return new Date().toISOString();
+  }
+  return new Date(milliseconds).toISOString();
+}
+
 function entityToVehicle(entity) {
   const vehicle = entity.vehicle;
   if (!vehicle?.position) return null;
@@ -124,7 +133,7 @@ function entityToVehicle(entity) {
     longitude: lon,
     bearing: normalizeBearing(position.bearing),
     speedMps: normalizeSpeed(position.speed),
-    observedAt: timestamp > 0 ? new Date(timestamp * 1000).toISOString() : new Date().toISOString()
+    observedAt: timestamp > 0 ? observedAtFromTimestamp(timestamp) : new Date().toISOString()
   };
 }
 
@@ -672,8 +681,12 @@ app.get('/api/search', dbRateLimit, async (req, res) => {
        WHERE name ILIKE $1 ESCAPE '\\'
        UNION ALL
        SELECT 'route' AS type, route_id AS id,
-              COALESCE(short_name, '') ||
-              CASE WHEN long_name IS NOT NULL THEN ' — ' || long_name ELSE '' END AS label
+              CASE
+                WHEN short_name IS NULL OR TRIM(short_name) = '' THEN COALESCE(long_name, '')
+                WHEN long_name IS NULL OR TRIM(long_name) = '' THEN TRIM(short_name)
+                WHEN LOWER(TRIM(long_name)) = LOWER(TRIM(short_name)) THEN TRIM(short_name)
+                ELSE TRIM(short_name) || ' — ' || TRIM(long_name)
+              END AS label
        FROM routes
        WHERE COALESCE(short_name, '') ILIKE $1 ESCAPE '\\'
           OR COALESCE(long_name, '') ILIKE $1 ESCAPE '\\'
