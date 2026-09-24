@@ -12,7 +12,7 @@ navigation, map WebViews, and pure utility code.
 
 - Fixed stop-arrivals runtime crash caused by destructuring vehicle objects incorrectly.
 - Added public `routeShortName` to stop-arrival responses and use it in the UI.
-- Added API rate limiting for public API and database-heavy endpoints.
+- Added API rate limiting for the public API, health endpoint, and database-heavy endpoints.
 - Added PostgreSQL pool error handling, connection timeouts, idle timeouts, and local-DB SSL handling.
 - Added input validation for coordinates, route/stop IDs, speed, bearing, and search length.
 - Escaped wildcard characters in PostgreSQL ILIKE search.
@@ -40,6 +40,8 @@ navigation, map WebViews, and pure utility code.
 - Added GitHub CI for typechecking, tests, dependency audits, and backend syntax checks.
 - Switched Render deployment to `npm ci` and added the Render health check path.
 - Kept APK builds manual so ordinary code pushes do not consume EAS build resources.
+- Applied the global API limiter middleware so the general 180/minute limit is actually enforced.
+- Aligned render.yaml service name with the existing Render service.
 
 ## Important limitations / not fully verified here
 
