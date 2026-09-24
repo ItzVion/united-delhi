@@ -30,10 +30,7 @@ export default function HomeScreen() {
       const existing = await Location.getForegroundPermissionsAsync();
       const permission = existing.status === 'granted'
         ? existing
-        : await Promise.race([
-            Location.requestForegroundPermissionsAsync(),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
-          ]);
+        : await Location.requestForegroundPermissionsAsync();
       if (permission.status !== 'granted') {
         setLocationStatus('Location is off. Showing Delhi.');
         return;
@@ -88,8 +85,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     requestLocation();
-    loadNearbyStops(DELHI_REGION.latitude, DELHI_REGION.longitude);
-  }, [requestLocation, loadNearbyStops]);
+  }, [requestLocation]);
 
   useEffect(() => {
     if (location) loadNearbyStops(location.coords.latitude, location.coords.longitude);
@@ -228,9 +224,9 @@ export default function HomeScreen() {
 
 function buildMapHtml() {
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <style>html,body,#map{margin:0;width:100%;height:100%;background:#eef2f6} .leaflet-control-zoom{border:0!important;box-shadow:0 2px 10px rgba(20,32,51,.14)!important}.leaflet-control-zoom a{border:0!important;color:#142033!important}.stop-label{font:700 11px system-ui,sans-serif;color:#142033;background:#fff;border:1px solid #e1e7ef;border-radius:10px;padding:4px 7px;box-shadow:0 2px 7px rgba(20,32,51,.12)}.bus-label{font:800 11px system-ui,sans-serif;color:#fff;background:#1769e0;border-radius:8px;padding:3px 6px;border:2px solid #fff;box-shadow:0 2px 6px rgba(20,32,51,.18)}</style></head><body><div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script>
 const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5}).setView([28.6139,77.209],13);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,keepBuffer:2,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
 const stopLayer=L.layerGroup().addTo(map); const busLayer=L.layerGroup().addTo(map); let userLayer=L.layerGroup().addTo(map); let hasCentered=false;
