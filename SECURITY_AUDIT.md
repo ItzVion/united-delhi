@@ -49,6 +49,7 @@ navigation, map WebViews, and pure utility code.
 - Made Search display API failures instead of silently showing an empty result state.
 - Restricted GitHub Actions workflows to read-only repository contents and pinned the EAS CLI build version.
 - Added a dedicated 30/minute rate limit to the large realtime-vehicles endpoint.
+- Updated transit search results to return real first/last stops for each matching route and removed trailing UP/DOWN direction suffixes from public route display labels without changing the underlying route IDs.
 - Applied the global API limiter middleware so the general 180/minute limit is actually enforced.
 - Aligned render.yaml service name with the existing Render service.
 
