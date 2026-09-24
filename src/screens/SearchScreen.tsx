@@ -103,8 +103,22 @@ export default function SearchScreen() {
               <Text style={styles.typeIconText}>{item.type === 'route' ? 'BUS' : '•'}</Text>
             </View>
             <View style={styles.resultText}>
-              <Text style={styles.label} numberOfLines={2}>{item.label}</Text>
-              <Text style={styles.typeLabel}>{item.type === 'route' ? 'Bus route' : 'Bus stop'}</Text>
+              <Text style={styles.label} numberOfLines={1}>{item.label}</Text>
+              {item.type === 'route' && item.fromStop ? (
+                <View style={styles.endpointRow}>
+                  <View style={styles.endpointRail}>
+                    <View style={styles.endpointDot} />
+                    <View style={styles.endpointLine} />
+                    <View style={styles.endpointDot} />
+                  </View>
+                  <View style={styles.endpointText}>
+                    <Text style={styles.endpoint} numberOfLines={1}>{item.fromStop}</Text>
+                    <Text style={styles.endpoint} numberOfLines={1}>{item.toStop || 'Destination unavailable'}</Text>
+                  </View>
+                </View>
+              ) : (
+                <Text style={styles.typeLabel}>Bus stop</Text>
+              )}
             </View>
             <Text style={styles.chevron}>›</Text>
           </Pressable>
@@ -123,5 +137,5 @@ const styles = StyleSheet.create({
   searchIcon:{fontSize:27,color:colors.text,marginRight:8,marginTop:-3},input:{flex:1,color:colors.text,fontSize:15},clear:{fontSize:26,color:colors.textMuted,paddingHorizontal:4},
   hintCard:{margin:18,padding:16,borderRadius:16,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},hintTitle:{fontSize:16,fontWeight:'800',color:colors.text},hintText:{fontSize:13,color:colors.textMuted,marginTop:4},exampleRow:{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:12},example:{paddingHorizontal:12,paddingVertical:7,borderRadius:999,backgroundColor:colors.accentSoft},exampleText:{fontSize:12,fontWeight:'800',color:colors.accent},
   errorCard:{marginHorizontal:18,marginTop:10,padding:12,borderRadius:14,backgroundColor:colors.dangerSoft,borderWidth:1,borderColor:colors.danger},errorTitle:{fontSize:13,fontWeight:'900',color:colors.danger},errorText:{fontSize:12,lineHeight:17,color:colors.textMuted,marginTop:2},
-  list:{paddingHorizontal:18,paddingTop:12,paddingBottom:30},empty:{paddingVertical:28,paddingHorizontal:8,alignItems:'center'},emptyTitle:{fontSize:16,fontWeight:'900',color:colors.text,textAlign:'center'},emptyText:{fontSize:13,lineHeight:19,color:colors.textMuted,textAlign:'center',marginTop:5},resultsTitle:{fontSize:13,fontWeight:'800',color:colors.textMuted,marginBottom:8},row:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:15,padding:13,marginBottom:8,flexDirection:'row',alignItems:'center'},typeIcon:{width:42,height:42,borderRadius:13,alignItems:'center',justifyContent:'center'},routeIcon:{backgroundColor:colors.accent},stopIcon:{backgroundColor:colors.successSoft},typeIconText:{fontSize:10,fontWeight:'900',color:'#fff'},resultText:{flex:1,marginLeft:11},label:{fontSize:14,fontWeight:'800',color:colors.text},typeLabel:{fontSize:11,color:colors.textMuted,marginTop:3},chevron:{fontSize:26,color:colors.textMuted}
+  list:{paddingHorizontal:18,paddingTop:12,paddingBottom:30},endpointRow:{flexDirection:'row',alignItems:'stretch',marginTop:6,minHeight:34},endpointRail:{width:14,alignItems:'center',paddingVertical:2},endpointDot:{width:6,height:6,borderRadius:3,backgroundColor:colors.accent,borderWidth:1,borderColor:colors.accent},endpointLine:{width:1,flex:1,backgroundColor:colors.accentSoft,marginVertical:2},endpointText:{flex:1,justifyContent:'space-between',marginLeft:5},endpoint:{fontSize:11,lineHeight:15,color:colors.textMuted},empty:{paddingVertical:28,paddingHorizontal:8,alignItems:'center'},emptyTitle:{fontSize:16,fontWeight:'900',color:colors.text,textAlign:'center'},emptyText:{fontSize:13,lineHeight:19,color:colors.textMuted,textAlign:'center',marginTop:5},resultsTitle:{fontSize:13,fontWeight:'800',color:colors.textMuted,marginBottom:8},row:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:15,padding:13,marginBottom:8,flexDirection:'row',alignItems:'center'},typeIcon:{width:42,height:42,borderRadius:13,alignItems:'center',justifyContent:'center'},routeIcon:{backgroundColor:colors.accent},stopIcon:{backgroundColor:colors.successSoft},typeIconText:{fontSize:10,fontWeight:'900',color:'#fff'},resultText:{flex:1,marginLeft:11},label:{fontSize:14,fontWeight:'800',color:colors.text},typeLabel:{fontSize:11,color:colors.textMuted,marginTop:3},chevron:{fontSize:26,color:colors.textMuted}
 });
