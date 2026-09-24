@@ -71,6 +71,8 @@ const healthRateLimit = rateLimit({
   }
 });
 
+app.use('/api', apiRateLimit);
+
 const ok = value => value !== undefined && value !== null && value !== '';
 
 function numberOrNull(value) {
