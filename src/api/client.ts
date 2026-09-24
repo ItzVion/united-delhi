@@ -36,6 +36,36 @@ export interface SearchResult {
   toStop?: string | null;
 }
 
+export interface TripPlanOption {
+  type: 'direct' | 'one-transfer';
+  durationMinutes: number;
+  walkingMinutes: number;
+  legs: Array<{
+    routeId: string;
+    routeName: string;
+    fromStop: string;
+    toStop: string;
+    fromStopId: string;
+    toStopId: string;
+  }>;
+  transferStop?: string | null;
+}
+
+export interface TripPlanStop {
+  stop_id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface TripPlanResponse {
+  status: string;
+  origin: TripPlanStop | null;
+  destination: TripPlanStop | null;
+  options: TripPlanOption[];
+  reason?: string;
+}
+
 export interface Arrival {
   vehicleId: string;
   routeId: string | null;
@@ -79,7 +109,8 @@ export const api = {
   search: (q: string) => request<{ status: string; results: SearchResult[] }>(`/api/search?q=${encodeURIComponent(q)}`),
   stop: (id: string) => request<{ status: string; stop: Stop; routes: Route[] }>(`/api/stops/${encodeURIComponent(id)}`),
   route: (id: string) => request<{ status: string; route: Route; stops: Stop[]; vehicles: Vehicle[] }>(`/api/routes/${encodeURIComponent(id)}`),
-  arrivals: (stopId: string) => request<{ status: string; arrivals: Arrival[]; reason?: string }>(`/api/stops/${encodeURIComponent(stopId)}/arrivals`)
+  arrivals: (stopId: string) => request<{ status: string; arrivals: Arrival[]; reason?: string }>(`/api/stops/${encodeURIComponent(stopId)}/arrivals`),
+  plan: (from: string, to: string) => request<TripPlanResponse>(`/api/plan?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
 };
 
 export { ApiError };
