@@ -40,6 +40,14 @@ navigation, map WebViews, and pure utility code.
 - Added GitHub CI for typechecking, tests, dependency audits, and backend syntax checks.
 - Switched Render deployment to `npm ci` and added the Render health check path.
 - Kept APK builds manual so ordinary code pushes do not consume EAS build resources.
+- Upgraded `csv-parse` to 7.0.2 to address the September 2026 prototype-pollution advisory.
+- Added a database statement timeout for normal API queries.
+- Prevented realtime vehicle persistence jobs from overlapping when the database is slow.
+- Made GTFS route and stop parsing deduplicate duplicate IDs before bulk upserts.
+- Added a timeout to foreground location permission requests so the UI cannot wait indefinitely.
+- Made the Home map filter live buses to the current visible viewport instead of only the initial location.
+- Made Search display API failures instead of silently showing an empty result state.
+- Restricted GitHub Actions workflows to read-only repository contents and pinned the EAS CLI build version.
 - Applied the global API limiter middleware so the general 180/minute limit is actually enforced.
 - Aligned render.yaml service name with the existing Render service.
 
