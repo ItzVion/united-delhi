@@ -2,11 +2,13 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { readGtfsCsv, parseStops, parseRoutes, buildRouteStops } from '../src/lib/gtfsImport.js';
 
 const { Pool } = pg;
 const arg = process.argv[2];
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 let dir = arg;
 let tempDir = null;
 
@@ -103,7 +105,7 @@ async function importGtfs() {
   try {
     // Keep schema creation in the importer so a fresh Render/Neon database can
     // bootstrap itself without a separate manual migration step.
-    const schemaPath = path.join(process.cwd(), 'sql', '001_initial.sql');
+    const schemaPath = path.join(scriptDir, '..', 'sql', '001_initial.sql');
     await client.query(fs.readFileSync(schemaPath, 'utf8'));
 
     await client.query('BEGIN');
