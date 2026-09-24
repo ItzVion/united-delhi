@@ -224,25 +224,24 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.actionRow}>
-        <Pressable style={styles.actionButton} onPress={() => navigation.navigate('Search')}>
-          <Text style={styles.actionIcon}>⌕</Text>
-          <View style={styles.actionCopy}>
-            <Text style={styles.actionTitle}>Find a route</Text>
-            <Text style={styles.actionSub}>Search buses and stops</Text>
-          </View>
-          <Text style={styles.actionArrow}>›</Text>
+        <Pressable style={styles.actionTile} onPress={() => navigation.navigate('Search')}>
+          <Text style={styles.actionTileIcon}>⌕</Text>
+          <Text style={styles.actionTileTitle}>Search</Text>
+          <Text style={styles.actionTileSub}>Routes & stops</Text>
+        </Pressable>
+        <Pressable style={styles.actionTile} onPress={() => navigation.navigate('Planner')}>
+          <Text style={[styles.actionTileIcon, { color: colors.secondary }]}>↗</Text>
+          <Text style={styles.actionTileTitle}>Plan trip</Text>
+          <Text style={styles.actionTileSub}>Find a bus</Text>
         </Pressable>
         <Pressable
-          style={[styles.actionButton, (!location || loadingNearby) && styles.actionButtonDisabled]}
+          style={[styles.actionTile, (!location || loadingNearby) && styles.actionButtonDisabled]}
           onPress={() => location && loadNearbyStops(location.coords.latitude, location.coords.longitude)}
           disabled={!location || loadingNearby}
         >
-          <Text style={[styles.actionIcon, { color: colors.success }]}>●</Text>
-          <View style={styles.actionCopy}>
-            <Text style={styles.actionTitle}>Nearby stops</Text>
-            <Text style={styles.actionSub}>Stops around you</Text>
-          </View>
-          <Text style={styles.actionArrow}>›</Text>
+          <Text style={[styles.actionTileIcon, { color: colors.success }]}>●</Text>
+          <Text style={styles.actionTileTitle}>Nearby</Text>
+          <Text style={styles.actionTileSub}>Stops around you</Text>
         </Pressable>
       </View>
 
@@ -315,6 +314,6 @@ const styles = StyleSheet.create({
   mapWrap:{marginHorizontal:16,height:315,borderRadius:20,overflow:'hidden',backgroundColor:'#eef2f6',borderWidth:1,borderColor:colors.border},map:{flex:1},
   mapAttribution:{position:'absolute',right:8,bottom:7,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:6,paddingVertical:2,borderRadius:4},mapAttributionText:{fontSize:8,color:'#4a5568'},mapBadge:{position:'absolute',left:10,top:10,backgroundColor:'rgba(255,255,255,.95)',paddingHorizontal:9,paddingVertical:6,borderRadius:10},mapBadgeText:{fontSize:11,fontWeight:'700',color:colors.text},locationNotice:{position:'absolute',left:12,right:12,bottom:12,backgroundColor:'#fff',borderRadius:12,padding:10,borderWidth:1,borderColor:colors.border,flexDirection:'row',justifyContent:'space-between'},locationNoticeText:{color:colors.textMuted,fontSize:12},locationRetry:{color:colors.accent,fontWeight:'800',fontSize:12},
   sectionHeader:{paddingHorizontal:20,paddingTop:16,paddingBottom:8,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{fontSize:19,fontWeight:'800',color:colors.text},
-  actionRow:{paddingHorizontal:20,paddingTop:4,gap:8},actionButtonDisabled:{opacity:0.55},actionButton:{minHeight:64,borderRadius:15,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,paddingHorizontal:13,flexDirection:'row',alignItems:'center'},actionIcon:{fontSize:20,color:colors.accent,fontWeight:'900',width:30,textAlign:'center'},actionCopy:{flex:1,marginLeft:7},actionTitle:{fontSize:14,fontWeight:'800',color:colors.text},actionSub:{fontSize:11,color:colors.textMuted,marginTop:2},actionArrow:{fontSize:25,color:colors.textMuted},
+  actionRow:{paddingHorizontal:18,paddingTop:6,gap:8,flexDirection:'row'},actionButtonDisabled:{opacity:0.55},actionTile:{flex:1,minHeight:76,borderRadius:17,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,paddingHorizontal:9,paddingVertical:10},actionTileIcon:{fontSize:21,color:colors.accent,fontWeight:'900'},actionTileTitle:{fontSize:12,fontWeight:'900',color:colors.text,marginTop:5},actionTileSub:{fontSize:9,color:colors.textMuted,marginTop:2},
   list:{paddingHorizontal:20,paddingBottom:30},stopCard:{backgroundColor:colors.surface,borderRadius:15,borderWidth:1,borderColor:colors.border,padding:12,marginBottom:8,flexDirection:'row',alignItems:'center'},stopPin:{width:34,height:34,borderRadius:17,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},stopPinText:{color:colors.accent,fontSize:13},stopInfo:{flex:1,marginLeft:10},stopName:{fontSize:14,fontWeight:'800',color:colors.text},stopDistance:{fontSize:12,color:colors.textMuted,marginTop:2},chevron:{fontSize:26,color:colors.textMuted,marginLeft:8},emptyText:{color:colors.textMuted,fontSize:13,paddingBottom:20}
 });
