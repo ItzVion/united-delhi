@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api, SearchResult } from '../api/client';
 import { colors } from '../theme';
+import { displayRouteName } from '../lib/routeDisplay';
 import type { RootStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Search'>;
@@ -99,28 +100,46 @@ export default function SearchScreen() {
               ? navigation.navigate('StopDetails', { stopId: item.id, stopName: item.label })
               : navigation.navigate('RouteDetails', { routeId: item.id, label: item.label })}
           >
-            <View style={[styles.typeIcon, item.type === 'route' ? styles.routeIcon : styles.stopIcon]}>
-              <Text style={styles.typeIconText}>{item.type === 'route' ? 'BUS' : '•'}</Text>
-            </View>
-            <View style={styles.resultText}>
-              <Text style={styles.label} numberOfLines={1}>{item.label}</Text>
-              {item.type === 'route' && item.fromStop ? (
-                <View style={styles.endpointRow}>
-                  <View style={styles.endpointRail}>
-                    <View style={styles.endpointDot} />
-                    <View style={styles.endpointLine} />
-                    <View style={styles.endpointDot} />
+            {item.type === 'route' ? (
+              <View style={styles.routeResult}>
+                <View style={styles.routeHeader}>
+                  <View style={styles.routeBadge}>
+                    <Text style={styles.routeBadgeText}>{displayRouteName(item.label) || item.label}</Text>
                   </View>
-                  <View style={styles.endpointText}>
-                    <Text style={styles.endpoint} numberOfLines={1}>{item.fromStop}</Text>
-                    <Text style={styles.endpoint} numberOfLines={1}>{item.toStop || 'Destination unavailable'}</Text>
-                  </View>
+                  <Text style={styles.routeCaption}>Bus route</Text>
+                  <Text style={styles.chevron}>›</Text>
                 </View>
-              ) : (
-                <Text style={styles.typeLabel}>Bus stop</Text>
-              )}
-            </View>
-            <Text style={styles.chevron}>›</Text>
+
+                {item.fromStop || item.toStop ? (
+                  <View style={styles.stopsBlock}>
+                    <View style={styles.stopColumn}>
+                      <View style={styles.stopDot} />
+                      <View style={styles.stopLine} />
+                      <View style={styles.stopDot} />
+                    </View>
+                    <View style={styles.stopNames}>
+                      <View style={styles.stopNameBlock}>
+                        <Text style={styles.stopLabel}>STARTING STOP</Text>
+                        <Text style={styles.stopName} numberOfLines={1}>{item.fromStop || 'Starting stop unavailable'}</Text>
+                      </View>
+                      <View style={styles.stopNameBlock}>
+                        <Text style={styles.stopLabel}>ENDING STOP</Text>
+                        <Text style={styles.stopName} numberOfLines={1}>{item.toStop || 'Ending stop unavailable'}</Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.stopResult}>
+                <View style={styles.stopIcon}><Text style={styles.stopIconText}>●</Text></View>
+                <View style={styles.resultText}>
+                  <Text style={styles.label} numberOfLines={1}>{item.label}</Text>
+                  <Text style={styles.typeLabel}>Bus stop</Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </View>
+            )}
           </Pressable>
         )}
       />
@@ -137,5 +156,28 @@ const styles = StyleSheet.create({
   searchIcon:{fontSize:27,color:colors.text,marginRight:8,marginTop:-3},input:{flex:1,color:colors.text,fontSize:15},clear:{fontSize:26,color:colors.textMuted,paddingHorizontal:4},
   hintCard:{margin:18,padding:16,borderRadius:16,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},hintTitle:{fontSize:16,fontWeight:'800',color:colors.text},hintText:{fontSize:13,color:colors.textMuted,marginTop:4},exampleRow:{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:12},example:{paddingHorizontal:12,paddingVertical:7,borderRadius:999,backgroundColor:colors.accentSoft},exampleText:{fontSize:12,fontWeight:'800',color:colors.accent},
   errorCard:{marginHorizontal:18,marginTop:10,padding:12,borderRadius:14,backgroundColor:colors.dangerSoft,borderWidth:1,borderColor:colors.danger},errorTitle:{fontSize:13,fontWeight:'900',color:colors.danger},errorText:{fontSize:12,lineHeight:17,color:colors.textMuted,marginTop:2},
-  list:{paddingHorizontal:18,paddingTop:12,paddingBottom:30},endpointRow:{flexDirection:'row',alignItems:'stretch',marginTop:6,minHeight:34},endpointRail:{width:14,alignItems:'center',paddingVertical:2},endpointDot:{width:6,height:6,borderRadius:3,backgroundColor:colors.accent,borderWidth:1,borderColor:colors.accent},endpointLine:{width:1,flex:1,backgroundColor:colors.accentSoft,marginVertical:2},endpointText:{flex:1,justifyContent:'space-between',marginLeft:5},endpoint:{fontSize:11,lineHeight:15,color:colors.textMuted},empty:{paddingVertical:28,paddingHorizontal:8,alignItems:'center'},emptyTitle:{fontSize:16,fontWeight:'900',color:colors.text,textAlign:'center'},emptyText:{fontSize:13,lineHeight:19,color:colors.textMuted,textAlign:'center',marginTop:5},resultsTitle:{fontSize:13,fontWeight:'800',color:colors.textMuted,marginBottom:8},row:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:15,padding:13,marginBottom:8,flexDirection:'row',alignItems:'center'},typeIcon:{width:42,height:42,borderRadius:13,alignItems:'center',justifyContent:'center'},routeIcon:{backgroundColor:colors.accent},stopIcon:{backgroundColor:colors.successSoft},typeIconText:{fontSize:10,fontWeight:'900',color:'#fff'},resultText:{flex:1,marginLeft:11},label:{fontSize:14,fontWeight:'800',color:colors.text},typeLabel:{fontSize:11,color:colors.textMuted,marginTop:3},chevron:{fontSize:26,color:colors.textMuted}
+  list:{paddingHorizontal:18,paddingTop:12,paddingBottom:30},
+  empty:{paddingVertical:28,paddingHorizontal:8,alignItems:'center'},emptyTitle:{fontSize:16,fontWeight:'900',color:colors.text,textAlign:'center'},emptyText:{fontSize:13,lineHeight:19,color:colors.textMuted,textAlign:'center',marginTop:5},
+  resultsTitle:{fontSize:13,fontWeight:'800',color:colors.textMuted,marginBottom:8},
+  row:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:17,marginBottom:10,overflow:'hidden'},
+  routeResult:{padding:14},
+  routeHeader:{flexDirection:'row',alignItems:'center'},
+  routeBadge:{minWidth:62,height:38,paddingHorizontal:12,borderRadius:10,backgroundColor:colors.accent,alignItems:'center',justifyContent:'center'},
+  routeBadgeText:{fontSize:17,fontWeight:'900',color:'#fff'},
+  routeCaption:{fontSize:12,fontWeight:'700',color:colors.textMuted,marginLeft:10,flex:1},
+  chevron:{fontSize:25,color:colors.textMuted},
+  stopsBlock:{flexDirection:'row',marginTop:14,paddingTop:13,borderTopWidth:1,borderTopColor:colors.border},
+  stopColumn:{width:18,alignItems:'center',paddingVertical:4},
+  stopDot:{width:8,height:8,borderRadius:4,backgroundColor:colors.accent},
+  stopLine:{width:2,flex:1,minHeight:20,backgroundColor:colors.accentSoft,marginVertical:3},
+  stopNames:{flex:1,marginLeft:9,justifyContent:'space-between',minHeight:66},
+  stopNameBlock:{marginBottom:8},
+  stopLabel:{fontSize:9,fontWeight:'900',letterSpacing:0.7,color:colors.textMuted},
+  stopName:{fontSize:13,fontWeight:'700',color:colors.text,lineHeight:18},
+  stopResult:{padding:13,flexDirection:'row',alignItems:'center'},
+  stopIcon:{width:38,height:38,borderRadius:11,backgroundColor:colors.successSoft,alignItems:'center',justifyContent:'center'},
+  stopIconText:{fontSize:11,color:colors.success},
+  resultText:{flex:1,marginLeft:11},
+  label:{fontSize:14,fontWeight:'800',color:colors.text},
+  typeLabel:{fontSize:11,color:colors.textMuted,marginTop:3}
 });
