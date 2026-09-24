@@ -28,12 +28,27 @@ export default function StopDetailsScreen() {
   const [computingSmartLeave, setComputingSmartLeave] = useState(false);
 
   const load = useCallback(async () => {
-    try {
-      const [stopResult, arrivalsResult] = await Promise.all([api.stop(stopId), api.arrivals(stopId)]);
+    const [stopSettled, arrivalsSettled] = await Promise.allSettled([
+      api.stop(stopId),
+      api.arrivals(stopId)
+    ]);
+
+    if (stopSettled.status === 'fulfilled') {
+      const stopResult = stopSettled.value;
       if (stopResult.status === 'OK') {
         setStop(stopResult.stop);
         setRoutes(stopResult.routes);
+      } else {
+        setStop(null);
+        setRoutes([]);
       }
+    } else {
+      setStop(null);
+      setRoutes([]);
+    }
+
+    if (arrivalsSettled.status === 'fulfilled') {
+      const arrivalsResult = arrivalsSettled.value;
       if (arrivalsResult.status === 'OK') {
         setArrivals(arrivalsResult.arrivals);
         setArrivalsReason(null);
@@ -41,11 +56,16 @@ export default function StopDetailsScreen() {
         setArrivals([]);
         setArrivalsReason(arrivalsResult.reason || 'Live arrival data is unavailable.');
       }
-    } catch (error) {
-      setArrivalsReason((error as Error).message);
-    } finally {
-      setLoading(false);
+    } else {
+      setArrivals([]);
+      setArrivalsReason((arrivalsSettled.reason as Error)?.message || 'Live arrival data is unavailable.');
     }
+
+    if (stopSettled.status === 'rejected' && arrivalsSettled.status === 'rejected') {
+      setArrivalsReason('Stop and live arrival data are temporarily unavailable.');
+    }
+
+    setLoading(false);
   }, [stopId]);
 
   useEffect(() => {
