@@ -60,7 +60,12 @@ export default function StopDetailsScreen() {
     setComputingSmartLeave(true);
     setSmartLeaveError(null);
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
+      const permission = await Promise.race([
+        Location.requestForegroundPermissionsAsync(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('permission-timeout')), 10000)
+        )
+      ]);
       if (permission.status !== 'granted') {
         setSmartLeaveError('Location permission is needed to estimate your walk.');
         return;
