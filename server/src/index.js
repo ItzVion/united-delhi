@@ -275,7 +275,7 @@ async function saveVehicles(vehicles) {
       const chunk = vehicles.slice(i, i + chunkSize);
       const values = [];
       const placeholders = chunk.map((v, index) => {
-        const base = index * 9;
+        const base = index * 8;
         values.push(
           v.id,
           v.routeId,
@@ -696,25 +696,31 @@ app.get('/api/search', dbRateLimit, async (req, res) => {
 async function ensureStaticData() {
   if (!pool) return;
 
-  const result = await pool.query(`
+  const tables = await pool.query(`
     SELECT
       to_regclass('public.stops') AS stops_table,
       to_regclass('public.routes') AS routes_table,
-      to_regclass('public.route_stops') AS route_stops_table,
-      (SELECT COUNT(*) FROM stops) AS stops,
-      (SELECT COUNT(*) FROM routes) AS routes,
-      (SELECT COUNT(*) FROM route_stops) AS route_stops
+      to_regclass('public.route_stops') AS route_stops_table
   `);
 
-  const counts = result.rows[0];
-  const tablesExist = counts.stops_table && counts.routes_table && counts.route_stops_table;
-  if (
-    tablesExist
-    && Number(counts.stops) >= 1000
-    && Number(counts.routes) >= 500
-    && Number(counts.route_stops) >= 10000
-  ) {
-    return;
+  const row = tables.rows[0];
+  const tablesExist = Boolean(row.stops_table && row.routes_table && row.route_stops_table);
+  if (tablesExist) {
+    const countsResult = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM stops) AS stops,
+        (SELECT COUNT(*) FROM routes) AS routes,
+        (SELECT COUNT(*) FROM route_stops) AS route_stops
+    `);
+    const counts = countsResult.rows[0];
+
+    if (
+      Number(counts.stops) >= 1000
+      && Number(counts.routes) >= 500
+      && Number(counts.route_stops) >= 10000
+    ) {
+      return;
+    }
   }
 
   console.log('Static GTFS data is missing/incomplete; starting the pinned dataset import...');
