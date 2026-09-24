@@ -54,12 +54,12 @@ export default function RouteDetailsScreen() {
     if (!mapReady) return;
     const payload = {
       stops: stops.map(s => ({ id: s.stop_id, name: s.name, lat: s.latitude, lon: s.longitude })),
-      buses: vehicles.map(v => ({ id: v.id, route: displayRouteName(v.routeShortName) || v.routeId, lat: v.latitude, lon: v.longitude }))
+      buses: vehicles.map(v => ({ id: v.id, route: displayRouteName(v.routeShortName) || 'BUS', lat: v.latitude, lon: v.longitude }))
     };
     mapRef.current?.injectJavaScript(`window.updateRouteMap(${JSON.stringify(payload)}); true;`);
   }, [mapReady, stops, vehicles]);
 
-  const routeName = displayRouteName(route?.short_name) || displayRouteName(label) || routeId;
+  const routeName = displayRouteName(route?.short_name) || displayRouteName(label) || 'Bus route';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -124,15 +124,15 @@ export default function RouteDetailsScreen() {
 }
 
 function buildRouteMapHtml() {
-  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""><style>html,body,#map{margin:0;width:100%;height:100%;background:#eef2f6}.stop-label{font:800 10px system-ui,sans-serif;color:#142033;background:#fff;border:1px solid #e1e7ef;border-radius:9px;padding:3px 6px;box-shadow:0 2px 7px rgba(20,32,51,.12)}.bus-label{font:800 10px system-ui,sans-serif;color:#fff;background:#1769e0;border-radius:7px;padding:3px 5px;border:2px solid #fff}</style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script>
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""><style>html,body,#map{margin:0;width:100%;height:100%;background:#eef2f6}.stop-label{width:12px;height:12px;border-radius:50%;background:#0b746b;border:2px solid #fff;box-shadow:0 2px 5px rgba(23,49,47,.25)}.bus-label{font:800 10px system-ui,sans-serif;color:#fff;background:#0b746b;border-radius:7px;padding:3px 5px;border:2px solid #fff}</style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script>
 const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false}).setView([28.6139,77.209],12.5);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,keepBuffer:2,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
 const lineLayer=L.layerGroup().addTo(map),stopLayer=L.layerGroup().addTo(map),busLayer=L.layerGroup().addTo(map);let fitted=false;
 window.updateRouteMap=function(data){
  lineLayer.clearLayers();stopLayer.clearLayers();busLayer.clearLayers();
  const line=data.stops.map(s=>[s.lat,s.lon]);
- if(line.length>1)L.polyline(line,{color:'#1769e0',weight:5,opacity:.9,lineCap:'round'}).addTo(lineLayer);
- const stopIcon=L.divIcon({className:'',html:'<div class="stop-label">●</div>',iconSize:[22,22],iconAnchor:[11,11]});
+ if(line.length>1)L.polyline(line,{color:'#0b746b',weight:5,opacity:.9,lineCap:'round'}).addTo(lineLayer);
+ const stopIcon=L.divIcon({className:'',html:'<div class="stop-label"></div>',iconSize:[16,16],iconAnchor:[8,8]});
  data.stops.forEach(s=>{
    const popup=document.createElement('div');
    const title=document.createElement('b');

@@ -129,7 +129,7 @@ export default function StopDetailsScreen() {
             <View key={a.vehicleId} style={styles.arrival}>
               <View style={[styles.busIcon, { backgroundColor: index % 2 ? colors.accentSoft : colors.warningSoft }]}><Text style={{ color: index % 2 ? colors.accent : colors.warning, fontWeight: '900' }}>BUS</Text></View>
               <View style={styles.arrivalMain}>
-                <Text style={styles.route}>{displayRouteName(a.routeShortName) || a.routeId || 'Unknown route'}</Text>
+                <Text style={styles.route}>{displayRouteName(a.routeShortName) || 'Bus'}</Text>
                 <Text style={styles.arrivalMeta}>{a.source === 'live-data-estimate' ? 'Live estimate' : 'Live position'} · {a.observedAgeSeconds}s old</Text>
               </View>
               <View style={styles.etaBox}>
@@ -144,8 +144,8 @@ export default function StopDetailsScreen() {
           <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Routes at this stop</Text><Text style={styles.count}>{routes.length}</Text></View>
           <View style={styles.routeList}>
             {routes.map(r => (
-              <Pressable key={r.route_id} style={styles.routeCard} onPress={() => navigation.navigate('RouteDetails', { routeId: r.route_id, label: displayRouteName(r.short_name) || r.route_id })}>
-                <View style={styles.routeNumber}><Text style={styles.routeNumberText}>{displayRouteName(r.short_name) || r.route_id}</Text></View>
+              <Pressable key={r.route_id} style={styles.routeCard} onPress={() => navigation.navigate('RouteDetails', { routeId: r.route_id, label: displayRouteName(r.short_name) || 'Bus route' })}>
+                <View style={styles.routeNumber}><Text style={styles.routeNumberText}>{displayRouteName(r.short_name) || 'BUS'}</Text></View>
                 <View style={styles.routeText}><Text style={styles.routeName}>{r.long_name || 'DTC route'}</Text><Text style={styles.routeHint}>View route details</Text></View>
                 <Text style={styles.chevron}>›</Text>
               </Pressable>

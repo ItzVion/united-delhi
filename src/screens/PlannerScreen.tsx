@@ -73,16 +73,16 @@ export default function PlannerScreen() {
           <View key={`${option.type}-${index}`} style={[styles.option, index === 0 && styles.optionFeatured]}>
             <View style={styles.optionTop}>
               <View>
-                <Text style={styles.optionType}>{index === 0 ? 'RECOMMENDED' : option.type === 'direct' ? 'DIRECT BUS' : 'ONE CHANGE'}</Text>
+                <Text style={styles.optionType}>{option.type === 'direct' ? 'DIRECT BUS' : 'ONE CHANGE'}</Text>
                 <Text style={styles.duration}>{option.durationMinutes} min</Text>
               </View>
               <View style={styles.walkPill}><Text style={styles.walkText}>Walk {option.walkingMinutes} min</Text></View>
             </View>
             {option.legs.map((leg, legIndex) => (
               <View key={`${leg.routeId}-${legIndex}`} style={styles.leg}>
-                <View style={styles.routeBadge}><Text style={styles.routeBadgeText}>{displayRouteName(leg.routeName) || leg.routeId}</Text></View>
+                <View style={styles.routeBadge}><Text style={styles.routeBadgeText}>{displayRouteName(leg.routeName) || 'Bus'}</Text></View>
                 <View style={styles.legCopy}>
-                  <Text style={styles.legRoute}>Bus {displayRouteName(leg.routeName) || leg.routeId}</Text>
+                  <Text style={styles.legRoute}>Bus {displayRouteName(leg.routeName) || 'Bus'}</Text>
                   <Text style={styles.legStops} numberOfLines={1}>{leg.fromStop} → {leg.toStop}</Text>
                 </View>
               </View>

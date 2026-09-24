@@ -699,7 +699,15 @@ app.get('/api/search', dbRateLimit, async (req, res) => {
   try {
     const result = await pool.query(
       `WITH route_matches AS (
-         SELECT route_id, short_name, long_name
+         SELECT
+           route_id,
+           short_name,
+           long_name,
+           CASE
+             WHEN short_name IS NULL OR BTRIM(short_name) = ''
+               THEN BTRIM(COALESCE(long_name, ''))
+             ELSE REGEXP_REPLACE(BTRIM(short_name), '(UP|DOWN)$', '', 'i')
+           END AS public_label
          FROM routes
          WHERE COALESCE(short_name, '') ILIKE $1 ESCAPE '\\'
             OR COALESCE(long_name, '') ILIKE $1 ESCAPE '\\'
@@ -707,7 +715,16 @@ app.get('/api/search', dbRateLimit, async (req, res) => {
            CASE WHEN COALESCE(short_name, '') ILIKE $1 ESCAPE '\\' THEN 0 ELSE 1 END,
            short_name NULLS LAST,
            route_id
-         LIMIT 30
+       ),
+       representative_routes AS (
+         SELECT DISTINCT ON (public_label)
+           route_id,
+           short_name,
+           long_name,
+           public_label
+         FROM route_matches
+         WHERE BTRIM(public_label) <> ''
+         ORDER BY public_label, route_id
        ),
        stop_matches AS (
          SELECT 'stop' AS type,
@@ -721,29 +738,27 @@ app.get('/api/search', dbRateLimit, async (req, res) => {
          LIMIT 20
        ),
        route_results AS (
-         SELECT 'route' AS type,
-                r.route_id AS id,
-                CASE
-                  WHEN r.short_name IS NULL OR TRIM(r.short_name) = '' THEN COALESCE(r.long_name, '')
-                  ELSE REGEXP_REPLACE(TRIM(r.short_name), '(UP|DOWN)$', '', 'i')
-                END AS label,
-                (
-                  SELECT s.name
-                  FROM route_stops rs
-                  JOIN stops s ON s.stop_id = rs.stop_id
-                  WHERE rs.route_id = r.route_id
-                  ORDER BY rs.stop_sequence ASC, s.name, s.stop_id
-                  LIMIT 1
-                ) AS "fromStop",
-                (
-                  SELECT s.name
-                  FROM route_stops rs
-                  JOIN stops s ON s.stop_id = rs.stop_id
-                  WHERE rs.route_id = r.route_id
-                  ORDER BY rs.stop_sequence DESC, s.name, s.stop_id
-                  LIMIT 1
-                ) AS "toStop"
-         FROM route_matches r
+         SELECT
+           'route' AS type,
+           r.route_id AS id,
+           r.public_label AS label,
+           (
+             SELECT s.name
+             FROM route_stops rs
+             JOIN stops s ON s.stop_id = rs.stop_id
+             WHERE rs.route_id = r.route_id
+             ORDER BY rs.stop_sequence ASC, s.name, s.stop_id
+             LIMIT 1
+           ) AS "fromStop",
+           (
+             SELECT s.name
+             FROM route_stops rs
+             JOIN stops s ON s.stop_id = rs.stop_id
+             WHERE rs.route_id = r.route_id
+             ORDER BY rs.stop_sequence DESC, s.name, s.stop_id
+             LIMIT 1
+           ) AS "toStop"
+         FROM representative_routes r
        )
        SELECT type, id, label, "fromStop", "toStop"
        FROM (
@@ -754,7 +769,7 @@ app.get('/api/search', dbRateLimit, async (req, res) => {
          FROM stop_matches
        ) combined
        ORDER BY result_order, label, id
-       LIMIT 50`,
+       LIMIT 50`,,
       [like]
     );
 
@@ -893,7 +908,7 @@ app.get('/api/plan', dbRateLimit, async (req, res) => {
       : { rows: [] };
     const names = new Map(routeNames.rows.map(row => [
       String(row.route_id),
-      String(row.short_name || row.route_id).replace(/(UP|DOWN)$/i, '')
+      String(row.short_name || 'BUS').replace(/(UP|DOWN)$/i, '')
     ]));
 
     const makeDuration = hops => Math.max(8, Math.round(Number(hops || 0) * 2.1 + 6));
@@ -904,7 +919,7 @@ app.get('/api/plan', dbRateLimit, async (req, res) => {
         walkingMinutes: 6,
         legs: [{
           routeId: String(row.route_id),
-          routeName: names.get(String(row.route_id)) || String(row.short_name || row.route_id),
+          routeName: names.get(String(row.route_id)) || String(row.short_name || 'BUS'),
           fromStop: row.from_stop, toStop: row.to_stop,
           fromStopId: String(row.from_stop_id), toStopId: String(row.to_stop_id)
         }],
@@ -917,13 +932,13 @@ app.get('/api/plan', dbRateLimit, async (req, res) => {
         legs: [
           {
             routeId: String(row.first_route_id),
-            routeName: names.get(String(row.first_route_id)) || String(row.first_route_id),
+            routeName: names.get(String(row.first_route_id)) || 'BUS',
             fromStop: row.from_stop, toStop: row.transfer_stop,
             fromStopId: String(row.from_stop_id), toStopId: String(row.transfer_stop_id)
           },
           {
             routeId: String(row.second_route_id),
-            routeName: names.get(String(row.second_route_id)) || String(row.second_route_id),
+            routeName: names.get(String(row.second_route_id)) || 'BUS',
             fromStop: row.transfer_stop, toStop: row.to_stop,
             fromStopId: String(row.transfer_stop_id), toStopId: String(row.to_stop_id)
           }

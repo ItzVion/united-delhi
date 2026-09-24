@@ -146,7 +146,7 @@ export default function HomeScreen() {
           return distance(a) - distance(b);
         })
         .slice(0, 250)
-        .map(v => ({ id: v.id, route: displayRouteName(v.routeShortName) || v.routeId, lat: v.latitude, lon: v.longitude })),
+        .map(v => ({ id: v.id, route: displayRouteName(v.routeShortName) || 'BUS', lat: v.latitude, lon: v.longitude })),
       location: location ? { lat: location.coords.latitude, lon: location.coords.longitude } : null
     };
     mapRef.current?.injectJavaScript(`window.updateMap(${JSON.stringify(payload)}); true;`);
@@ -272,7 +272,7 @@ export default function HomeScreen() {
 function buildMapHtml() {
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<style>html,body,#map{margin:0;width:100%;height:100%;background:#eef2f6} .leaflet-control-zoom{border:0!important;box-shadow:0 2px 10px rgba(20,32,51,.14)!important}.leaflet-control-zoom a{border:0!important;color:#142033!important}.stop-label{font:700 11px system-ui,sans-serif;color:#142033;background:#fff;border:1px solid #e1e7ef;border-radius:10px;padding:4px 7px;box-shadow:0 2px 7px rgba(20,32,51,.12)}.bus-label{font:800 11px system-ui,sans-serif;color:#fff;background:#1769e0;border-radius:8px;padding:3px 6px;border:2px solid #fff;box-shadow:0 2px 6px rgba(20,32,51,.18)}</style></head><body><div id="map"></div>
+<style>html,body,#map{margin:0;width:100%;height:100%;background:#eef2f6} .leaflet-control-zoom{border:0!important;box-shadow:0 2px 10px rgba(20,32,51,.14)!important}.leaflet-control-zoom a{border:0!important;color:#142033!important}.stop-label{width:12px;height:12px;border-radius:50%;background:#0b746b;border:2px solid #fff;box-shadow:0 2px 5px rgba(23,49,47,.25)}.bus-label{font:800 10px system-ui,sans-serif;color:#fff;background:#0b746b;border-radius:7px;padding:3px 6px;border:2px solid #fff;box-shadow:0 2px 6px rgba(23,49,47,.22)}</style></head><body><div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script>
 const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5}).setView([28.6139,77.209],13);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,keepBuffer:2,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
@@ -283,7 +283,7 @@ setTimeout(reportBounds,0);
 window.centerMap=function(lat,lon){ map.setView([lat,lon],14); };
 window.updateMap=function(data){
   stopLayer.clearLayers(); busLayer.clearLayers(); userLayer.clearLayers();
-  const stopIcon=L.divIcon({className:'',html:'<div class="stop-label">● Stop</div>',iconSize:[55,24],iconAnchor:[8,12]});
+  const stopIcon=L.divIcon({className:'',html:'<div class="stop-label"></div>',iconSize:[16,16],iconAnchor:[8,8]});
   data.stops.forEach(s=>{
     const popup=document.createElement('div');
     const title=document.createElement('b');
@@ -297,7 +297,7 @@ window.updateMap=function(data){
     L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup(popup);
   });
   data.buses.forEach(v=>L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label">'+escapeHtml(v.route||'BUS')+'</div>',iconSize:[52,24],iconAnchor:[26,12]})}).addTo(busLayer).bindPopup(escapeHtml(v.route||'Live bus')));
-  if(data.location){L.circleMarker([data.location.lat,data.location.lon],{radius:8,color:'#1769e0',weight:3,fillColor:'#fff',fillOpacity:1}).addTo(userLayer); if(!hasCentered){map.setView([data.location.lat,data.location.lon],14);hasCentered=true; reportBounds();}}
+  if(data.location){L.circleMarker([data.location.lat,data.location.lon],{radius:6,color:'#ffffff',weight:2,fillColor:'#0b746b',fillOpacity:1}).addTo(userLayer); if(!hasCentered){map.setView([data.location.lat,data.location.lon],14);hasCentered=true; reportBounds();}}
 };
 function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}
 function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
