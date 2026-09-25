@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+<title id="title">United Delhi</title><desc id="desc">A custom Delhi transit mark with three white route lanes and an orange location dot.</desc>
+<rect width="256" height="256" rx="64" fill="#0B746B"/>
+<rect x="64" y="96" width="28" height="120" rx="14" fill="#fff"/>
+<rect x="114" y="68" width="28" height="148" rx="14" fill="#fff"/>
+<rect x="164" y="96" width="28" height="120" rx="14" fill="#fff"/>
+<circle cx="194" cy="58" r="20" fill="#F28C28" stroke="#0B746B" stroke-width="8"/>
+</svg>
