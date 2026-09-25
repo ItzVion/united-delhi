@@ -14,13 +14,10 @@ United Delhi is designed to work without a user account. We do not currently ask
 ### Location
 
 If you grant foreground location permission, the app can use device location for:
-- finding nearby DTC bus stops;
-- centering the map around you; and
-- Smart Leave, which estimates walking time to a selected stop.
+- finding nearby DTC bus stops; and
+- centering the map around you.
 
 For the **Nearby** stop request, the app sends a reduced-precision location to the United Delhi API so the server can calculate nearby stops. The app does not intentionally store that location in the United Delhi database.
-
-For **Smart Leave**, the current implementation calculates the user's walking distance on the device and does not send the user's current coordinates to the United Delhi API for that calculation.
 
 You can deny or revoke location permission in your device settings. Core route and stop search does not require location permission.
 
