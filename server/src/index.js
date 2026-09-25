@@ -121,8 +121,8 @@ app.get('/api/search',dbRateLimit,async(req,res)=>{
         SELECT *,
           CASE WHEN UPPER(public_label)='801' AND short_name ILIKE '%DOWN' THEN 'IGI Airport Terminal 2'
                WHEN UPPER(public_label)='801' AND short_name ILIKE '%UP' THEN 'Kapashera Border'
-               WHEN UPPER(public_label)='801STL' AND short_name ILIKE '%DOWN' THEN 'Uttam Nagar Terminal'
-               WHEN UPPER(public_label)='801STL' AND short_name ILIKE '%UP' THEN 'Kapashera Border'
+               WHEN UPPER(public_label)='801STL' AND short_name ILIKE '%DOWN' THEN 'Kapashera Border'
+               WHEN UPPER(public_label)='801STL' AND short_name ILIKE '%UP' THEN 'Uttam Nagar Terminal'
                ELSE from_stop END public_from_stop,
           CASE WHEN UPPER(public_label)='801' AND short_name ILIKE '%DOWN' THEN 'Kapashera Border'
                WHEN UPPER(public_label)='801' AND short_name ILIKE '%UP' THEN 'IGI Airport Terminal 2'
