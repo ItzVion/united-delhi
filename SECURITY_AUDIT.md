@@ -31,7 +31,7 @@ Reviewed:
 - Added strict identifier/text bounds.
 - Rejected empty wildcard-only search patterns so % and _ input cannot force an unbounded search.
 - Kept SQL parameterized throughout the reviewed backend.
-- Added realtime vehicle ID bounds and coordinate/speed/bearing validation.
+- Added realtime vehicle ID bounds and coordinate/bearing validation.
 - Deduplicated realtime vehicles by vehicle ID before persistence.
 - Rejected realtime timestamps older than 24 hours or more than 5 minutes in the future.
 - Added HTTP request/header/keep-alive timeouts.
@@ -51,7 +51,7 @@ Added server/sql/002_security_hardening.sql with rerunnable integrity hardening:
 - route color format checks
 - non-negative stop sequences
 - vehicle ID/route/stop ID bounds
-- vehicle coordinate/bearing/speed bounds
+- vehicle coordinate/bearing bounds
 - indexes for stop-name lookup, route-name lookup, route sequencing, and stop-to-route lookup
 - revoked public CREATE privilege on the public PostgreSQL schema to reduce object-shadowing risk
 - enabled PostgreSQL Row Level Security on all four transit tables; no permissive policies are created because the mobile app has no direct database connection, so non-owner roles default to deny
@@ -81,12 +81,11 @@ No foreign key was added from realtime vehicle_positions.route_id to routes.rout
 ### GitHub Actions / supply chain
 
 - GitHub Actions checkout and setup-node are pinned to immutable commit SHAs.
-- Dependency lock refresh uses npm install --package-lock-only --ignore-scripts.
 - Dependency audits run in CI.
 - Added an npm override for uuid 11.1.1 to eliminate the transitive moderate-severity advisory without forcing an Expo SDK downgrade.
-- CI now fails on any known npm audit issue.
+- CI fails on any known npm audit issue.
 - Added a security reporting policy.
-- Workflow permissions remain read-only except the two narrowly scoped workflows that must commit generated assets/lockfiles.
+- Workflow permissions are read-only for the remaining CI and APK-trigger workflows.
 
 ## Database export audit
 
@@ -132,7 +131,7 @@ The current realtime/static route-ID reconciliation also remains unresolved and 
 
 - Added a production 18+ access gate pending a legally appropriate parental-consent implementation.
 - Added an in-app legal center linking the Privacy Policy, Terms of Service, Third-Party Notices, and Security Policy.
-- Added a pre-permission location disclosure explaining nearby-stop processing and on-device Smart Leave calculation.
+- Added a pre-permission location disclosure explaining nearby-stop processing and reduced-precision location handling.
 - Nearby coordinates are rounded on-device and sent in a POST body rather than query parameters, reducing accidental exposure through URL logs.
 - Added explicit third-party notices for Delhi Open Transit Data and OpenStreetMap.
 - Added a legal/compliance checklist covering Indian data-protection, contract, consumer, copyright, cybersecurity, and app-store requirements.
