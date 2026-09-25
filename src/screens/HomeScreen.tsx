@@ -10,6 +10,7 @@ import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
+import { resolveRouteColor } from '../lib/routeColor';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
@@ -146,7 +147,7 @@ export default function HomeScreen() {
           return distance(a) - distance(b);
         })
         .slice(0, 250)
-        .map(v => ({ id: v.id, route: displayRouteName(v.routeShortName) || 'BUS', lat: v.latitude, lon: v.longitude })),
+        .map(v => { const route = displayRouteName(v.routeShortName) || 'BUS'; const color = resolveRouteColor(route, v.routeColor, v.routeTextColor); return { id: v.id, route, color: color.background, textColor: color.text, lat: v.latitude, lon: v.longitude }; }),
       location: location ? { lat: location.coords.latitude, lon: location.coords.longitude } : null
     };
     mapRef.current?.injectJavaScript(`window.updateMap(${JSON.stringify(payload)}); true;`);
@@ -296,11 +297,11 @@ window.updateMap=function(data){
     popup.append(title,document.createElement('br'),button);
     L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup(popup);
   });
-  data.buses.forEach(v=>L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label">'+escapeHtml(v.route||'BUS')+'</div>',iconSize:[52,24],iconAnchor:[26,12]})}).addTo(busLayer).bindPopup(escapeHtml(v.route||'Live bus')));
+  data.buses.forEach(v=>{ const bg=escapeCssColor(v.color||'#0b746b'); const fg=escapeCssColor(v.textColor||'#fff'); L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label" style="background:'+bg+';color:'+fg+'">'+escapeHtml(v.route||'BUS')+'</div>',iconSize:[52,24],iconAnchor:[26,12]})}).addTo(busLayer).bindPopup(escapeHtml(v.route||'Live bus')); });
   if(data.location){L.circleMarker([data.location.lat,data.location.lon],{radius:6,color:'#ffffff',weight:2,fillColor:'#0b746b',fillOpacity:1}).addTo(userLayer); if(!hasCentered){map.setView([data.location.lat,data.location.lon],14);hasCentered=true; reportBounds();}}
 };
 function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}
-function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));} function escapeCssColor(x){return /^#[0-9a-f]{6}$/i.test(String(x))?String(x):'#0b746b';}
 </script></body></html>`;
 }
 
