@@ -330,40 +330,6 @@ const server=app.listen(port,()=>{
 server.requestTimeout=15000;
 server.headersTimeout=20000;
 server.keepAliveTimeout=5000;
-      public_routes AS (
-        SELECT *,from_stop AS public_from_stop,to_stop AS public_to_stop
-        FROM route_base
-      ),
-      representative_routes AS (
-        SELECT DISTINCT ON (UPPER(public_label),LOWER(public_from_stop),LOWER(public_to_stop))
-          route_id,short_name,long_name,route_color,route_text_color,public_label,public_from_stop,public_to_stop
-        FROM public_routes
-        WHERE BTRIM(public_label)<>'' AND ($2::TEXT IS NULL OR UPPER(public_label)=$2)
-        ORDER BY UPPER(public_label),LOWER(public_from_stop),LOWER(public_to_stop),stop_count DESC,route_id
-      ),
-      stop_matches AS (
-        SELECT 'stop' type,stop_id id,name label,NULL::TEXT "fromStop",NULL::TEXT "toStop",NULL::TEXT "routeColor",NULL::TEXT "routeTextColor"
-        FROM stops WHERE name ILIKE $1 ORDER BY name,stop_id LIMIT 30
-      ),
-      route_results AS (
-        SELECT 'route' type,r.route_id id,r.public_label label,r.public_from_stop "fromStop",r.public_to_stop "toStop",r.route_color "routeColor",r.route_text_color "routeTextColor"
-        FROM representative_routes r
-      )
-      SELECT type,id,label,"fromStop","toStop","routeColor","routeTextColor"
-      FROM (
-        SELECT type,id,label,"fromStop","toStop","routeColor","routeTextColor",0 result_order FROM route_results
-        UNION ALL
-        SELECT type,id,label,"fromStop","toStop","routeColor","routeTextColor",1 result_order FROM stop_matches
-      ) combined
-      ORDER BY result_order,label,"fromStop","toStop",id LIMIT 60
-    `,[like,exactRoute]);
-    res.json({status:'OK',results:result.rows});
-  }catch(error){
-    console.error('Failed to search transit data:',error.message);
-    res.status(500).json({status:'ERROR',results:[],reason:'Search is temporarily unavailable'});
-  }
-});
-
 app.get('/api/plan',dbRateLimit,async(req,res)=>{
   if(!pool)return res.status(503).json({status:'UNAVAILABLE',options:[],reason:'Database is not configured'});
   const from=boundedText(req.query.from,80),to=boundedText(req.query.to,80);
