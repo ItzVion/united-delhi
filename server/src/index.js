@@ -96,7 +96,205 @@ app.get('/api/search',dbRateLimit,async(req,res)=>{
       WITH route_base AS (
         SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,
           CASE WHEN r.short_name IS NULL OR BTRIM(r.short_name)='' THEN BTRIM(COALESCE(r.long_name,''))
-          ELSE REGEXP_REPLACE(REGEXP_REPLACE(BTRIM(r.short_name),'(UP|DOWN|DWN)$','','i'),'^AIR-0+','AIR-','i') END public_label,
+          ELSE REGEXP_REPLACE(REGEXP_REPLACE(BTRIM(r.short_name),'(?:UP|DOWN|DWN)
+          COALESCE(rc.stop_count,0) stop_count,start_stop.name from_stop,end_stop.name to_stop
+        FROM routes r
+        LEFT JOIN (SELECT route_id,COUNT(*) stop_count FROM route_stops GROUP BY route_id) rc ON rc.route_id=r.route_id
+        LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.name,s.stop_id LIMIT 1) start_stop ON TRUE
+        LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.name,s.stop_id LIMIT 1) end_stop ON TRUE
+        WHERE COALESCE(r.short_name,'') ILIKE $1 OR COALESCE(r.long_name,'') ILIKE $1
+      ),
+      public_routes AS (
+        SELECT *,from_stop AS public_from_stop,to_stop AS public_to_stop
+        FROM route_base
+      ),
+      representative_routes AS (
+        SELECT DISTINCT ON (UPPER(public_label),LOWER(public_from_stop),LOWER(public_to_stop))
+          route_id,short_name,long_name,route_color,route_text_color,public_label,public_from_stop,public_to_stop
+        FROM public_routes
+        WHERE BTRIM(public_label)<>'' AND ($2::TEXT IS NULL OR UPPER(public_label)=$2)
+        ORDER BY UPPER(public_label),LOWER(public_from_stop),LOWER(public_to_stop),stop_count DESC,route_id
+      ),
+      stop_matches AS (
+        SELECT 'stop' type,stop_id id,name label,NULL::TEXT "fromStop",NULL::TEXT "toStop",NULL::TEXT "routeColor",NULL::TEXT "routeTextColor"
+        FROM stops WHERE name ILIKE $1 ORDER BY name,stop_id LIMIT 30
+      ),
+      route_results AS (
+        SELECT 'route' type,r.route_id id,r.public_label label,r.public_from_stop "fromStop",r.public_to_stop "toStop",r.route_color "routeColor",r.route_text_color "routeTextColor"
+        FROM representative_routes r
+      )
+      SELECT type,id,label,"fromStop","toStop","routeColor","routeTextColor"
+      FROM (
+        SELECT type,id,label,"fromStop","toStop","routeColor","routeTextColor",0 result_order FROM route_results
+        UNION ALL
+        SELECT type,id,label,"fromStop","toStop","routeColor","routeTextColor",1 result_order FROM stop_matches
+      ) combined
+      ORDER BY result_order,label,"fromStop","toStop",id LIMIT 60
+    `,[like,exactRoute]);
+    res.json({status:'OK',results:result.rows});
+  }catch(error){
+    console.error('Failed to search transit data:',error.message);
+    res.status(500).json({status:'ERROR',results:[],reason:'Search is temporarily unavailable'});
+  }
+});
+
+app.get('/api/plan',dbRateLimit,async(req,res)=>{
+  if(!pool)return res.status(503).json({status:'UNAVAILABLE',options:[],reason:'Database is not configured'});
+  const from=boundedText(req.query.from,80),to=boundedText(req.query.to,80);
+  const fromLike=searchPattern(from),toLike=searchPattern(to);
+  if(!fromLike||!toLike)return res.status(400).json({status:'ERROR',options:[],reason:'Valid origin and destination are required'});
+  if(fromLike.toLowerCase()===toLike.toLowerCase())return res.status(400).json({status:'ERROR',options:[],reason:'Choose two different stops or places'});
+  try{
+    const candidates=await pool.query(`
+      WITH origin AS (
+        SELECT stop_id,name,latitude,longitude,
+               ROW_NUMBER() OVER (ORDER BY CASE WHEN LOWER(BTRIM(name))=LOWER($1) THEN 0 ELSE 1 END, name, stop_id) rn
+        FROM stops WHERE name ILIKE $2 LIMIT 12
+      ),
+      destination AS (
+        SELECT stop_id,name,latitude,longitude,
+               ROW_NUMBER() OVER (ORDER BY CASE WHEN LOWER(BTRIM(name))=LOWER($3) THEN 0 ELSE 1 END, name, stop_id) rn
+        FROM stops WHERE name ILIKE $4 LIMIT 12
+      )
+      SELECT 'origin' side,stop_id,name,latitude,longitude FROM origin
+      UNION ALL
+      SELECT 'destination' side,stop_id,name,latitude,longitude FROM destination
+    `,[from,fromLike,to,toLike]);
+    const origins=candidates.rows.filter(r=>r.side==='origin');
+    const destinations=candidates.rows.filter(r=>r.side==='destination');
+    if(!origins.length||!destinations.length)return res.status(404).json({status:'NOT_FOUND',origin:origins[0]||null,destination:destinations[0]||null,options:[],reason:'Could not find matching bus stops'});
+    const same=origins.some(o=>destinations.some(d=>o.stop_id===d.stop_id));
+    if(same)return res.status(400).json({status:'ERROR',origin:origins[0],destination:destinations[0],options:[],reason:'Origin and destination resolve to the same stop'});
+
+    const originIds=origins.map(r=>r.stop_id),destinationIds=destinations.map(r=>r.stop_id);
+    const direct=await pool.query(`
+      SELECT DISTINCT ON (r.route_id,o.stop_id,d.stop_id)
+        r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,
+        o.stop_id from_stop_id,o.name from_stop,o.stop_sequence from_sequence,
+        d.stop_id to_stop_id,d.name to_stop,d.stop_sequence to_sequence
+      FROM route_stops o
+      JOIN route_stops d ON d.route_id=o.route_id AND d.stop_sequence>o.stop_sequence
+      JOIN routes r ON r.route_id=o.route_id
+      JOIN stops os ON os.stop_id=o.stop_id
+      JOIN stops ds ON ds.stop_id=d.stop_id
+      WHERE o.stop_id=ANY($1::text[]) AND d.stop_id=ANY($2::text[])
+      ORDER BY r.route_id,o.stop_id,d.stop_id,(d.stop_sequence-o.stop_sequence)
+      LIMIT 20
+    `,[originIds,destinationIds]);
+
+    const transfers=await pool.query(`
+      WITH origins AS (
+        SELECT rs.route_id,rs.stop_id from_stop_id,rs.stop_sequence from_sequence,
+               s.name from_stop,r.short_name route1_name,r.route_color route1_color,r.route_text_color route1_text_color
+        FROM route_stops rs
+        JOIN stops s ON s.stop_id=rs.stop_id
+        JOIN routes r ON r.route_id=rs.route_id
+        WHERE rs.stop_id=ANY($1::text[])
+      ),
+      first_legs AS (
+        SELECT o.route_id,o.from_stop_id,o.from_sequence,o.from_stop,o.route1_name,o.route1_color,o.route1_text_color,
+               t.stop_id transfer_stop_id,t.stop_sequence transfer_sequence,ts.name transfer_stop
+        FROM origins o
+        JOIN route_stops t ON t.route_id=o.route_id AND t.stop_sequence>o.from_sequence
+        JOIN stops ts ON ts.stop_id=t.stop_id
+      ),
+      second_legs AS (
+        SELECT f.*,t2.route_id route2_id,t2.stop_sequence transfer2_sequence,
+               d.stop_id to_stop_id,d.stop_sequence to_sequence,ds.name to_stop,
+               r2.short_name route2_name,r2.route_color route2_color,r2.route_text_color route2_text_color
+        FROM first_legs f
+        JOIN route_stops t2 ON t2.stop_id=f.transfer_stop_id AND t2.route_id<>f.route_id
+        JOIN routes r2 ON r2.route_id=t2.route_id
+        JOIN route_stops d ON d.route_id=t2.route_id AND d.stop_sequence>t2.stop_sequence
+        JOIN stops ds ON ds.stop_id=d.stop_id
+        WHERE d.stop_id=ANY($2::text[])
+      )
+      SELECT DISTINCT ON (route_id,route2_id,from_stop_id,to_stop_id,transfer_stop_id)
+        route_id route1_id,route1_name,route1_color,route1_text_color,
+        from_stop_id,from_stop,transfer_stop_id,transfer_stop,
+        route2_id,route2_name,route2_color,route2_text_color,
+        to_stop_id,to_stop,from_sequence,transfer_sequence,to_sequence
+      FROM second_legs
+      ORDER BY route_id,route2_id,from_stop_id,to_stop_id,transfer_stop_id,
+               (transfer_sequence-from_sequence)+(to_sequence-transfer_sequence)
+      LIMIT 20
+    `,[originIds,destinationIds]);
+
+    const options=[];
+    for(const row of direct.rows){
+      const hops=Math.max(1,Number(row.to_sequence)-Number(row.from_sequence));
+      options.push({
+        type:'direct',
+        durationMinutes:Math.max(3,Math.ceil(hops*2.5)),
+        walkingMinutes:0,
+        legs:[{routeId:String(row.route_id),routeName:row.short_name||row.long_name||'Bus',routeColor:row.route_color,routeTextColor:row.route_text_color,fromStop:row.from_stop,toStop:row.to_stop,fromStopId:row.from_stop_id,toStopId:row.to_stop_id}]
+      });
+    }
+    for(const row of transfers.rows){
+      const firstHops=Math.max(1,Number(row.transfer_sequence)-Number(row.from_sequence));
+      const secondHops=Math.max(1,Number(row.to_sequence)-Number(row.transfer_sequence));
+      options.push({
+        type:'one-transfer',
+        durationMinutes:Math.max(8,Math.ceil((firstHops+secondHops)*2.5+5)),
+        walkingMinutes:0,
+        legs:[
+          {routeId:String(row.route1_id),routeName:row.route1_name||'Bus',routeColor:row.route1_color,routeTextColor:row.route1_text_color,fromStop:row.from_stop,toStop:row.transfer_stop,fromStopId:row.from_stop_id,toStopId:row.transfer_stop_id},
+          {routeId:String(row.route2_id),routeName:row.route2_name||'Bus',routeColor:row.route2_color,routeTextColor:row.route2_text_color,fromStop:row.transfer_stop,toStop:row.to_stop,fromStopId:row.transfer_stop_id,toStopId:row.to_stop_id}
+        ],
+        transferStop:row.transfer_stop
+      });
+    }
+    const seen=new Set();
+    const unique=options.filter(option=>{
+      const key=option.type+'|'+option.legs.map(l=>l.routeId+':'+l.fromStopId+'>'+l.toStopId).join('|');
+      if(seen.has(key))return false;
+      seen.add(key);return true;
+    }).sort((a,b)=>a.durationMinutes-b.durationMinutes).slice(0,5);
+    const response={status:'OK',origin:{stop_id:origins[0].stop_id,name:origins[0].name,latitude:Number(origins[0].latitude),longitude:Number(origins[0].longitude)},destination:{stop_id:destinations[0].stop_id,name:destinations[0].name,latitude:Number(destinations[0].latitude),longitude:Number(destinations[0].longitude)},options:unique};
+    if(!unique.length)response.reason='No direct or one-change bus journey was found';
+    res.json(response);
+  }catch(error){
+    console.error('Failed to plan journey:',error.message);
+    res.status(500).json({status:'ERROR',options:[],reason:'Journey planner is temporarily unavailable'});
+  }
+});
+
+async function applyMigrations(){
+  const fs=await import('node:fs/promises');
+  const sqlDir=new URL('../sql/',import.meta.url);
+  const files=(await fs.readdir(sqlDir)).filter(name=>/^\d+.*\.sql$/i.test(name)).sort();
+  for(const name of files){
+    const sql=await fs.readFile(new URL(name,sqlDir),'utf8');
+    const client=await pool.connect();
+    try{
+      await client.query('BEGIN');
+      await client.query("SET LOCAL statement_timeout='30000'");
+      await client.query(sql);
+      await client.query('COMMIT');
+    }catch(error){
+      await client.query('ROLLBACK').catch(()=>{});
+      throw new Error('Migration '+name+' failed: '+(error instanceof Error?error.message:String(error)));
+    }finally{client.release();}
+  }
+}
+async function ensureStaticData(){if(!pool)return;await applyMigrations();const tables=await pool.query("SELECT to_regclass('public.stops') stops_table,to_regclass('public.routes') routes_table,to_regclass('public.route_stops') route_stops_table");const row=tables.rows[0];if(row.stops_table&&row.routes_table&&row.route_stops_table){const counts=(await pool.query('SELECT (SELECT COUNT(*) FROM stops) stops,(SELECT COUNT(*) FROM routes) routes,(SELECT COUNT(*) FROM route_stops) route_stops')).rows[0];if(Number(counts.stops)>=1000&&Number(counts.routes)>=500&&Number(counts.route_stops)>=10000)return;}console.log('Static GTFS data is missing/incomplete; starting fallback import...');await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['scripts/import-gtfs.js'],{cwd:process.cwd(),env:process.env,stdio:'inherit'});child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(new Error('GTFS import exited with code '+code)));});}
+app.use((_req,res)=>res.status(404).json({status:'NOT_FOUND',reason:'Endpoint not found'}));
+app.use((error,_req,res,_next)=>{
+  console.error('Unhandled request error:',error instanceof Error?error.message:String(error));
+  if(res.headersSent)return;
+  res.status(500).json({status:'ERROR',reason:'Internal server error'});
+});
+const server=app.listen(port,()=>{
+  console.log('United Delhi API listening on :'+port);
+  void ensureStaticData().then(()=>startRealtimePolling()).catch(error=>{
+    console.error('Static GTFS bootstrap failed:',error.message);
+    startRealtimePolling();
+  });
+});
+server.requestTimeout=15000;
+server.headersTimeout=20000;
+server.keepAliveTimeout=5000;
+,'','i'),'^AIR-0+','AIR-','i') END public_label,
           COALESCE(rc.stop_count,0) stop_count,start_stop.name from_stop,end_stop.name to_stop
         FROM routes r
         LEFT JOIN (SELECT route_id,COUNT(*) stop_count FROM route_stops GROUP BY route_id) rc ON rc.route_id=r.route_id
