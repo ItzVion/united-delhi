@@ -6,7 +6,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api, Arrival, Route as ApiRoute, Stop } from '../api/client';
 import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
-import { formatDuration } from '../lib/geo';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
@@ -97,7 +96,7 @@ export default function StopDetailsScreen() {
             <View key={a.vehicleId} style={styles.arrival}>
               {(() => { const name=displayRouteName(a.routeShortName);if(!name)return null; const rc=resolveRouteColor(name,a.routeColor,a.routeTextColor); return <View style={[styles.busIcon,{backgroundColor:rc.background}]}><Text style={{color:rc.text,fontWeight:'900',fontSize:11}}>{name}</Text></View>; })()}
               <View style={styles.arrivalMain}>
-                <Text style={styles.route}>{displayRouteName(a.routeShortName) || 'Bus'}</Text>
+                <Text style={styles.route}>{displayRouteName(a.routeShortName)}</Text>
                 <Text style={styles.arrivalMeta}>{a.observedAgeSeconds < 60 ? 'Updated just now' : 'Updated '+Math.floor(a.observedAgeSeconds/60)+' min ago'}</Text>
               </View>
               <View style={styles.etaBox}>
