@@ -1,7 +1,10 @@
 export function normalizePublicRouteName(value: string | null | undefined): string | null {
-  const route = String(value ?? '').trim();
+  let route = String(value ?? '').trim();
   if (!route) return null;
-  return route.replace(/(?:UP|DOWN)$/i, '').trim() || route;
+  route = route.replace(/(?:UP|DOWN|DWN)$/i, '').trim() || route;
+  // Public-facing airport services use compact numbering (AIR-5, AIR-6, AIR-8).
+  route = route.replace(/^AIR-0+(?=\d)/i, 'AIR-');
+  return route;
 }
 
 export function displayRouteName(value: string | null | undefined): string | null {
