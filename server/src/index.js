@@ -126,7 +126,6 @@ app.get('/api/search',dbRateLimit,async(req,res)=>{
   const raw=String(req.query.q||'').trim();
   const like=searchPattern(raw);
   if(!like)return res.json({status:'OK',results:[]});
-  const exactRoute=/^(?:AIR-)?\d+[A-Z0-9-]*$/i.test(raw)?raw.toUpperCase().replace(/^AIR-0+/,'AIR-'):null;
   try{
     const result=await pool.query(`
       WITH route_base AS (
@@ -148,7 +147,7 @@ app.get('/api/search',dbRateLimit,async(req,res)=>{
         SELECT DISTINCT ON (UPPER(public_label),LOWER(public_from_stop),LOWER(public_to_stop))
           route_id,short_name,long_name,route_color,route_text_color,public_label,public_from_stop,public_to_stop
         FROM public_routes
-        WHERE BTRIM(public_label)<>'' AND ($2::TEXT IS NULL OR UPPER(public_label)=$2)
+        WHERE BTRIM(public_label)<>''
         ORDER BY UPPER(public_label),LOWER(public_from_stop),LOWER(public_to_stop),stop_count DESC,route_id
       ),
       stop_matches AS (
@@ -165,8 +164,10 @@ app.get('/api/search',dbRateLimit,async(req,res)=>{
         UNION ALL
         SELECT type,id,label,"fromStop","toStop","routeColor","routeTextColor",1 result_order FROM stop_matches
       ) combined
-      ORDER BY result_order,label,"fromStop","toStop",id LIMIT 60
-    `,[like,exactRoute]);
+      ORDER BY result_order,
+               CASE WHEN UPPER(label)=UPPER($2) THEN 0 ELSE 1 END,
+               label,"fromStop","toStop",id LIMIT 60
+    `,[like,raw]);
     res.json({status:'OK',results:result.rows});
   }catch(error){
     console.error('Failed to search transit data:',error.message);
