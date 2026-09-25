@@ -33,8 +33,7 @@ export default function LegalScreen() {
         <Text style={styles.section}>Location</Text>
         <Text style={styles.body}>
           Location is optional and used only for transit features. Nearby uses a
-          reduced-precision location request to find stops. Smart Leave calculates
-          walking distance on the device.
+          reduced-precision location request to find stops and centre the map.
         </Text>
         <Text style={styles.section}>Transit information</Text>
         <Text style={styles.body}>
