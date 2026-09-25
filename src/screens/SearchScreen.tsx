@@ -9,176 +9,50 @@ import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
 import type { RootStackParamList } from '../navigation/types';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'Search'>;
+type Nav=NativeStackNavigationProp<RootStackParamList,'Search'>;
 
-export default function SearchScreen() {
-  const navigation = useNavigation<Nav>();
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function SearchScreen(){
+  const navigation=useNavigation<Nav>();
+  const [query,setQuery]=useState('');const [results,setResults]=useState<SearchResult[]>([]);const [loading,setLoading]=useState(false);const [error,setError]=useState<string|null>(null);
+  useEffect(()=>{
+    const value=query.trim();
+    if(value.length<2){setResults([]);setLoading(false);setError(null);return;}
+    let cancelled=false;setLoading(true);setError(null);
+    const timer=setTimeout(async()=>{try{const result=await api.search(value);if(!cancelled)setResults(result.status==='OK'?result.results:[]);}catch(e){if(!cancelled){setResults([]);setError((e as Error).message||'Search is temporarily unavailable.');}}finally{if(!cancelled)setLoading(false);},220);
+    return()=>{cancelled=true;clearTimeout(timer);};
+  },[query]);
 
-  useEffect(() => {
-    const value = query.trim();
-    if (value.length < 2) {
-      setResults([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    const timer = setTimeout(async () => {
-      try {
-        const result = await api.search(value);
-        if (!cancelled) setResults(result.status === 'OK' ? result.results : []);
-      } catch (e) {
-        if (!cancelled) {
-          setResults([]);
-          setError((e as Error).message || 'Search is temporarily unavailable.');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }, 250);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [query]);
-
-  return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.topBar}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}><Text style={styles.back}>‹</Text></Pressable>
-        <View style={styles.titleWrap}><Text style={styles.title}>Search</Text><Text style={styles.subtitle}>Routes and stops across Delhi</Text></View>
-      </View>
-
-      <View style={styles.searchBox}>
-        <Text style={styles.searchIcon}>⌕</Text>
-        <TextInput
-          autoFocus
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search route number or stop"
-          placeholderTextColor={colors.textMuted}
-          style={styles.input}
-          returnKeyType="search"
-          autoCorrect={false}
-        />
-        {loading ? <ActivityIndicator color={colors.accent} size="small" /> : null}
-        {query ? <Pressable onPress={() => setQuery('')}><Text style={styles.clear}>×</Text></Pressable> : null}
-      </View>
-
-      {query.trim().length < 2 ? (
-        <View style={styles.hintCard}>
-          <Text style={styles.hintTitle}>Try a route or stop</Text>
-          <Text style={styles.hintText}>Examples: 721, 801, Dwarka, Palam, Airport</Text>
-          <View style={styles.exampleRow}>
-            {['721', '801', 'Dwarka', 'Palam'].map(item => (
-              <Pressable key={item} style={styles.example} onPress={() => setQuery(item)}><Text style={styles.exampleText}>{item}</Text></Pressable>
-            ))}
-          </View>
-        </View>
-      ) : null}
-
-      {error ? (
-        <View style={styles.errorCard}>
-          <Text style={styles.errorTitle}>Search unavailable</Text>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : null}
-
-      <FlatList
-        keyboardShouldPersistTaps="handled"
-        data={results}
-        keyExtractor={item => `${item.type}-${item.id}`}
-        contentContainerStyle={styles.list}
-        ListHeaderComponent={results.length > 0 ? <Text style={styles.resultsTitle}>{results.length} matches</Text> : null}
-        ListEmptyComponent={!loading && !error && query.trim().length >= 2 ? <View style={styles.empty}><Text style={styles.emptyTitle}>No matches</Text><Text style={styles.emptyText}>Try a route number, stop name, or part of a destination.</Text></View> : null}
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.row}
-            onPress={() => item.type === 'stop'
-              ? navigation.navigate('StopDetails', { stopId: item.id, stopName: item.label })
-              : navigation.navigate('RouteDetails', { routeId: item.id, label: item.label })}
-          >
-            {item.type === 'route' ? (
-              <View style={styles.routeResult}>
-                <View style={styles.routeHeader}>
-                  <View style={styles.routeBadge}>
-                    <Text style={styles.routeBadgeText}>{displayRouteName(item.label) || item.label}</Text>
-                  </View>
-                  <Text style={styles.routeCaption}>Bus route</Text>
-                  <Text style={styles.chevron}>›</Text>
-                </View>
-
-                {item.fromStop || item.toStop ? (
-                  <View style={styles.stopsBlock}>
-                    <View style={styles.stopColumn}>
-                      <View style={styles.stopDot} />
-                      <View style={styles.stopLine} />
-                      <View style={styles.stopDot} />
-                    </View>
-                    <View style={styles.stopNames}>
-                      <View style={styles.stopNameBlock}>
-                        <Text style={styles.stopLabel}>STARTING STOP</Text>
-                        <Text style={styles.stopName} numberOfLines={1}>{item.fromStop || 'Starting stop unavailable'}</Text>
-                      </View>
-                      <View style={styles.stopNameBlock}>
-                        <Text style={styles.stopLabel}>ENDING STOP</Text>
-                        <Text style={styles.stopName} numberOfLines={1}>{item.toStop || 'Ending stop unavailable'}</Text>
-                      </View>
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-            ) : (
-              <View style={styles.stopResult}>
-                <View style={styles.stopIcon}><Text style={styles.stopIconText}>●</Text></View>
-                <View style={styles.resultText}>
-                  <Text style={styles.label} numberOfLines={1}>{item.label}</Text>
-                  <Text style={styles.typeLabel}>Bus stop</Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </View>
-            )}
-          </Pressable>
-        )}
-      />
-    </SafeAreaView>
-  );
+  return <SafeAreaView style={styles.safe}>
+    <View style={styles.header}><Pressable onPress={()=>navigation.goBack()} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><View><Text style={styles.eyebrow}>FIND YOUR BUS</Text><Text style={styles.title}>Search</Text></View></View>
+    <View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput autoFocus value={query} onChangeText={setQuery} placeholder="Route number, stop or place" placeholderTextColor={colors.textMuted} style={styles.input} autoCorrect={false} returnKeyType="search"/>{loading?<ActivityIndicator size="small" color={colors.accent}/>:null}{query?<Pressable onPress={()=>setQuery('')}><Text style={styles.clear}>×</Text></Pressable>:null}</View>
+    {query.trim().length<2?<View style={styles.suggestions}><Text style={styles.suggestTitle}>Search Delhi transit</Text><Text style={styles.suggestText}>Try a route number or a stop name.</Text><View style={styles.chips}>{['801','801STL','772','Dwarka','Palam'].map(x=><Pressable key={x} style={styles.chip} onPress={()=>setQuery(x)}><Text style={styles.chipText}>{x}</Text></Pressable>)}</View></View>:null}
+    {error?<View style={styles.error}><Text style={styles.errorTitle}>Search unavailable</Text><Text style={styles.errorText}>{error}</Text></View>:null}
+    <FlatList
+      keyboardShouldPersistTaps="handled" data={results} keyExtractor={item=>`${item.type}-${item.id}`} contentContainerStyle={styles.list}
+      ListHeaderComponent={results.length?<Text style={styles.resultsTitle}>{results.length} results</Text>:null}
+      ListEmptyComponent={!loading&&!error&&query.trim().length>=2?<View style={styles.empty}><Text style={styles.emptyTitle}>Nothing found</Text><Text style={styles.emptyText}>Try another route number, stop name or destination.</Text></View>:null}
+      renderItem={({item})=><Pressable style={styles.card} onPress={()=>item.type==='stop'?navigation.navigate('StopDetails',{stopId:item.id,stopName:item.label}):navigation.navigate('RouteDetails',{routeId:item.id,label:item.label})}>
+        {item.type==='route'?<RouteResult item={item}/>:<StopResult item={item}/>}
+      </Pressable>}
+    />
+  </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
-  safe:{flex:1,backgroundColor:colors.background},
-  topBar:{paddingHorizontal:18,paddingTop:10,paddingBottom:10,flexDirection:'row',alignItems:'center'},
-  backButton:{width:40,height:40,alignItems:'center',justifyContent:'center'},back:{fontSize:36,lineHeight:38,color:colors.text},
-  titleWrap:{marginLeft:2},title:{fontSize:23,fontWeight:'900',color:colors.text},subtitle:{fontSize:12,color:colors.textMuted,marginTop:2},
-  searchBox:{marginHorizontal:18,height:54,borderRadius:17,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,flexDirection:'row',alignItems:'center',paddingHorizontal:14},
-  searchIcon:{fontSize:27,color:colors.text,marginRight:8,marginTop:-3},input:{flex:1,color:colors.text,fontSize:15},clear:{fontSize:26,color:colors.textMuted,paddingHorizontal:4},
-  hintCard:{margin:18,padding:16,borderRadius:16,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},hintTitle:{fontSize:16,fontWeight:'800',color:colors.text},hintText:{fontSize:13,color:colors.textMuted,marginTop:4},exampleRow:{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:12},example:{paddingHorizontal:12,paddingVertical:7,borderRadius:999,backgroundColor:colors.accentSoft},exampleText:{fontSize:12,fontWeight:'800',color:colors.accent},
-  errorCard:{marginHorizontal:18,marginTop:10,padding:12,borderRadius:14,backgroundColor:colors.dangerSoft,borderWidth:1,borderColor:colors.danger},errorTitle:{fontSize:13,fontWeight:'900',color:colors.danger},errorText:{fontSize:12,lineHeight:17,color:colors.textMuted,marginTop:2},
-  list:{paddingHorizontal:18,paddingTop:12,paddingBottom:30},
-  empty:{paddingVertical:28,paddingHorizontal:8,alignItems:'center'},emptyTitle:{fontSize:16,fontWeight:'900',color:colors.text,textAlign:'center'},emptyText:{fontSize:13,lineHeight:19,color:colors.textMuted,textAlign:'center',marginTop:5},
-  resultsTitle:{fontSize:13,fontWeight:'800',color:colors.textMuted,marginBottom:8},
-  row:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:17,marginBottom:10,overflow:'hidden'},
-  routeResult:{padding:14},
-  routeHeader:{flexDirection:'row',alignItems:'center'},
-  routeBadge:{minWidth:62,height:38,paddingHorizontal:12,borderRadius:10,backgroundColor:colors.accent,alignItems:'center',justifyContent:'center'},
-  routeBadgeText:{fontSize:17,fontWeight:'900',color:'#fff'},
-  routeCaption:{fontSize:12,fontWeight:'700',color:colors.textMuted,marginLeft:10,flex:1},
-  chevron:{fontSize:25,color:colors.textMuted},
-  stopsBlock:{flexDirection:'row',marginTop:14,paddingTop:13,borderTopWidth:1,borderTopColor:colors.border},
-  stopColumn:{width:18,alignItems:'center',paddingVertical:4},
-  stopDot:{width:8,height:8,borderRadius:4,backgroundColor:colors.accent},
-  stopLine:{width:2,flex:1,minHeight:20,backgroundColor:colors.accentSoft,marginVertical:3},
-  stopNames:{flex:1,marginLeft:9,justifyContent:'space-between',minHeight:66},
-  stopNameBlock:{marginBottom:8},
-  stopLabel:{fontSize:9,fontWeight:'900',letterSpacing:0.7,color:colors.textMuted},
-  stopName:{fontSize:13,fontWeight:'700',color:colors.text,lineHeight:18},
-  stopResult:{padding:13,flexDirection:'row',alignItems:'center'},
-  stopIcon:{width:38,height:38,borderRadius:11,backgroundColor:colors.successSoft,alignItems:'center',justifyContent:'center'},
-  stopIconText:{fontSize:11,color:colors.success},
-  resultText:{flex:1,marginLeft:11},
-  label:{fontSize:14,fontWeight:'800',color:colors.text},
-  typeLabel:{fontSize:11,color:colors.textMuted,marginTop:3}
+function RouteResult({item}:{item:SearchResult}){
+  const name=displayRouteName(item.label)||item.label;const c=resolveRouteColor(name,item.routeColor,item.routeTextColor);
+  return <View style={styles.routeResult}>
+    <View style={styles.routeTop}><View style={[styles.routeBadge,{backgroundColor:c.background}]}><Text style={[styles.routeBadgeText,{color:c.text}]}>{name}</Text></View><View style={styles.routeType}><Text style={styles.routeTypeTitle}>Bus route</Text><Text style={styles.routeTypeSub}>Direction</Text></View><Text style={styles.arrow}>›</Text></View>
+    {(item.fromStop||item.toStop)?<View style={styles.direction}><View style={styles.directionRail}><View style={styles.directionDot}/><View style={styles.directionLine}/><View style={[styles.directionDot,{backgroundColor:colors.secondary,borderColor:colors.secondary}]}/></View><View style={styles.directionCopy}><Text style={styles.directionFrom} numberOfLines={1}>{item.fromStop||'Starting stop'}</Text><Text style={styles.directionTo} numberOfLines={1}>{item.toStop||'Ending stop'}</Text></View></View>:null}
+  </View>;
+}
+function StopResult({item}:{item:SearchResult}){return <View style={styles.stopResult}><View style={styles.stopIcon}><Text style={styles.stopIconText}>●</Text></View><View style={styles.stopCopy}><Text style={styles.stopName} numberOfLines={1}>{item.label}</Text><Text style={styles.stopType}>Bus stop</Text></View><Text style={styles.arrow}>›</Text></View>;}
+
+const styles=StyleSheet.create({
+ safe:{flex:1,backgroundColor:colors.background},header:{paddingHorizontal:16,paddingTop:7,paddingBottom:10,flexDirection:'row',alignItems:'center'},back:{width:40,height:40,alignItems:'center',justifyContent:'center'},backText:{fontSize:36,color:colors.text},eyebrow:{fontSize:9,fontWeight:'900',letterSpacing:1.1,color:colors.textMuted},title:{fontSize:22,fontWeight:'900',color:colors.text,marginTop:2},
+ searchBox:{marginHorizontal:16,height:50,borderRadius:15,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,flexDirection:'row',alignItems:'center',paddingHorizontal:13},searchIcon:{fontSize:23,color:colors.text,marginRight:8},input:{flex:1,color:colors.text,fontSize:14},clear:{fontSize:25,color:colors.textMuted,paddingHorizontal:4},
+ suggestions:{margin:16,padding:15,borderRadius:17,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},suggestTitle:{fontSize:15,fontWeight:'900',color:colors.text},suggestText:{fontSize:11,color:colors.textMuted,marginTop:3},chips:{flexDirection:'row',flexWrap:'wrap',gap:7,marginTop:12},chip:{paddingHorizontal:11,paddingVertical:7,borderRadius:999,backgroundColor:colors.accentSoft},chipText:{fontSize:10,fontWeight:'900',color:colors.accent},
+ error:{marginHorizontal:16,marginTop:2,padding:11,borderRadius:13,backgroundColor:colors.dangerSoft},errorTitle:{fontSize:12,fontWeight:'900',color:colors.danger},errorText:{fontSize:11,color:colors.textMuted,marginTop:2},
+ list:{paddingHorizontal:16,paddingTop:10,paddingBottom:30},resultsTitle:{fontSize:11,fontWeight:'900',color:colors.textMuted,marginBottom:7},card:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:16,marginBottom:8,overflow:'hidden'},routeResult:{padding:13},routeTop:{flexDirection:'row',alignItems:'center'},routeBadge:{minWidth:58,height:36,paddingHorizontal:9,borderRadius:10,alignItems:'center',justifyContent:'center'},routeBadgeText:{fontSize:15,fontWeight:'900'},routeType:{flex:1,marginLeft:10},routeTypeTitle:{fontSize:12,fontWeight:'900',color:colors.text},routeTypeSub:{fontSize:9,color:colors.textMuted,marginTop:2},arrow:{fontSize:23,color:colors.textMuted},direction:{flexDirection:'row',marginTop:11,paddingTop:10,borderTopWidth:1,borderTopColor:colors.border},directionRail:{width:15,alignItems:'center',paddingTop:2},directionDot:{width:7,height:7,borderRadius:4,borderWidth:2,borderColor:colors.accent,backgroundColor:colors.surface},directionLine:{height:15,width:2,backgroundColor:colors.border,marginVertical:2},directionCopy:{flex:1,marginLeft:8},directionFrom:{fontSize:11,fontWeight:'800',color:colors.text},directionTo:{fontSize:11,fontWeight:'800',color:colors.text,marginTop:5},
+ stopResult:{padding:12,flexDirection:'row',alignItems:'center'},stopIcon:{width:36,height:36,borderRadius:11,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},stopIconText:{fontSize:10,color:colors.accent},stopCopy:{flex:1,marginLeft:10},stopName:{fontSize:13,fontWeight:'800',color:colors.text},stopType:{fontSize:9,color:colors.textMuted,marginTop:2},
+ empty:{alignItems:'center',padding:35},emptyTitle:{fontSize:15,fontWeight:'900',color:colors.text},emptyText:{fontSize:11,color:colors.textMuted,textAlign:'center',marginTop:4,lineHeight:17}
 });

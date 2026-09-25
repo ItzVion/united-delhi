@@ -13,6 +13,7 @@ import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
 import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 import { confirmLocationUse } from '../lib/locationConsent';
+import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
