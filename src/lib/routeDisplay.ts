@@ -33,8 +33,8 @@ export function publicRouteDirection(
 
   if (publicName === '801STL') {
     return isDown
-      ? { from: 'Uttam Nagar Terminal', to: 'Kapashera Border' }
-      : { from: 'Kapashera Border', to: 'Uttam Nagar Terminal' };
+      ? { from: 'Kapashera Border', to: 'Uttam Nagar Terminal' }
+      : { from: 'Uttam Nagar Terminal', to: 'Kapashera Border' };
   }
 
   return {
