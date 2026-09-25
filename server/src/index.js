@@ -330,14 +330,6 @@ const server=app.listen(port,()=>{
 server.requestTimeout=15000;
 server.headersTimeout=20000;
 server.keepAliveTimeout=5000;
-,'','i'),'^AIR-0+','AIR-','i') END public_label,
-          COALESCE(rc.stop_count,0) stop_count,start_stop.name from_stop,end_stop.name to_stop
-        FROM routes r
-        LEFT JOIN (SELECT route_id,COUNT(*) stop_count FROM route_stops GROUP BY route_id) rc ON rc.route_id=r.route_id
-        LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.name,s.stop_id LIMIT 1) start_stop ON TRUE
-        LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.name,s.stop_id LIMIT 1) end_stop ON TRUE
-        WHERE COALESCE(r.short_name,'') ILIKE $1 OR COALESCE(r.long_name,'') ILIKE $1
-      ),
       public_routes AS (
         SELECT *,from_stop AS public_from_stop,to_stop AS public_to_stop
         FROM route_base
