@@ -1,0 +1,41 @@
+name: Generate United Delhi Icons
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - assets/united-delhi-logo.svg
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  icons:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Generate PNG assets
+        run: |
+          npm install --no-save sharp@0.33.5
+          node <<'NODE'
+          const sharp = require('sharp');
+          const input = 'assets/united-delhi-logo.svg';
+          (async () => {
+            await sharp(input).resize(1024, 1024).png().toFile('assets/united-delhi-logo.png');
+            await sharp(input).resize(1024, 1024).png().toFile('assets/icon.png');
+            await sharp(input).resize(1024, 1024).png().toFile('assets/adaptive-icon.png');
+          })().catch(err => { console.error(err); process.exit(1); });
+          NODE
+      - name: Commit generated icons
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/icon.png assets/adaptive-icon.png assets/united-delhi-logo.png
+          git diff --cached --quiet || git commit -m "chore: generate United Delhi app icons"
+          git push

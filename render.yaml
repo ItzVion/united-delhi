@@ -1,10 +1,11 @@
 services:
   - type: web
-    name: united-delhi-api
+    name: united-delhi
     runtime: node
     rootDir: server
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: DTC_API_KEY
         sync: false

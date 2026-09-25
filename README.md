@@ -13,3 +13,13 @@ The official realtime endpoint is documented as:
 https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb?key=YOUR_PRIVATE_KEY
 
 Static GTFS data and realtime access require the relevant OTD access steps. The official documentation warns that stop_times.txt is only a rough constant-speed estimate, so the app must label scheduled ETAs as estimates.
+
+## Legal
+
+- Privacy Policy: `PRIVACY_POLICY.md`
+- Terms of Service: `TERMS_OF_SERVICE.md`
+- Third-Party Notices: `THIRD_PARTY_NOTICES.md`
+- Security Policy: `SECURITY.md`
+- Legal & Compliance Checklist: `LEGAL_COMPLIANCE.md`
+
+The production app currently uses an 18+ access gate until a legally appropriate parental-consent flow is implemented.

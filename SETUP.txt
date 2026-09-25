@@ -1,20 +1,32 @@
 UNITED DELHI SETUP
 
-1. In the project directory:
+1. Frontend
+   In the project directory:
    npm install
-   npm start
-
-2. Mobile:
    npx expo start
 
-3. Backend on Render:
-   Create a Web Service using the /server directory.
-   Build command: npm install
-   Start command: npm start
-   Add DTC_API_KEY as a Render environment variable.
+2. Backend
+   From the server directory:
+   npm ci
+   npm run check
+   npm start
 
-4. DTC data:
-   Request access through https://otd.delhi.gov.in/data/realtime/
-   Obtain the authorised key and required static GTFS data through OTD.
+3. Backend environment
+   Set DATABASE_URL and DTC_API_KEY in the server environment.
+   Never put either secret in frontend source or the mobile bundle.
 
-5. Do not put DTC_API_KEY in App.tsx, GitHub, or the mobile bundle.
+4. Backend on Render
+   Use the /server directory as the service root.
+   Build command: npm ci
+   Start command: npm start (schema migrations and fallback static-data import run during startup when needed)
+   Health check: /health
+   Add DTC_API_KEY and DATABASE_URL as Render environment variables.
+
+5. DTC realtime data
+   Request API access through:
+   https://otd.delhi.gov.in/data/realtime/
+   The authorised key belongs only on the backend.
+
+6. Static GTFS data
+   The repository uses its pinned GTFS snapshot unless a newer compatible source is
+   verified against the realtime route IDs.

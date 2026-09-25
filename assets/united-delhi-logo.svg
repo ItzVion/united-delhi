@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+<title id="title">United Delhi</title>
+<desc id="desc">United Delhi transit logo with a Delhi landmark, connected route, bus and location pin.</desc>
+<rect width="1024" height="1024" rx="210" fill="#F7FAF8"/>
+<path d="M170 150v500c0 125 75 200 190 200h65" fill="none" stroke="#073F3B" stroke-width="86" stroke-linecap="round"/>
+<path d="M225 705V535h270v170M260 535h200M285 495h150M315 455h90M335 415h50M350 375h20" fill="none" stroke="#B7CCC7" stroke-width="24" stroke-linecap="round"/>
+<path d="M325 705v-105c0-25 20-45 45-45s45 20 45 45v105" fill="none" stroke="#B7CCC7" stroke-width="30"/>
+<path d="M525 220h180c145 0 230 85 230 230v165c0 145-85 230-230 230H535" fill="none" stroke="#0B8F70" stroke-width="86" stroke-linecap="round"/>
+<path d="M540 270h150c105 0 165 60 165 165v125c0 105-60 165-165 165H555" fill="none" stroke="#073F3B" stroke-width="22" stroke-linecap="round"/>
+<g fill="#F7FAF8" stroke="#0B8F70" stroke-width="18"><circle cx="545" cy="270" r="30"/><circle cx="855" cy="435" r="30"/><circle cx="555" cy="725" r="30"/></g>
+<path d="M545 155c0-55 45-100 100-100s100 45 100 100c0 75-100 170-100 170S545 230 545 155z" fill="#F47B20"/>
+<circle cx="645" cy="155" r="32" fill="#F7FAF8"/>
+<rect x="575" y="455" width="210" height="225" rx="45" fill="#F7FAF8" stroke="#073F3B" stroke-width="22"/>
+<rect x="610" y="490" width="140" height="80" rx="18" fill="#B7CCC7"/>
+<rect x="620" y="475" width="120" height="18" rx="9" fill="#F47B20"/>
+<circle cx="625" cy="645" r="22" fill="#073F3B"/><circle cx="735" cy="645" r="22" fill="#073F3B"/>
+<path d="M660 645h40" stroke="#073F3B" stroke-width="12" stroke-linecap="round"/>
+</svg>

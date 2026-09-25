@@ -1,8 +1,25 @@
-Known environment issue from previous development:
-- GitHub Codespaces + Expo Go produced connection failures because the Expo server was running inside a remote environment. The project later bundled successfully on a local Windows machine.
-- Codespaces also showed missing Linux shared-library messages for React Native DevTools. These were environment issues.
-- npm reported moderate dependency audit findings in prior installs. They were not fixed with npm audit --force because blindly forcing upgrades can break Expo compatibility.
+UNITED DELHI — CURRENT KNOWN ISSUES / LIMITATIONS
 
-Current repository status:
-- This repository contains a clean app scaffold and backend boundary.
-- Production DTC GTFS loading and production protobuf vehicle decoding must be completed before claiming live bus tracking.
+Previous environment-specific issues:
+- GitHub Codespaces + Expo Go had remote tunnel/connection problems.
+- Codespaces React Native DevTools required Linux GUI libraries.
+These are development-environment issues, not production API vulnerabilities.
+
+Previously fixed backend issues:
+- GTFS PostgreSQL placeholder/batch insert failures.
+- Duplicate route-stop batch conflicts.
+- Startup schema race around route-color columns.
+- Missing/unfinished Journey Planner backend endpoint.
+- Realtime duplicate vehicles and invalid timestamp handling.
+- Dependency/configuration validation issues in Expo.
+
+Current data limitation:
+- Some realtime trip.routeId values do not have a matching row in the current static routes table.
+- United Delhi does not invent public route numbers for those vehicles.
+- A verified OTD realtime-to-static/public route mapping is still required.
+
+Current external verification limitation:
+- The live Neon security-advisor/role-privilege state was not directly readable in this session because the Neon connector runtime required a project ID that was not available.
+- The repository now contains an automatic database hardening migration that runs before normal API/static-data startup.
+
+Do not treat an unresolved data mapping as a security vulnerability or guess a route number to hide it.
