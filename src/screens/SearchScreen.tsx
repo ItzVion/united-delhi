@@ -32,7 +32,19 @@ export default function SearchScreen() {
     const timer = setTimeout(async () => {
       try {
         const result = await api.search(value);
-        if (!cancelled) setResults(result.status === 'OK' ? result.results : []);
+        if (!cancelled) {
+          const incoming=result.status === 'OK' ? result.results : [];
+          const seen=new Set<string>();
+          const cleaned=incoming.filter(item=>{
+            const key=item.type==='route'
+              ? `route|${(item.label||'').trim().toUpperCase()}|${(item.fromStop||'').trim().toLowerCase()}|${(item.toStop||'').trim().toLowerCase()}`
+              : `stop|${item.id}`;
+            if(seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          setResults(cleaned);
+        }
       } catch (e) {
         if (!cancelled) {
           setResults([]);
