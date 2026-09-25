@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -25,6 +25,7 @@ export default function RouteDetailsScreen(){
   const [loading,setLoading]=useState(true);
   const [mapReady,setMapReady]=useState(false);
   const [error,setError]=useState<string|null>(null);
+  const [selectedBus,setSelectedBus]=useState<Vehicle|null>(null);
 
   const load=useCallback(async()=>{
     try{
@@ -71,7 +72,7 @@ export default function RouteDetailsScreen(){
 
     <View style={styles.mapWrap}>
       <WebView ref={mapRef} style={styles.map} originWhitelist={['*']} javaScriptEnabled domStorageEnabled cacheEnabled userAgent="UnitedDelhi/1.0 (+https://github.com/ItzVion/united-delhi)" source={{html:buildRouteMapHtml()}} onLoadEnd={()=>setMapReady(true)}
-        onMessage={event=>{try{const m=JSON.parse(event.nativeEvent.data);if(m.type==='stop'){const stop=stops.find(s=>s.stop_id===m.stopId);if(stop)navigation.navigate('StopDetails',{stopId:stop.stop_id,stopName:stop.name});}}catch{}}}/>
+        onMessage={event=>{try{const m=JSON.parse(event.nativeEvent.data);if(m.type==='stop'){const stop=stops.find(s=>s.stop_id===m.stopId);if(stop)navigation.navigate('StopDetails',{stopId:stop.stop_id,stopName:stop.name});}else if(m.type==='bus'){const bus=vehicles.find(v=>v.id===m.busId);if(bus)setSelectedBus(bus);}}catch{}}}/>
       <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View>
       <View pointerEvents="none" style={styles.mapPill}><View style={styles.liveDot}/><Text style={styles.mapPillText}>{vehicles.length?(`${vehicles.length} live on route`):'No live position on route'}</Text></View>
     </View>
@@ -84,8 +85,39 @@ export default function RouteDetailsScreen(){
 
     {vehicles.length>0?<View style={styles.liveCard}>
       <View style={styles.liveHeader}><View><Text style={styles.liveTitle}>Live buses</Text><Text style={styles.liveSub}>Fresh positions matched to this route</Text></View><Text style={styles.liveCount}>{vehicles.length}</Text></View>
-      {vehicles.slice(0,4).map(v=>{const ageMs=Date.now()-Date.parse(v.observedAt);const age=Number.isFinite(ageMs)?Math.max(0,Math.round(ageMs/1000)):null;return <Pressable key={v.id} style={styles.busRow} onPress={()=>navigation.goBack()}><View style={[styles.miniBadge,{backgroundColor:c.background}]}><Text style={[styles.miniBadgeText,{color:c.text}]}>{routeName}</Text></View><View style={styles.busCopy}><Text style={styles.busId}>Live bus · {v.id}</Text><Text style={styles.busMeta}>{v.toStop?'To '+v.toStop:to} · {age===null?'Live position':age<60?'Updated just now':'Updated '+Math.floor(age/60)+' min ago'}</Text></View><Text style={styles.chevron}>›</Text></Pressable>})}
+      {vehicles.slice(0,4).map(v=>{const ageMs=Date.now()-Date.parse(v.observedAt);const age=Number.isFinite(ageMs)?Math.max(0,Math.round(ageMs/1000)):null;return <Pressable key={v.id} style={styles.busRow} onPress={()=>setSelectedBus(v)}><View style={[styles.miniBadge,{backgroundColor:c.background}]}><Text style={[styles.miniBadgeText,{color:c.text}]}>{routeName}</Text></View><View style={styles.busCopy}><Text style={styles.busId}>Live bus · {v.id}</Text><Text style={styles.busMeta}>{v.toStop?'To '+v.toStop:to} · {age===null?'Live position':age<60?'Updated just now':'Updated '+Math.floor(age/60)+' min ago'}</Text></View><Text style={styles.chevron}>›</Text></Pressable>})}
     </View>:null}
+
+    <Modal visible={!!selectedBus} transparent animationType="slide" onRequestClose={()=>setSelectedBus(null)}>
+      <View style={styles.modalBackdrop}>
+        <Pressable style={styles.modalDismissArea} onPress={()=>setSelectedBus(null)}/>
+        {selectedBus ? (() => {
+          const busName=displayRouteName(selectedBus.routeShortName)||routeName;
+          const busColor=resolveRouteColor(busName,selectedBus.routeColor,selectedBus.routeTextColor);
+          const ageMs=Date.now()-Date.parse(selectedBus.observedAt);
+          const age=Number.isFinite(ageMs)?Math.max(0,Math.round(ageMs/1000)):null;
+          return <View style={styles.busSheet}>
+            <View style={styles.sheetHandle}/>
+            <View style={styles.sheetTop}>
+              <View style={[styles.sheetRouteBadge,{backgroundColor:busColor.background}]}>
+                <Text style={[styles.sheetRouteText,{color:busColor.text}]}>{busName}</Text>
+              </View>
+              <Pressable onPress={()=>setSelectedBus(null)} style={styles.sheetClose}><Text style={styles.sheetCloseText}>×</Text></Pressable>
+            </View>
+            <Text style={styles.sheetEyebrow}>LIVE BUS</Text>
+            <Text style={styles.sheetTitle}>Vehicle {selectedBus.id}</Text>
+            <Text style={styles.sheetDestination}>To {selectedBus.toStop||to}</Text>
+            <View style={styles.sheetMetaRow}>
+              <View><Text style={styles.sheetMetaLabel}>STATUS</Text><Text style={styles.sheetMetaValue}>Live position</Text></View>
+              <View><Text style={styles.sheetMetaLabel}>UPDATED</Text><Text style={styles.sheetMetaValue}>{age===null?'Live':age<60?'Just now':Math.floor(age/60)+' min ago'}</Text></View>
+            </View>
+            <Pressable style={styles.sheetAction} onPress={()=>setSelectedBus(null)}>
+              <Text style={styles.sheetActionText}>Close</Text>
+            </Pressable>
+          </View>;
+        })() : null}
+      </View>
+    </Modal>
 
     <FlatList data={stops} keyExtractor={item=>item.stop_id} contentContainerStyle={styles.list}
       ListHeaderComponent={<View style={styles.listHeader}><Text style={styles.listTitle}>Stops in order</Text><Text style={styles.listHint}>Tap a stop for live arrivals</Text></View>}
@@ -104,7 +136,7 @@ function Metric({value,label}:{value:string;label:string}){return <View style={s
 function buildRouteMapHtml(){
  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""><style>html,body,#map{margin:0;width:100%;height:100%;background:#eef2f1}.leaflet-control-zoom{border:0!important;box-shadow:0 2px 10px rgba(23,49,47,.16)!important;border-radius:10px!important;overflow:hidden}.leaflet-control-zoom a{border:0!important;color:#17312f!important}.stop-label{width:9px;height:9px;border-radius:50%;background:#0b746b;border:2px solid #fff}.bus-label{font:800 9px system-ui,sans-serif;white-space:nowrap;border-radius:8px;padding:3px 5px;border:2px solid #fff;box-shadow:0 2px 7px rgba(23,49,47,.22)}</style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script>
 const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5}).setView([28.6139,77.209],12.5);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,keepBuffer:2,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);const lineLayer=L.layerGroup().addTo(map),stopLayer=L.layerGroup().addTo(map),busLayer=L.layerGroup().addTo(map);let fitted=false;
-window.updateRouteMap=function(data){lineLayer.clearLayers();stopLayer.clearLayers();busLayer.clearLayers();const line=data.stops.map(s=>[s.lat,s.lon]);if(line.length>1)L.polyline(line,{color:'#0b746b',weight:5,opacity:.9,lineCap:'round'}).addTo(lineLayer);const stopIcon=L.divIcon({className:'',html:'<div class="stop-label"></div>',iconSize:[13,13],iconAnchor:[6,6]});data.stops.forEach(s=>{const popup=document.createElement('div'),title=document.createElement('b'),button=document.createElement('button');title.textContent=s.name;button.textContent='View stop';button.type='button';button.style.marginTop='6px';button.onclick=()=>openStop(s.id);popup.append(title,document.createElement('br'),button);L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup(popup);});data.buses.forEach(v=>{const bg=valid(v.color)?v.color:'#0b746b',fg=valid(v.textColor)?v.textColor:'#fff';L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label" style="background:'+bg+';color:'+fg+'">'+esc(v.route)+'</div>',iconSize:[58,22],iconAnchor:[29,11]})}).addTo(busLayer);});if(!fitted&&(line.length||data.buses.length)){const points=[...line,...data.buses.map(v=>[v.lat,v.lon])];map.fitBounds(points,{padding:[18,18],maxZoom:13});fitted=true;}};function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}function valid(x){return /^#[0-9a-f]{6}$/i.test(String(x));}function esc(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}</script></body></html>`;
+window.updateRouteMap=function(data){lineLayer.clearLayers();stopLayer.clearLayers();busLayer.clearLayers();const line=data.stops.map(s=>[s.lat,s.lon]);if(line.length>1)L.polyline(line,{color:'#0b746b',weight:5,opacity:.9,lineCap:'round'}).addTo(lineLayer);const stopIcon=L.divIcon({className:'',html:'<div class="stop-label"></div>',iconSize:[13,13],iconAnchor:[6,6]});data.stops.forEach(s=>{const popup=document.createElement('div'),title=document.createElement('b'),button=document.createElement('button');title.textContent=s.name;button.textContent='View stop';button.type='button';button.style.marginTop='6px';button.onclick=()=>openStop(s.id);popup.append(title,document.createElement('br'),button);L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup(popup);});data.buses.forEach(v=>{const bg=valid(v.color)?v.color:'#0b746b',fg=valid(v.textColor)?v.textColor:'#fff';const marker=L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label" style="background:'+bg+';color:'+fg+'">'+esc(v.route)+'</div>',iconSize:[58,22],iconAnchor:[29,11]})});marker.on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'bus',busId:v.id})));marker.addTo(busLayer);});if(!fitted&&(line.length||data.buses.length)){const points=[...line,...data.buses.map(v=>[v.lat,v.lon])];map.fitBounds(points,{padding:[18,18],maxZoom:13});fitted=true;}};function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}function valid(x){return /^#[0-9a-f]{6}$/i.test(String(x));}function esc(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}</script></body></html>`;
 }
 const styles=StyleSheet.create({
  safe:{flex:1,backgroundColor:colors.background},topBar:{paddingHorizontal:16,paddingTop:7,paddingBottom:7,flexDirection:'row',alignItems:'center'},backButton:{width:40,height:40,alignItems:'center',justifyContent:'center'},back:{fontSize:36,color:colors.text},topCopy:{flex:1},eyebrow:{fontSize:9,fontWeight:'900',letterSpacing:1.1,color:colors.textMuted},title:{fontSize:21,fontWeight:'900',color:colors.text,marginTop:2},
