@@ -11,6 +11,7 @@ import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
+import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
@@ -167,9 +168,12 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.brand}>UNITED DELHI</Text>
-          <Text style={styles.tagline}>Move better around Delhi</Text>
+        <View style={styles.brandRow}>
+          <UnitedDelhiMark size={40} />
+          <View style={styles.brandCopy}>
+            <Text style={styles.brand}>UNITED DELHI</Text>
+            <Text style={styles.tagline}>Delhi, made simpler</Text>
+          </View>
         </View>
         <StatusPill label={freshnessLabel} tone={vehiclesFreshness === 'ok' ? 'ok' : vehiclesFreshness === 'unavailable' ? 'danger' : 'muted'} />
       </View>
@@ -308,6 +312,7 @@ function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':
 const styles = StyleSheet.create({
   safe:{flex:1,backgroundColor:colors.background},
   header:{paddingHorizontal:20,paddingTop:10,paddingBottom:4,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
+  brandRow:{flexDirection:'row',alignItems:'center'},brandCopy:{marginLeft:10},
   brand:{fontSize:23,fontWeight:'900',letterSpacing:1,color:colors.text},tagline:{fontSize:12,color:colors.textMuted,marginTop:2},
   searchBar:{marginHorizontal:20,marginTop:12,height:52,borderRadius:17,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,flexDirection:'row',alignItems:'center',paddingHorizontal:15},
   searchIcon:{fontSize:27,color:colors.text,marginRight:8,marginTop:-3},searchPlaceholder:{fontSize:15,color:colors.textMuted},
