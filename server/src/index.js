@@ -105,17 +105,7 @@ app.get('/api/search',dbRateLimit,async(req,res)=>{
         WHERE COALESCE(r.short_name,'') ILIKE $1 OR COALESCE(r.long_name,'') ILIKE $1
       ),
       public_routes AS (
-        SELECT *,
-          CASE WHEN UPPER(public_label)='801' AND short_name ILIKE '%DOWN' THEN 'IGI Airport Terminal 2'
-               WHEN UPPER(public_label)='801' AND short_name ILIKE '%UP' THEN 'Kapashera Border'
-               WHEN UPPER(public_label)='801STL' AND short_name ILIKE '%DOWN' THEN 'Kapashera Border'
-               WHEN UPPER(public_label)='801STL' AND short_name ILIKE '%UP' THEN 'Uttam Nagar Terminal'
-               ELSE from_stop END public_from_stop,
-          CASE WHEN UPPER(public_label)='801' AND short_name ILIKE '%DOWN' THEN 'Kapashera Border'
-               WHEN UPPER(public_label)='801' AND short_name ILIKE '%UP' THEN 'IGI Airport Terminal 2'
-               WHEN UPPER(public_label)='801STL' AND short_name ILIKE '%DOWN' THEN 'Kapashera Border'
-               WHEN UPPER(public_label)='801STL' AND short_name ILIKE '%UP' THEN 'Uttam Nagar Terminal'
-               ELSE to_stop END public_to_stop
+        SELECT *,from_stop AS public_from_stop,to_stop AS public_to_stop
         FROM route_base
       ),
       representative_routes AS (
