@@ -93,7 +93,7 @@ export default function StopDetailsScreen() {
           {arrivalsReason ? <Text style={styles.muted}>{arrivalsReason}</Text> : null}
           {!loading && !arrivalsReason && arrivals.length === 0 ? <Text style={styles.muted}>No live buses are reporting on these routes right now.</Text> : null}
           {arrivals.map((a) => (
-            <View key={a.vehicleId} style={styles.arrival}>
+            <Pressable key={a.vehicleId} style={styles.arrival} onPress={() => a.routeId && navigation.navigate('RouteDetails', { routeId: a.routeId, label: displayRouteName(a.routeShortName) || 'Bus route' })}>
               {(() => { const name=displayRouteName(a.routeShortName);if(!name)return null; const rc=resolveRouteColor(name,a.routeColor,a.routeTextColor); return <View style={[styles.busIcon,{backgroundColor:rc.background}]}><Text style={{color:rc.text,fontWeight:'900',fontSize:11}}>{name}</Text></View>; })()}
               <View style={styles.arrivalMain}>
                 <Text style={styles.route}>{displayRouteName(a.routeShortName)}</Text>
@@ -103,7 +103,7 @@ export default function StopDetailsScreen() {
                 <Text style={styles.eta}>{Math.round(a.distanceMeters)+' m'}</Text>
                 <Text style={styles.confidence}>Live position</Text>
               </View>
-            </View>
+            </Pressable>
           ))}
         </View>
 
@@ -134,5 +134,5 @@ const styles = StyleSheet.create({
   section:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:18,padding:15,marginTop:12},sectionHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:8},sectionTitle:{fontSize:17,fontWeight:'900',color:colors.text},refreshText:{fontSize:10,color:colors.textMuted},count:{minWidth:28,textAlign:'center',paddingVertical:4,paddingHorizontal:8,borderRadius:999,backgroundColor:colors.accentSoft,color:colors.accent,fontWeight:'900'},
   muted:{fontSize:13,lineHeight:19,color:colors.textMuted},arrival:{borderTopWidth:1,borderTopColor:colors.border,paddingVertical:11,flexDirection:'row',alignItems:'center'},busIcon:{width:44,height:44,borderRadius:13,alignItems:'center',justifyContent:'center'},arrivalMain:{flex:1,marginLeft:10},route:{fontSize:16,fontWeight:'900',color:colors.text},arrivalMeta:{fontSize:10,color:colors.textMuted,marginTop:3},etaBox:{alignItems:'flex-end'},eta:{fontSize:15,fontWeight:'900',color:colors.accent},confidence:{fontSize:9,color:colors.textMuted,marginTop:2},
   routeList:{gap:8},routeCard:{borderWidth:1,borderColor:colors.border,borderRadius:13,padding:10,flexDirection:'row',alignItems:'center'},routeNumber:{minWidth:54,height:38,borderRadius:10,backgroundColor:colors.accent,alignItems:'center',justifyContent:'center',paddingHorizontal:7},routeNumberText:{color:'#fff',fontWeight:'900',fontSize:13},routeText:{flex:1,marginLeft:10},routeName:{fontSize:12,fontWeight:'800',color:colors.text},routeHint:{fontSize:10,color:colors.textMuted,marginTop:3},chevron:{fontSize:25,color:colors.textMuted},
-  smartButton:{marginTop:12,borderRadius:13,backgroundColor:colors.accent,paddingVertical:13,alignItems:'center'},smartButtonText:{color:'#fff',fontWeight:'900'},error:{color:colors.danger,fontSize:12,marginTop:8},smartResult:{marginTop:12,padding:12,borderRadius:13,backgroundColor:colors.accentSoft},smartHeadline:{fontSize:20,fontWeight:'900',color:colors.text},detail:{fontSize:11,color:colors.textMuted,marginTop:7}
+
 });
