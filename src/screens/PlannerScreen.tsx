@@ -7,6 +7,7 @@ import { api, TripPlanOption } from '../api/client';
 import { colors } from '../theme';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
+import { resolveRouteColor } from '../lib/routeColor';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Planner'>;
 
@@ -80,7 +81,7 @@ export default function PlannerScreen() {
             </View>
             {option.legs.map((leg, legIndex) => (
               <View key={`${leg.routeId}-${legIndex}`} style={styles.leg}>
-                <View style={styles.routeBadge}><Text style={styles.routeBadgeText}>{displayRouteName(leg.routeName) || 'Bus'}</Text></View>
+                {(() => { const name=displayRouteName(leg.routeName)||'Bus'; const rc=resolveRouteColor(name,leg.routeColor,leg.routeTextColor); return <View style={[styles.routeBadge,{backgroundColor:rc.background}]}><Text style={[styles.routeBadgeText,{color:rc.text}]}>{name}</Text></View>; })()}
                 <View style={styles.legCopy}>
                   <Text style={styles.legRoute}>Bus {displayRouteName(leg.routeName) || 'Bus'}</Text>
                   <Text style={styles.legStops} numberOfLines={1}>{leg.fromStop} → {leg.toStop}</Text>
