@@ -9,6 +9,7 @@ import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
+import { resolveRouteColor } from '../lib/routeColor';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'RouteDetails'>;
 type RouteDetailsRoute = RouteProp<RootStackParamList, 'RouteDetails'>;
@@ -54,7 +55,7 @@ export default function RouteDetailsScreen() {
     if (!mapReady) return;
     const payload = {
       stops: stops.map(s => ({ id: s.stop_id, name: s.name, lat: s.latitude, lon: s.longitude })),
-      buses: vehicles.map(v => ({ id: v.id, route: displayRouteName(v.routeShortName) || 'BUS', lat: v.latitude, lon: v.longitude }))
+      buses: vehicles.map(v => { const route=displayRouteName(v.routeShortName)||'BUS'; const color=resolveRouteColor(route,v.routeColor,v.routeTextColor); return { id:v.id, route, color:color.background, textColor:color.text, lat:v.latitude, lon:v.longitude }; })
     };
     mapRef.current?.injectJavaScript(`window.updateRouteMap(${JSON.stringify(payload)}); true;`);
   }, [mapReady, stops, vehicles]);
@@ -145,7 +146,7 @@ window.updateRouteMap=function(data){
    popup.append(title,document.createElement('br'),button);
    L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup(popup);
  });
- data.buses.forEach(v=>L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label">'+escapeHtml(v.route||'BUS')+'</div>',iconSize:[50,22],iconAnchor:[25,11]})}).addTo(busLayer).bindPopup(escapeHtml(v.route||'Live bus')));
+ data.buses.forEach(v=>{const bg=/^#[0-9a-f]{6}$/i.test(String(v.color))?v.color:'#0b746b';const fg=/^#[0-9a-f]{6}$/i.test(String(v.textColor))?v.textColor:'#fff';L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label" style="background:'+bg+';color:'+fg+'">'+escapeHtml(v.route||'BUS')+'</div>',iconSize:[50,22],iconAnchor:[25,11]})}).addTo(busLayer).bindPopup(escapeHtml(v.route||'Live bus'));});
  if(line.length>1&&!fitted){map.fitBounds(line,{padding:[20,20]});fitted=true;}
 };
 function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}
