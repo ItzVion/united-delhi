@@ -93,9 +93,9 @@ export default function StopDetailsScreen() {
           {loading ? <ActivityIndicator color={colors.accent} style={{ marginVertical: 18 }} /> : null}
           {arrivalsReason ? <Text style={styles.muted}>{arrivalsReason}</Text> : null}
           {!loading && !arrivalsReason && arrivals.length === 0 ? <Text style={styles.muted}>No live buses are reporting on these routes right now.</Text> : null}
-          {arrivals.map((a, index) => (
+          {arrivals.map((a) => (
             <View key={a.vehicleId} style={styles.arrival}>
-              {(() => { const name=displayRouteName(a.routeShortName)||'Bus'; const rc=resolveRouteColor(name,a.routeColor,a.routeTextColor); return <View style={[styles.busIcon,{backgroundColor:rc.background}]}><Text style={{color:rc.text,fontWeight:'900',fontSize:11}}>{name}</Text></View>; })()}
+              {(() => { const name=displayRouteName(a.routeShortName);if(!name)return null; const rc=resolveRouteColor(name,a.routeColor,a.routeTextColor); return <View style={[styles.busIcon,{backgroundColor:rc.background}]}><Text style={{color:rc.text,fontWeight:'900',fontSize:11}}>{name}</Text></View>; })()}
               <View style={styles.arrivalMain}>
                 <Text style={styles.route}>{displayRouteName(a.routeShortName) || 'Bus'}</Text>
                 <Text style={styles.arrivalMeta}>{a.observedAgeSeconds < 60 ? 'Updated just now' : 'Updated '+Math.floor(a.observedAgeSeconds/60)+' min ago'}</Text>
