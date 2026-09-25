@@ -2,7 +2,7 @@ import { API_BASE_URL } from '../config';
 
 export interface Stop { stop_id:string; name:string; latitude:number; longitude:number; distance_m?:number; }
 export interface Route { route_id:string; short_name:string|null; long_name:string|null; route_color?:string|null; route_text_color?:string|null; stop_sequence?:number; }
-export interface Vehicle { id:string; routeId:string|null; routeShortName:string|null; routeColor?:string|null; routeTextColor?:string|null; tripId:string|null; stopId:string|null; latitude:number; longitude:number; bearing:number|null; speedMps:number|null; observedAt:string; }
+export interface Vehicle { id:string; routeId:string|null; routeShortName:string|null; routeColor?:string|null; routeTextColor?:string|null; tripId:string|null; stopId:string|null; fromStop?:string|null; toStop?:string|null; latitude:number; longitude:number; bearing:number|null; speedMps:number|null; observedAt:string; }
 export interface SearchResult { type:'stop'|'route'; id:string; label:string; fromStop?:string|null; toStop?:string|null; routeColor?:string|null; routeTextColor?:string|null; }
 export interface TripPlanOption { type:'direct'|'one-transfer'; durationMinutes:number; walkingMinutes:number; legs:Array<{routeId:string;routeName:string;routeColor?:string|null;routeTextColor?:string|null;fromStop:string;toStop:string;fromStopId:string;toStopId:string}>; transferStop?:string|null; }
 export interface TripPlanStop { stop_id:string; name:string; latitude:number; longitude:number; }
