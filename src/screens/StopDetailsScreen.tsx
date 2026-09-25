@@ -1,18 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Location from 'expo-location';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api, Arrival, Route as ApiRoute, Stop } from '../api/client';
 import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
-import { computeSmartLeave, SmartLeaveResult } from '../lib/smartLeave';
-import { formatDuration, haversineMeters, walkingSeconds } from '../lib/geo';
+import { formatDuration } from '../lib/geo';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
-import { confirmLocationUse } from '../lib/locationConsent';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'StopDetails'>;
 type StopRoute = RouteProp<RootStackParamList, 'StopDetails'>;
@@ -26,9 +23,6 @@ export default function StopDetailsScreen() {
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [arrivalsReason, setArrivalsReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [smartLeave, setSmartLeave] = useState<SmartLeaveResult | null>(null);
-  const [smartLeaveError, setSmartLeaveError] = useState<string | null>(null);
-  const [computingSmartLeave, setComputingSmartLeave] = useState(false);
 
   const load = useCallback(async () => {
     const [stopSettled, arrivalsSettled] = await Promise.allSettled([
@@ -78,38 +72,6 @@ export default function StopDetailsScreen() {
     return () => clearInterval(interval);
   }, [load]);
 
-  const runSmartLeave = useCallback(async () => {
-    if (!stop) return;
-    setComputingSmartLeave(true);
-    setSmartLeaveError(null);
-    try {
-      if (!(await confirmLocationUse())) {
-        setSmartLeaveError('Location use was cancelled.');
-        return;
-      }
-      const permission = await Promise.race([
-        Location.requestForegroundPermissionsAsync(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('permission-timeout')), 10000)
-        )
-      ]);
-      if (permission.status !== 'granted') {
-        setSmartLeaveError('Location permission is needed to estimate your walk.');
-        return;
-      }
-      const current = await Promise.race([
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
-      ]);
-      const distance = haversineMeters(current.coords.latitude, current.coords.longitude, stop.latitude, stop.longitude);
-      setSmartLeave(computeSmartLeave(arrivals, walkingSeconds(distance)));
-    } catch {
-      setSmartLeaveError('Could not get your location for Smart Leave.');
-    } finally {
-      setComputingSmartLeave(false);
-    }
-  }, [stop, arrivals]);
-
   const title = stop?.name || stopName || 'Bus stop';
 
   return (
@@ -136,11 +98,11 @@ export default function StopDetailsScreen() {
               {(() => { const name=displayRouteName(a.routeShortName)||'Bus'; const rc=resolveRouteColor(name,a.routeColor,a.routeTextColor); return <View style={[styles.busIcon,{backgroundColor:rc.background}]}><Text style={{color:rc.text,fontWeight:'900',fontSize:11}}>{name}</Text></View>; })()}
               <View style={styles.arrivalMain}>
                 <Text style={styles.route}>{displayRouteName(a.routeShortName) || 'Bus'}</Text>
-                <Text style={styles.arrivalMeta}>{a.source === 'live-data-estimate' ? 'Live estimate' : 'Live position'} · {a.observedAgeSeconds}s old</Text>
+                <Text style={styles.arrivalMeta}>{a.observedAgeSeconds < 60 ? 'Updated just now' : 'Updated '+Math.floor(a.observedAgeSeconds/60)+' min ago'}</Text>
               </View>
               <View style={styles.etaBox}>
-                <Text style={styles.eta}>{a.etaSeconds !== null ? formatDuration(a.etaSeconds) : `${Math.round(a.distanceMeters)} m`}</Text>
-                <Text style={styles.confidence}>{a.confidence} confidence</Text>
+                <Text style={styles.eta}>{Math.round(a.distanceMeters)+' m'}</Text>
+                <Text style={styles.confidence}>Live position</Text>
               </View>
             </View>
           ))}
@@ -160,23 +122,7 @@ export default function StopDetailsScreen() {
           {!loading && routes.length === 0 ? <Text style={styles.muted}>No routes found for this stop.</Text> : null}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Smart Leave</Text>
-          <Text style={styles.muted}>Estimate when to leave based on your walking time, the nearest live bus and a safety buffer.</Text>
-          <Pressable style={styles.smartButton} onPress={runSmartLeave} disabled={computingSmartLeave}>
-            {computingSmartLeave ? <ActivityIndicator color="#fff" /> : <Text style={styles.smartButtonText}>When should I leave?</Text>}
-          </Pressable>
-          {smartLeaveError ? <Text style={styles.error}>{smartLeaveError}</Text> : null}
-          {smartLeave ? (
-            <View style={styles.smartResult}>
-              <Text style={styles.smartHeadline}>
-                {smartLeave.status === 'insufficient-data' ? 'Not enough live data' : smartLeave.status === 'leave-now' ? 'Leave now' : `Leave in ${formatDuration(smartLeave.leaveInSeconds || 0)}`}
-              </Text>
-              <Text style={styles.muted}>{smartLeave.explanation}</Text>
-              <Text style={styles.detail}>Walk ~{formatDuration(smartLeave.walkingSeconds)} · buffer {formatDuration(smartLeave.safetyBufferSeconds)}{smartLeave.arrivalEtaSeconds !== null ? ` · bus ~${formatDuration(smartLeave.arrivalEtaSeconds)}` : ''}</Text>
-            </View>
-          ) : null}
-        </View>
+
       </ScrollView>
     </SafeAreaView>
   );
