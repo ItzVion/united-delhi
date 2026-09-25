@@ -11,6 +11,7 @@ import { computeSmartLeave, SmartLeaveResult } from '../lib/smartLeave';
 import { formatDuration, haversineMeters, walkingSeconds } from '../lib/geo';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
+import { resolveRouteColor } from '../lib/routeColor';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'StopDetails'>;
 type StopRoute = RouteProp<RootStackParamList, 'StopDetails'>;
@@ -127,7 +128,7 @@ export default function StopDetailsScreen() {
           {!loading && !arrivalsReason && arrivals.length === 0 ? <Text style={styles.muted}>No live buses are reporting on these routes right now.</Text> : null}
           {arrivals.map((a, index) => (
             <View key={a.vehicleId} style={styles.arrival}>
-              <View style={[styles.busIcon, { backgroundColor: index % 2 ? colors.accentSoft : colors.warningSoft }]}><Text style={{ color: index % 2 ? colors.accent : colors.warning, fontWeight: '900' }}>BUS</Text></View>
+              {(() => { const name=displayRouteName(a.routeShortName)||'Bus'; const rc=resolveRouteColor(name,a.routeColor,a.routeTextColor); return <View style={[styles.busIcon,{backgroundColor:rc.background}]}><Text style={{color:rc.text,fontWeight:'900'}}>BUS</Text></View>; })()}
               <View style={styles.arrivalMain}>
                 <Text style={styles.route}>{displayRouteName(a.routeShortName) || 'Bus'}</Text>
                 <Text style={styles.arrivalMeta}>{a.source === 'live-data-estimate' ? 'Live estimate' : 'Live position'} · {a.observedAgeSeconds}s old</Text>
@@ -145,7 +146,7 @@ export default function StopDetailsScreen() {
           <View style={styles.routeList}>
             {routes.map(r => (
               <Pressable key={r.route_id} style={styles.routeCard} onPress={() => navigation.navigate('RouteDetails', { routeId: r.route_id, label: displayRouteName(r.short_name) || 'Bus route' })}>
-                <View style={styles.routeNumber}><Text style={styles.routeNumberText}>{displayRouteName(r.short_name) || 'BUS'}</Text></View>
+                {(() => { const name=displayRouteName(r.short_name)||'BUS'; const rc=resolveRouteColor(name,r.route_color,r.route_text_color); return <View style={[styles.routeNumber,{backgroundColor:rc.background}]}><Text style={[styles.routeNumberText,{color:rc.text}]}>{name}</Text></View>; })()}
                 <View style={styles.routeText}><Text style={styles.routeName}>{r.long_name || 'DTC route'}</Text><Text style={styles.routeHint}>View route details</Text></View>
                 <Text style={styles.chevron}>›</Text>
               </Pressable>
