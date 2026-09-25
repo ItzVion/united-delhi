@@ -132,7 +132,7 @@ app.get('/api/search',dbRateLimit,async(req,res)=>{
       WITH route_base AS (
         SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,
           CASE WHEN r.short_name IS NULL OR BTRIM(r.short_name)='' THEN BTRIM(COALESCE(r.long_name,''))
-          ELSE REGEXP_REPLACE(REGEXP_REPLACE(BTRIM(r.short_name),'(?:UP|DOWN|DWN)
+          ELSE REGEXP_REPLACE(REGEXP_REPLACE(BTRIM(r.short_name),'(?:UP|DOWN|DWN)$','','i'),'^AIR-0+','AIR-','i') END public_label,
           COALESCE(rc.stop_count,0) stop_count,start_stop.name from_stop,end_stop.name to_stop
         FROM routes r
         LEFT JOIN (SELECT route_id,COUNT(*) stop_count FROM route_stops GROUP BY route_id) rc ON rc.route_id=r.route_id
