@@ -81,9 +81,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vehicle_positions_bearing_range') THEN
     ALTER TABLE vehicle_positions ADD CONSTRAINT vehicle_positions_bearing_range CHECK (bearing IS NULL OR bearing BETWEEN 0 AND 360);
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vehicle_positions_speed_range') THEN
-    ALTER TABLE vehicle_positions ADD CONSTRAINT vehicle_positions_speed_range CHECK (speed_mps IS NULL OR speed_mps BETWEEN 0 AND 100);
-  END IF;
+
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_stops_name_lower ON stops (lower(btrim(name)));
