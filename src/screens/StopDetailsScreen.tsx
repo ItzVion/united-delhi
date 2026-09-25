@@ -112,7 +112,7 @@ export default function StopDetailsScreen() {
           <View style={styles.routeList}>
             {routes.map(r => (
               <Pressable key={r.route_id} style={styles.routeCard} onPress={() => navigation.navigate('RouteDetails', { routeId: r.route_id, label: displayRouteName(r.short_name) || 'Bus route' })}>
-                {(() => { const name=displayRouteName(r.short_name)||'BUS'; const rc=resolveRouteColor(name,r.route_color,r.route_text_color); return <View style={[styles.routeNumber,{backgroundColor:rc.background}]}><Text style={[styles.routeNumberText,{color:rc.text}]}>{name}</Text></View>; })()}
+                {(() => { const name=displayRouteName(r.short_name);if(!name)return null; const rc=resolveRouteColor(name,r.route_color,r.route_text_color); return <View style={[styles.routeNumber,{backgroundColor:rc.background}]}><Text style={[styles.routeNumberText,{color:rc.text}]}>{name}</Text></View>; })()}
                 <View style={styles.routeText}><Text style={styles.routeName}>{r.long_name || 'DTC route'}</Text><Text style={styles.routeHint}>View route details</Text></View>
                 <Text style={styles.chevron}>›</Text>
               </Pressable>
