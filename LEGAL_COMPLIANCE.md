@@ -12,7 +12,6 @@ This file is an internal engineering/compliance checklist. It is not legal advic
 - No external automated model-processing service.
 - Foreground location only.
 - Location is requested only for transit features.
-- Smart Leave performs the walking-distance calculation on the device.
 - Nearby requests are transient API requests and are not intentionally stored as user location history.
 - Production API traffic uses HTTPS.
 - Database credentials and the OTD realtime key remain server-side.
