@@ -9,7 +9,7 @@ import { api, Stop, Vehicle } from '../api/client';
 import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
-import { displayRouteName, publicRouteDirection } from '../lib/routeDisplay';
+import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
 import { confirmLocationUse } from '../lib/locationConsent';
 import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
@@ -76,11 +76,12 @@ export default function HomeScreen(){
     const payload={
       center,
       stops:nearbyStops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
-      buses:visible.slice(0,220).map(v=>{
-        const route=displayRouteName(v.routeShortName)||'BUS';
+      buses:visible.flatMap(v=>{
+        const route=displayRouteName(v.routeShortName);
+        if(!route || !v.routeId) return [];
         const c=resolveRouteColor(route,v.routeColor,v.routeTextColor);
-        return{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude};
-      }),
+        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];
+      }).slice(0,220),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
     };
     mapRef.current?.injectJavaScript(`window.updateMap(${JSON.stringify(payload)});true;`);
@@ -137,20 +138,21 @@ export default function HomeScreen(){
         <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
-          const name=displayRouteName(selectedBus.routeShortName)||'Bus';
-          const direction=publicRouteDirection(selectedBus.routeShortName,selectedBus.fromStop,selectedBus.toStop);
-          const rc=resolveRouteColor(name,selectedBus.routeColor,selectedBus.routeTextColor);
-          const speed=selectedBus.speedMps!=null ? `${Math.round(selectedBus.speedMps*3.6)} km/h` : 'Speed unavailable';
+          const name=displayRouteName(selectedBus.routeShortName);
+          if(!name || !selectedBus.routeId) return null;
+          const c=resolveRouteColor(name,selectedBus.routeColor,selectedBus.routeTextColor);
+          const ageSeconds=Math.max(0,Math.round((Date.now()-Date.parse(selectedBus.observedAt))/1000));
+          const freshness=Number.isFinite(ageSeconds)?(ageSeconds<60?'Updated just now':`Updated ${Math.floor(ageSeconds/60)} min ago`):'Live position';
           return <View style={styles.busPreview}>
             <Pressable style={styles.busPreviewClose} onPress={()=>setSelectedBus(null)}><Text style={styles.busPreviewCloseText}>×</Text></Pressable>
             <Pressable style={styles.busPreviewBody} onPress={()=>{
-              if(selectedBus.routeId) navigation.navigate('RouteDetails',{routeId:selectedBus.routeId,label:name});
+              navigation.navigate('RouteDetails',{routeId:selectedBus.routeId!,label:name});
             }}>
-              <View style={[styles.busPreviewBadge,{backgroundColor:rc.background}]}><Text style={[styles.busPreviewBadgeText,{color:rc.text}]}>{name}</Text></View>
+              <View style={[styles.busPreviewBadge,{backgroundColor:c.background}]}><Text style={[styles.busPreviewBadgeText,{color:c.text}]}>{name}</Text></View>
               <View style={styles.busPreviewCopy}>
                 <Text style={styles.busPreviewEyebrow}>LIVE BUS</Text>
-                <Text style={styles.busPreviewTitle} numberOfLines={1}>To {direction.to}</Text>
-                <Text style={styles.busPreviewMeta}>{speed} · tap for route</Text>
+                <Text style={styles.busPreviewTitle} numberOfLines={1}>To {selectedBus.toStop || 'Destination'}</Text>
+                <Text style={styles.busPreviewMeta} numberOfLines={1}>{selectedBus.id} · {freshness} · View route</Text>
               </View>
               <Text style={styles.busPreviewArrow}>›</Text>
             </Pressable>
