@@ -8,7 +8,7 @@ import { api, Route as ApiRoute, Stop, Vehicle } from '../api/client';
 import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
-import { displayRouteName, publicRouteDirection } from '../lib/routeDisplay';
+import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
 
 type Nav=NativeStackNavigationProp<RootStackParamList,'RouteDetails'>;
@@ -41,15 +41,14 @@ export default function RouteDetailsScreen(){
     if(!mapReady)return;
     const payload={
       stops:stops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
-      buses:vehicles.map(v=>{const name=displayRouteName(v.routeShortName)||'BUS';const c=resolveRouteColor(name,v.routeColor,v.routeTextColor);return{id:v.id,route:name,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude};})
+      buses:vehicles.flatMap(v=>{const name=displayRouteName(v.routeShortName);if(!name)return [];const c=resolveRouteColor(name,v.routeColor,v.routeTextColor);return[{id:v.id,route:name,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];})
     };
     mapRef.current?.injectJavaScript(`window.updateRouteMap(${JSON.stringify(payload)});true;`);
   },[mapReady,stops,vehicles]);
 
-  const routeName=displayRouteName(route?.short_name)||displayRouteName(label)||'Bus route';
-  const endpoints=publicRouteDirection(route?.short_name,stops[0]?.name,stops[stops.length-1]?.name);
-  const from=endpoints.from;
-  const to=endpoints.to;
+  const routeName=route?.publicRouteName||displayRouteName(route?.short_name)||displayRouteName(label)||'Bus route';
+  const from=route?.fromStop||stops[0]?.name||'Starting stop';
+  const to=route?.toStop||stops[stops.length-1]?.name||'Ending stop';
   const c=resolveRouteColor(routeName,route?.route_color,route?.route_text_color);
 
   return <SafeAreaView style={styles.safe}>
@@ -85,7 +84,7 @@ export default function RouteDetailsScreen(){
 
     {vehicles.length>0?<View style={styles.liveCard}>
       <View style={styles.liveHeader}><View><Text style={styles.liveTitle}>Live buses</Text><Text style={styles.liveSub}>Fresh positions matched to this route</Text></View><Text style={styles.liveCount}>{vehicles.length}</Text></View>
-      {vehicles.slice(0,4).map(v=><View key={v.id} style={styles.busRow}><View style={[styles.miniBadge,{backgroundColor:c.background}]}><Text style={[styles.miniBadgeText,{color:c.text}]}>{routeName}</Text></View><View style={styles.busCopy}><Text style={styles.busId}>Live vehicle</Text><Text style={styles.busMeta}>{v.speedMps!=null?(`${(v.speedMps*3.6).toFixed(0)} km/h`):'Speed unavailable'} · observed just now</Text></View></View>)}
+      {vehicles.slice(0,4).map(v=>{const ageMs=Date.now()-Date.parse(v.observedAt);const age=Number.isFinite(ageMs)?Math.max(0,Math.round(ageMs/1000)):null;return <View key={v.id} style={styles.busRow}><View style={[styles.miniBadge,{backgroundColor:c.background}]}><Text style={[styles.miniBadgeText,{color:c.text}]}>{routeName}</Text></View><View style={styles.busCopy}><Text style={styles.busId}>Vehicle {v.id}</Text><Text style={styles.busMeta}>{age===null?'Live position':age<60?'Updated just now':`Updated ${Math.floor(age/60)} min ago`}</Text></View></View>})}
     </View>:null}
 
     <FlatList data={stops} keyExtractor={item=>item.stop_id} contentContainerStyle={styles.list}
