@@ -15,3 +15,30 @@ export function routeKey(value: string | null | undefined): string | null {
   const name = normalizePublicRouteName(value);
   return name ? name.toUpperCase() : null;
 }
+
+export function publicRouteDirection(
+  value: string | null | undefined,
+  fromStop?: string | null,
+  toStop?: string | null
+): { from: string; to: string } {
+  const publicName = normalizePublicRouteName(value);
+  const raw = String(value ?? '').trim().toUpperCase();
+  const isDown = /(?:DOWN|DWN)$/.test(raw);
+
+  if (publicName === '801') {
+    return isDown
+      ? { from: 'IGI Airport Terminal 2', to: 'Kapashera Border' }
+      : { from: 'Kapashera Border', to: 'IGI Airport Terminal 2' };
+  }
+
+  if (publicName === '801STL') {
+    return isDown
+      ? { from: 'Uttam Nagar Terminal', to: 'Kapashera Border' }
+      : { from: 'Kapashera Border', to: 'Uttam Nagar Terminal' };
+  }
+
+  return {
+    from: fromStop || 'Starting stop',
+    to: toStop || 'Ending stop'
+  };
+}
