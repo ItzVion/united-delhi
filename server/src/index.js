@@ -451,25 +451,6 @@ app.get('/api/plan',dbRateLimit,async(req,res)=>{
   }
 });
 
-async function applyMigrations(){
-  const fs=await import('node:fs/promises');
-  const sqlDir=new URL('../sql/',import.meta.url);
-  const files=(await fs.readdir(sqlDir)).filter(name=>/^\d+.*\.sql$/i.test(name)).sort();
-  for(const name of files){
-    const sql=await fs.readFile(new URL(name,sqlDir),'utf8');
-    const client=await pool.connect();
-    try{
-      await client.query('BEGIN');
-      await client.query("SET LOCAL statement_timeout='30000'");
-      await client.query(sql);
-      await client.query('COMMIT');
-    }catch(error){
-      await client.query('ROLLBACK').catch(()=>{});
-      throw new Error('Migration '+name+' failed: '+(error instanceof Error?error.message:String(error)));
-    }finally{client.release();}
-  }
-}
-async function ensureStaticData(){if(!pool)return;await applyMigrations();const tables=await pool.query("SELECT to_regclass('public.stops') stops_table,to_regclass('public.routes') routes_table,to_regclass('public.route_stops') route_stops_table");const row=tables.rows[0];if(row.stops_table&&row.routes_table&&row.route_stops_table){const counts=(await pool.query('SELECT (SELECT COUNT(*) FROM stops) stops,(SELECT COUNT(*) FROM routes) routes,(SELECT COUNT(*) FROM route_stops) route_stops')).rows[0];if(Number(counts.stops)>=1000&&Number(counts.routes)>=500&&Number(counts.route_stops)>=10000)return;}console.log('Static GTFS data is missing/incomplete; starting fallback import...');await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['scripts/import-gtfs.js'],{cwd:process.cwd(),env:process.env,stdio:'inherit'});child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(new Error('GTFS import exited with code '+code)));});}
 app.use((_req,res)=>res.status(404).json({status:'NOT_FOUND',reason:'Endpoint not found'}));
 app.use((error,_req,res,_next)=>{
   console.error('Unhandled request error:',error instanceof Error?error.message:String(error));
