@@ -103,20 +103,65 @@ app.get('/api/search',dbRateLimit,async(req,res)=>{
   const raw=String(req.query.q||'').trim();
   const like=searchPattern(raw);
   if(!like)return res.json({status:'OK',results:[]});
-  const exactRoute=/^(?:AIR-)?\\d+[A-Z0-9-]*$/i.test(raw)?raw.toUpperCase().replace(/^AIR-0+/,'AIR-'):null;
+  const exactRoute=/^(?:AIR-)?\d+[A-Z0-9-]*$/i.test(raw)?raw.toUpperCase().replace(/^AIR-0+/,'AIR-'):null;
   try{
     const result=await pool.query(`
       WITH route_base AS (
-        SELECT
-          r.route_id,
-          r.short_name,
-          r.long_name,
-          r.route_color,
-          r.route_text_color,
-          CASE
-            WHEN r.short_name IS NULL OR BTRIM(r.short_name)='' THEN BTRIM(COALESCE(r.long_name,''))
-            ELSE REGEXP_REPLACE(
-              REGEXP_REPLACE(BTRIM(r.short_name),'(UP|DOWN|DWN),dbRateLimit,async(req,res)=>{
+        SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,
+          CASE WHEN r.short_name IS NULL OR BTRIM(r.short_name)='' THEN BTRIM(COALESCE(r.long_name,''))
+          ELSE REGEXP_REPLACE(REGEXP_REPLACE(BTRIM(r.short_name),'(UP|DOWN|DWN)$','','i'),'^AIR-0+','AIR-','i') END public_label,
+          COALESCE(rc.stop_count,0) stop_count,start_stop.name from_stop,end_stop.name to_stop
+        FROM routes r
+        LEFT JOIN (SELECT route_id,COUNT(*) stop_count FROM route_stops GROUP BY route_id) rc ON rc.route_id=r.route_id
+        LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.name,s.stop_id LIMIT 1) start_stop ON TRUE
+        LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.name,s.stop_id LIMIT 1) end_stop ON TRUE
+        WHERE COALESCE(r.short_name,'') ILIKE $1 OR COALESCE(r.long_name,'') ILIKE $1
+      ),
+      public_routes AS (
+        SELECT *,
+          CASE WHEN UPPER(public_label)='801' AND short_name ILIKE '%DOWN' THEN 'IGI Airport Terminal 2'
+               WHEN UPPER(public_label)='801' AND short_name ILIKE '%UP' THEN 'Kapashera Border'
+               WHEN UPPER(public_label)='801STL' AND short_name ILIKE '%DOWN' THEN 'Uttam Nagar Terminal'
+               WHEN UPPER(public_label)='801STL' AND short_name ILIKE '%UP' THEN 'Kapashera Border'
+               ELSE from_stop END public_from_stop,
+          CASE WHEN UPPER(public_label)='801' AND short_name ILIKE '%DOWN' THEN 'Kapashera Border'
+               WHEN UPPER(public_label)='801' AND short_name ILIKE '%UP' THEN 'IGI Airport Terminal 2'
+               WHEN UPPER(public_label)='801STL' AND short_name ILIKE '%DOWN' THEN 'Kapashera Border'
+               WHEN UPPER(public_label)='801STL' AND short_name ILIKE '%UP' THEN 'Uttam Nagar Terminal'
+               ELSE to_stop END public_to_stop
+        FROM route_base
+      ),
+      representative_routes AS (
+        SELECT DISTINCT ON (UPPER(public_label),LOWER(public_from_stop),LOWER(public_to_stop))
+          route_id,short_name,long_name,route_color,route_text_color,public_label,public_from_stop,public_to_stop
+        FROM public_routes
+        WHERE BTRIM(public_label)<>'' AND ($2::TEXT IS NULL OR UPPER(public_label)=$2)
+        ORDER BY UPPER(public_label),LOWER(public_from_stop),LOWER(public_to_stop),stop_count DESC,route_id
+      ),
+      stop_matches AS (
+        SELECT 'stop' type,stop_id id,name label,NULL::TEXT "fromStop",NULL::TEXT "toStop",NULL::TEXT "routeColor",NULL::TEXT "routeTextColor"
+        FROM stops WHERE name ILIKE $1 ORDER BY name,stop_id LIMIT 30
+      ),
+      route_results AS (
+        SELECT 'route' type,r.route_id id,r.public_label label,r.public_from_stop "fromStop",r.public_to_stop "toStop",r.route_color "routeColor",r.route_text_color "routeTextColor"
+        FROM representative_routes r
+      )
+      SELECT type,id,label,"fromStop","toStop","routeColor","routeTextColor"
+      FROM (
+        SELECT type,id,label,"fromStop","toStop","routeColor","routeTextColor",0 result_order FROM route_results
+        UNION ALL
+        SELECT type,id,label,"fromStop","toStop","routeColor","routeTextColor",1 result_order FROM stop_matches
+      ) combined
+      ORDER BY result_order,label,"fromStop","toStop",id LIMIT 60
+    `,[like,exactRoute]);
+    res.json({status:'OK',results:result.rows});
+  }catch(error){
+    console.error('Failed to search transit data:',error.message);
+    res.status(500).json({status:'ERROR',results:[],reason:'Search is temporarily unavailable'});
+  }
+});
+
+app.get('/api/plan',dbRateLimit,async(req,res)=>{
   if(!pool)return res.status(503).json({status:'UNAVAILABLE',options:[],reason:'Database is not configured'});
   const from=boundedText(req.query.from,80),to=boundedText(req.query.to,80);
   const fromLike=searchPattern(from),toLike=searchPattern(to);
@@ -272,4 +317,3 @@ const server=app.listen(port,()=>{
 server.requestTimeout=15000;
 server.headersTimeout=20000;
 server.keepAliveTimeout=5000;
-+(base+1)+',app.get('/',(_req,res)=>res.status(200).json({ok:true,service:'united-delhi-api'}));
