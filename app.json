@@ -2,7 +2,7 @@
   "expo": {
     "name": "United Delhi",
     "slug": "united-delhi",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
@@ -10,7 +10,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.uniteddelhi.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "United Delhi uses your location to find nearby DTC bus stops and estimate when to leave to catch your bus."
+        "NSLocationWhenInUseUsageDescription": "United Delhi uses your location to find nearby DTC bus stops."
       }
     },
     "android": {
@@ -33,7 +33,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "United Delhi uses your location to find nearby DTC bus stops and estimate when to leave to catch your bus."
+          "locationWhenInUsePermission": "United Delhi uses your location to find nearby DTC bus stops."
         }
       ]
     ]
