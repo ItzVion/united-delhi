@@ -53,7 +53,7 @@ function observedAtFromTimestamp(value){
   const milliseconds=seconds===null?NaN:seconds*1000;
   const now=Date.now();
   if(!Number.isFinite(milliseconds)||milliseconds<0||Math.abs(milliseconds)>8640000000000000)return new Date().toISOString();
-  if(milliseconds>now+300000||milliseconds<now-86400000)return null;
+  if(milliseconds>now+300000||milliseconds<now-5*60*1000)return null;
   return new Date(milliseconds).toISOString();
 }
 function entityToVehicle(entity){
@@ -77,7 +77,14 @@ for(const entity of feed.entity){
   const vehicle=entityToVehicle(entity);
   if(vehicle?.id) vehicleMap.set(vehicle.id,vehicle);
 }
-const vehicles=[...vehicleMap.values()];if(pool&&vehicles.length){const routeIds=[...new Set(vehicles.map(v=>v.routeId).filter(Boolean))];if(routeIds.length){try{const result=await pool.query('SELECT route_id,short_name,route_color,route_text_color FROM routes WHERE route_id=ANY($1::text[])',[routeIds]);const map=new Map(result.rows.map(row=>[String(row.route_id),row]));for(const v of vehicles){const row=v.routeId?map.get(String(v.routeId)):null;v.routeShortName=row?.short_name?String(row.short_name).trim():null;v.routeColor=row?.route_color?String(row.route_color).trim():null;v.routeTextColor=row?.route_text_color?String(row.route_text_color).trim():null;}}catch(error){console.error('Realtime route lookup failed:',error.message);}}}return vehicles;}catch(error){if(error?.name==='AbortError')throw new Error('OTD realtime feed timed out after 15 seconds');throw error;}finally{clearTimeout(timer);}}
+const rawVehicles=[...vehicleMap.values()];
+const vehicles=rawVehicles.filter(v=>{
+  if(!v.routeId)return false;
+  const observed=Date.parse(v.observedAt);
+  return Number.isFinite(observed)&&Date.now()-observed<=5*60*1000;
+});
+if(pool&&vehicles.length){const routeIds=[...new Set(vehicles.map(v=>v.routeId).filter(Boolean))];if(routeIds.length){try{const result=await pool.query('SELECT route_id,short_name,route_color,route_text_color FROM routes WHERE route_id=ANY($1::text[])',[routeIds]);const map=new Map(result.rows.map(row=>[String(row.route_id),row]));for(const v of vehicles){const row=v.routeId?map.get(String(v.routeId)):null;v.routeShortName=row?.short_name?String(row.short_name).trim():null;v.routeColor=row?.route_color?String(row.route_color).trim():null;v.routeTextColor=row?.route_text_color?String(row.route_text_color).trim():null;}}catch(error){console.error('Realtime route lookup failed:',error.message);}}}
+return vehicles.filter(v=>Boolean(v.routeShortName));}catch(error){if(error?.name==='AbortError')throw new Error('OTD realtime feed timed out after 15 seconds');throw error;}finally{clearTimeout(timer);}}
 const realtimeCache={vehicles:[],status:'INIT',reason:null,fetchedAt:null};let realtimeRefreshInFlight=null;let vehicleSaveInFlight=false;
 async function persistVehiclesIfIdle(vehicles){if(!pool||!vehicles.length||vehicleSaveInFlight)return;vehicleSaveInFlight=true;try{await saveVehicles(vehicles);}catch(error){console.error('Failed to save realtime vehicles:',error.message);}finally{vehicleSaveInFlight=false;}}
 async function refreshRealtimeCache(){if(realtimeRefreshInFlight)return realtimeRefreshInFlight;realtimeRefreshInFlight=(async()=>{try{const vehicles=await getRealtimeVehicles();realtimeCache.vehicles=vehicles;realtimeCache.status='OK';realtimeCache.reason=null;realtimeCache.fetchedAt=new Date().toISOString();if(pool&&vehicles.length)void persistVehiclesIfIdle(vehicles);}catch(error){if(!realtimeCache.fetchedAt)realtimeCache.status='UNAVAILABLE';realtimeCache.reason=error instanceof Error?error.message:'Realtime request failed';console.error('Realtime poll failed:',realtimeCache.reason);}})().finally(()=>{realtimeRefreshInFlight=null;});return realtimeRefreshInFlight;}
