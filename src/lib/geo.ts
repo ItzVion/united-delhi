@@ -6,8 +6,6 @@ export function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: 
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(a));
 }
-const WALKING_SPEED_MPS = 1.3;
-export function walkingSeconds(distanceMeters: number): number { return Math.round(distanceMeters / WALKING_SPEED_MPS); }
 export function formatDuration(totalSeconds: number): string {
   if (totalSeconds < 60) return '<1 min';
   const minutes = Math.round(totalSeconds / 60);
