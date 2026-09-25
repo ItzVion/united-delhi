@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api, SearchResult } from '../api/client';
 import { colors } from '../theme';
 import { displayRouteName } from '../lib/routeDisplay';
+import { resolveRouteColor } from '../lib/routeColor';
 import type { RootStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Search'>;
