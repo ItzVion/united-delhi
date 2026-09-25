@@ -8,7 +8,7 @@ import { api, Route as ApiRoute, Stop, Vehicle } from '../api/client';
 import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
-import { displayRouteName } from '../lib/routeDisplay';
+import { displayRouteName, publicRouteDirection } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
 
 type Nav=NativeStackNavigationProp<RootStackParamList,'RouteDetails'>;
@@ -47,8 +47,9 @@ export default function RouteDetailsScreen(){
   },[mapReady,stops,vehicles]);
 
   const routeName=displayRouteName(route?.short_name)||displayRouteName(label)||'Bus route';
-  const from=stops[0]?.name||'Starting stop';
-  const to=stops[stops.length-1]?.name||'Ending stop';
+  const endpoints=publicRouteDirection(route?.short_name,stops[0]?.name,stops[stops.length-1]?.name);
+  const from=endpoints.from;
+  const to=endpoints.to;
   const c=resolveRouteColor(routeName,route?.route_color,route?.route_text_color);
 
   return <SafeAreaView style={styles.safe}>
@@ -63,9 +64,9 @@ export default function RouteDetailsScreen(){
     <View style={styles.hero}>
       <View style={[styles.routeBadge,{backgroundColor:c.background}]}><Text style={[styles.routeBadgeText,{color:c.text}]}>{routeName}</Text></View>
       <View style={styles.heroCopy}>
-        <Text style={styles.direction}>{from}</Text>
+        <Text style={styles.direction} numberOfLines={1}>{from}</Text>
         <View style={styles.directionLine}><View style={styles.dot}/><View style={styles.line}/><View style={[styles.dot,{backgroundColor:colors.secondary,borderColor:colors.secondary}]}/></View>
-        <Text style={styles.direction}>{to}</Text>
+        <Text style={styles.direction} numberOfLines={1}>{to}</Text>
       </View>
     </View>
 
