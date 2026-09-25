@@ -9,7 +9,7 @@ import { api, Stop, Vehicle } from '../api/client';
 import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
-import { displayRouteName } from '../lib/routeDisplay';
+import { displayRouteName, publicRouteDirection } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
 import { confirmLocationUse } from '../lib/locationConsent';
 import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
@@ -28,6 +28,7 @@ export default function HomeScreen(){
   const [fresh,setFresh]=useState<'loading'|'ok'|'unavailable'>('loading');
   const [mapReady,setMapReady]=useState(false);
   const [bounds,setBounds]=useState<MapBounds|null>(null);
+  const [selectedBus,setSelectedBus]=useState<Vehicle|null>(null);
 
   const requestLocation=useCallback(async()=>{
     if(!(await confirmLocationUse())){setLocationStatus('Showing Delhi without your location.');return;}
@@ -78,7 +79,7 @@ export default function HomeScreen(){
       buses:visible.slice(0,220).map(v=>{
         const route=displayRouteName(v.routeShortName)||'BUS';
         const c=resolveRouteColor(route,v.routeColor,v.routeTextColor);
-        return{id:v.id,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude};
+        return{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude};
       }),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
     };
@@ -122,6 +123,9 @@ export default function HomeScreen(){
               if(m.type==='stop'){
                 const stop=nearbyStops.find(s=>s.stop_id===m.stopId);
                 if(stop)navigation.navigate('StopDetails',{stopId:stop.stop_id,stopName:stop.name});
+              }else if(m.type==='bus'){
+                const bus=vehicles.find(v=>v.id===m.busId);
+                if(bus)setSelectedBus(bus);
               }else if(m.type==='bounds'&&m.bounds)setBounds(m.bounds);
             }catch{}
           }}
@@ -132,6 +136,26 @@ export default function HomeScreen(){
         </View>
         <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
+        {selectedBus ? (() => {
+          const name=displayRouteName(selectedBus.routeShortName)||'Bus';
+          const direction=publicRouteDirection(selectedBus.routeShortName,selectedBus.fromStop,selectedBus.toStop);
+          const rc=resolveRouteColor(name,selectedBus.routeColor,selectedBus.routeTextColor);
+          const speed=selectedBus.speedMps!=null ? `${Math.round(selectedBus.speedMps*3.6)} km/h` : 'Speed unavailable';
+          return <View style={styles.busPreview}>
+            <Pressable style={styles.busPreviewClose} onPress={()=>setSelectedBus(null)}><Text style={styles.busPreviewCloseText}>×</Text></Pressable>
+            <Pressable style={styles.busPreviewBody} onPress={()=>{
+              if(selectedBus.routeId) navigation.navigate('RouteDetails',{routeId:selectedBus.routeId,label:name});
+            }}>
+              <View style={[styles.busPreviewBadge,{backgroundColor:rc.background}]}><Text style={[styles.busPreviewBadgeText,{color:rc.text}]}>{name}</Text></View>
+              <View style={styles.busPreviewCopy}>
+                <Text style={styles.busPreviewEyebrow}>LIVE BUS</Text>
+                <Text style={styles.busPreviewTitle} numberOfLines={1}>To {direction.to}</Text>
+                <Text style={styles.busPreviewMeta}>{speed} · tap for route</Text>
+              </View>
+              <Text style={styles.busPreviewArrow}>›</Text>
+            </Pressable>
+          </View>;
+        })() : null}
       </View>
 
       <View style={styles.quickRow}>
@@ -185,10 +209,10 @@ window.updateMap=function(data){
  stopLayer.clearLayers();busLayer.clearLayers();userLayer.clearLayers();busMarkers.clear();
  const stopIcon=L.divIcon({className:'',html:'<div class="stop-label"></div>',iconSize:[14,14],iconAnchor:[7,7]});
  data.stops.forEach(s=>{const popup=document.createElement('div'),title=document.createElement('b'),button=document.createElement('button');title.textContent=s.name;button.textContent='View stop';button.type='button';button.style.marginTop='6px';button.onclick=()=>openStop(s.id);popup.append(title,document.createElement('br'),button);L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup(popup);});
- data.buses.forEach(v=>{const bg=validColor(v.color)?v.color:'#0b746b',fg=validColor(v.textColor)?v.textColor:'#fff';const marker=L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label" style="background:'+bg+';color:'+fg+'">'+escapeHtml(v.route)+'</div>',iconSize:[56,22],iconAnchor:[28,11]})});marker.addTo(busLayer);busMarkers.set(v.id,marker);});
+ data.buses.forEach(v=>{const bg=validColor(v.color)?v.color:'#0b746b',fg=validColor(v.textColor)?v.textColor:'#fff';const marker=L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label" style="background:'+bg+';color:'+fg+'">'+escapeHtml(v.route)+'</div>',iconSize:[56,22],iconAnchor:[28,11]})});marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);busMarkers.set(v.id,marker);});
  if(data.location)L.circleMarker([data.location.lat,data.location.lon],{radius:6,color:'#fff',weight:2,fillColor:'#0b746b',fillOpacity:1}).addTo(userLayer);
 };
-function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}
+function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}function openBus(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'bus',busId:id}));}
 function validColor(x){return /^#[0-9a-f]{6}$/i.test(String(x));}
 function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 </script></body></html>`;
@@ -204,7 +228,18 @@ const styles=StyleSheet.create({
  sectionLine:{paddingHorizontal:2,paddingTop:13,paddingBottom:7,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionKicker:{fontSize:10,fontWeight:'900',letterSpacing:1.1,color:colors.textMuted},locationLink:{fontSize:11,fontWeight:'900',color:colors.accent},
  mapCard:{height:275,borderRadius:20,overflow:'hidden',borderWidth:1,borderColor:colors.border,backgroundColor:'#eef2f1'},map:{flex:1},
  mapTop:{position:'absolute',left:10,top:10,flexDirection:'row',alignItems:'center',backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:9,paddingVertical:6,borderRadius:10},liveDot:{width:7,height:7,borderRadius:4,backgroundColor:colors.success,marginRight:6},mapTopText:{fontSize:10,fontWeight:'900',color:colors.text},mapAttribution:{position:'absolute',right:7,bottom:6,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:5,paddingVertical:2,borderRadius:4},mapAttributionText:{fontSize:7,color:'#52625f'},
- locationNotice:{position:'absolute',left:10,right:10,bottom:10,padding:9,borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,flexDirection:'row',justifyContent:'space-between'},locationNoticeText:{fontSize:11,color:colors.textMuted},retry:{fontSize:11,fontWeight:'900',color:colors.accent},
+ locationNotice:{position:'absolute',left:10,right:10,bottom:10,padding:9,borderRadius:11,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,flexDirection:'row',justifyContent:'space-between'},
+ busPreview:{position:'absolute',left:9,right:9,bottom:9,borderRadius:17,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,shadowColor:'#17312F',shadowOpacity:.14,shadowRadius:12,shadowOffset:{width:0,height:4},elevation:6},
+ busPreviewBody:{minHeight:72,padding:11,paddingRight:28,flexDirection:'row',alignItems:'center'},
+ busPreviewClose:{position:'absolute',right:6,top:5,zIndex:3,width:25,height:25,borderRadius:13,alignItems:'center',justifyContent:'center',backgroundColor:colors.background},
+ busPreviewCloseText:{fontSize:19,lineHeight:21,color:colors.textMuted},
+ busPreviewBadge:{minWidth:58,height:40,borderRadius:11,paddingHorizontal:8,alignItems:'center',justifyContent:'center'},
+ busPreviewBadgeText:{fontSize:13,fontWeight:'900'},
+ busPreviewCopy:{flex:1,marginLeft:10},
+ busPreviewEyebrow:{fontSize:8,fontWeight:'900',letterSpacing:1,color:colors.accent},
+ busPreviewTitle:{fontSize:14,fontWeight:'900',color:colors.text,marginTop:2},
+ busPreviewMeta:{fontSize:9,color:colors.textMuted,marginTop:3},
+ busPreviewArrow:{fontSize:27,color:colors.textMuted,marginLeft:6},locationNoticeText:{fontSize:11,color:colors.textMuted},retry:{fontSize:11,fontWeight:'900',color:colors.accent},
  quickRow:{flexDirection:'row',gap:8,marginTop:10},quick:{flex:1,minHeight:72,padding:10,borderRadius:16,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},quickIcon:{fontSize:18,fontWeight:'900'},quickTitle:{fontSize:12,fontWeight:'900',color:colors.text,marginTop:4},quickSub:{fontSize:9,color:colors.textMuted,marginTop:1},
  sectionHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginTop:18,marginBottom:8},sectionTitle:{fontSize:17,fontWeight:'900',color:colors.text},sectionSub:{fontSize:10,color:colors.textMuted,marginTop:2},seeAll:{fontSize:11,fontWeight:'900',color:colors.accent},
  stopCard:{flexDirection:'row',alignItems:'center',padding:11,borderRadius:15,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,marginBottom:7},stopIcon:{width:34,height:34,borderRadius:11,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},stopIconText:{fontSize:10,color:colors.accent},stopCopy:{flex:1,marginLeft:10},stopName:{fontSize:13,fontWeight:'800',color:colors.text},stopDistance:{fontSize:10,color:colors.textMuted,marginTop:2},arrow:{fontSize:24,color:colors.textMuted,marginLeft:7},
