@@ -7,10 +7,11 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web",
+    "web": "node web/serve.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test \"src/lib/__tests__/*.test.ts\"",
-    "build:apk": "eas build -p android --profile preview"
+    "build:apk": "eas build -p android --profile preview",
+    "web:check": "node web/check.mjs"
   },
   "dependencies": {
     "@react-navigation/native": "^7.1.20",
