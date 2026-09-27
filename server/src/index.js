@@ -4,7 +4,7 @@ import cors from 'cors';
 import pg from 'pg';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { spawn } from 'node:child_process';
-import { rateLimit } from 'express-rate-limit';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 
 const { Pool } = pg;
 const app = express();
@@ -30,10 +30,10 @@ app.use((_req,res,next)=>{
   next();
 });
 app.use('/api',(_req,res,next)=>{res.setHeader('Cache-Control','no-store');next();});
-const apiRateLimit=rateLimit({windowMs:60_000,limit:180,standardHeaders:'draft-8',legacyHeaders:false,message:{status:'RATE_LIMITED',reason:'Too many requests. Please try again shortly.'}});
-const dbRateLimit=rateLimit({windowMs:60_000,limit:45,standardHeaders:'draft-8',legacyHeaders:false,message:{status:'RATE_LIMITED',reason:'Too many database requests. Please try again shortly.'}});
-const realtimeRateLimit=rateLimit({windowMs:60_000,limit:30,standardHeaders:'draft-8',legacyHeaders:false,message:{status:'RATE_LIMITED',reason:'Too many realtime-feed requests. Please try again shortly.'}});
-const healthRateLimit=rateLimit({windowMs:60_000,limit:60,standardHeaders:'draft-8',legacyHeaders:false,message:{status:'RATE_LIMITED',reason:'Too many health checks. Please try again shortly.'}});
+const apiRateLimit=rateLimit({windowMs:60_000,limit:180,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:clientIpKey,message:{status:'RATE_LIMITED',reason:'Too many requests. Please try again shortly.'}});
+const dbRateLimit=rateLimit({windowMs:60_000,limit:45,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:clientIpKey,message:{status:'RATE_LIMITED',reason:'Too many database requests. Please try again shortly.'}});
+const realtimeRateLimit=rateLimit({windowMs:60_000,limit:30,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:clientIpKey,message:{status:'RATE_LIMITED',reason:'Too many realtime-feed requests. Please try again shortly.'}});
+const clientIpKey=req=>ipKeyGenerator(req.ip);const healthRateLimit=rateLimit({windowMs:60_000,limit:60,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:clientIpKey,message:{status:'RATE_LIMITED',reason:'Too many health checks. Please try again shortly.'}});
 app.use('/api',apiRateLimit);
 const ok=value=>value!==undefined&&value!==null&&value!=='';
 function numberOrNull(value){const n=Number(value);return Number.isFinite(n)?n:null;}
