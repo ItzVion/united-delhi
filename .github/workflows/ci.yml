@@ -32,7 +32,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
       - run: npm install
       - run: npm run typecheck
       - run: npm run build
