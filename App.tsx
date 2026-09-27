@@ -17,8 +17,8 @@ const Stack=createNativeStackNavigator<RootStackParamList>();
 const navTheme={...DefaultTheme,colors:{...DefaultTheme.colors,background:colors.background,card:colors.surface,text:colors.text,border:colors.border,primary:colors.accent}};
 
 export default function App(){
-  const [ageConfirmed,setAgeConfirmed]=useState(false);
-  if(!ageConfirmed)return <SafeAreaProvider><AgeGate onConfirm={()=>setAgeConfirmed(true)}/></SafeAreaProvider>;
+  const [consentGiven,setConsentGiven]=useState(false);
+  if(!consentGiven)return <SafeAreaProvider><AgeGate onConfirm={()=>setConsentGiven(true)}/></SafeAreaProvider>;
   return <SafeAreaProvider><NavigationContainer theme={navTheme}>
     <Stack.Navigator screenOptions={{headerShown:false}}>
       <Stack.Screen name="Home" component={HomeScreen}/>
