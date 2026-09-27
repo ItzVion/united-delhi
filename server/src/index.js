@@ -28,7 +28,8 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.set('etag', false);
 const appOrigins = String(process.env.APP_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean);
-app.use(cors(appOrigins.length ? { origin: appOrigins } : { origin: false }));
+const defaultOrigin = /^https:\/\/(?:[a-z0-9-]+\.)?vercel\.app$/i;
+app.use(cors({ origin: appOrigins.length ? appOrigins : defaultOrigin }));
 app.use(express.json({ limit: '32kb', strict: true }));
 app.use((_req,res,next)=>{
   res.setHeader('X-Content-Type-Options','nosniff');
