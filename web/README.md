@@ -1,51 +1,15 @@
-# United Delhi web client
+# United Delhi Web
 
-This directory contains the browser/desktop version of United Delhi.
+React + Vite + TypeScript browser client for United Delhi.
 
-## Run locally
-
-From the repository root:
-
-```bash
-python -m http.server 8080 -d web
-```
-
-Then open:
-
-```
-http://localhost:8080
-```
-
-A normal HTTPS/static host can serve this directory without a Node backend. The web client calls the hosted United Delhi API at:
-
-```
-https://united-delhi.de.deplexo.com
-```
-
-## Deploy on Vercel
-
-Create a Vercel project from this repository and set:
-
+## Vercel
 - Root Directory: `web`
-- Framework Preset: Other
-- Build Command: empty
-- Output Directory: `.`
+- Framework Preset: Vite
+- Build Command: `npm run build`
+- Output Directory: `dist`
 
-No secrets are required in the web project.
+The client uses only the public Deplexo API endpoint. No DTC API key, Neon credential, or server secret belongs in this project.
 
-## Features
+Security headers are defined in `vercel.json`; dependencies should stay current and CI should run npm audit before production releases.
 
-- 18+ access gate
-- Live DTC vehicle map
-- Route search
-- Stop search
-- Exact route variant details
-- Ordered route stops and route polyline
-- Live vehicles on a route
-- Stop live arrivals
-- Nearby stops using browser location
-- Direct/one-change trip planner
-- Legal/privacy links
-- Responsive desktop and mobile browser layout
-
-The iOS/Android app remains in the repository root and shares the same backend API.
+The native Expo Android/iOS app remains at the repository root and shares the same backend.
