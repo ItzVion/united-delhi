@@ -23,3 +23,20 @@ Static GTFS data and realtime access require the relevant OTD access steps. The 
 - Legal & Compliance Checklist: `LEGAL_COMPLIANCE.md`
 
 The production app currently uses an 18+ access gate until a legally appropriate parental-consent flow is implemented.
+
+
+## Platforms
+
+United Delhi keeps the Android and iOS Expo app in the repository root and includes a responsive browser/desktop web client in `web/`.
+
+Run the browser client locally:
+
+```bash
+npm run web
+```
+
+Then open `http://localhost:8080`.
+
+The browser client uses the same Deplexo backend as the mobile app and does not contain private DTC or Neon credentials. It can be hosted as a static website; see `web/README.md`.
+
+Expo SDK 57 supports Android, iOS and web targets, while the dedicated `web/` client is used here so desktop browsers do not depend on native-only WebView components.
