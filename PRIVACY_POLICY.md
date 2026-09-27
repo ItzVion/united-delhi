@@ -1,9 +1,9 @@
 # United Delhi Privacy Policy
 
-**Effective date:** 25 September 2026  
-**Last updated:** 25 September 2026
+**Effective date:** 27 September 2026  
+**Last updated:** 27 September 2026
 
-United Delhi ("United Delhi", "we", "us", or "our") is a Delhi public-transit information application. This Privacy Policy explains what information the app processes, why it is processed, where it is sent, how long it is retained, and how you can make a privacy request.
+United Delhi ("United Delhi", "we", "us", or "our") is a Delhi public-transit information application and website. This Privacy Policy explains what information the current implementation processes, why it is processed, and how you can make a privacy request.
 
 **Important contact placeholder:** Before public release, replace **[LEGAL CONTACT EMAIL]** below with an email address that you control and actively monitor for privacy and legal requests. Do not publish the placeholder.
 
@@ -13,17 +13,15 @@ United Delhi is designed to work without a user account. We do not currently ask
 
 ### Location
 
-If you grant foreground location permission, the app can use device location for:
-- finding nearby DTC bus stops; and
-- centering the map around you.
+Location is optional.
 
-For the **Nearby** stop request, the app sends a reduced-precision location to the United Delhi API so the server can calculate nearby stops. The app does not intentionally store that location in the United Delhi database.
+If you choose the **Nearby** feature, the web client requests browser location permission and sends a reduced-precision latitude/longitude to the United Delhi API so the server can calculate nearby DTC stops. The web client does not intentionally store that location in the United Delhi database.
 
-You can deny or revoke location permission in your device settings. Core route and stop search does not require location permission.
+Core route and stop search does not require location permission.
 
 ### Search and journey planning
 
-When you search for a route or stop, or ask the journey planner for a trip, the text needed to perform that request is sent to the United Delhi API. We use it only to return transit information and do not intentionally create a user profile from those searches.
+When you search for a route or stop, or ask the journey planner for a trip, the text needed to perform that request is sent to the United Delhi API. We use it to return transit information and do not intentionally create a user profile from those searches.
 
 ### Technical information
 
@@ -34,9 +32,9 @@ United Delhi does not currently use advertising SDKs, analytics SDKs, crash-repo
 ## 2. Third-party services
 
 United Delhi currently uses or may rely on:
-- **Delhi Open Transit Data (OTD):** transit route, stop and realtime vehicle data. OTD is operated by the Department of Transport, Government of NCT of Delhi, in association with IIIT-Delhi.
-- **OpenStreetMap:** map data and standard map tiles. OpenStreetMap's own services have their own policies and may receive network information needed to serve map tiles.
-- **Render:** application hosting for the United Delhi API.
+- **Delhi Open Transit Data (OTD):** transit route, stop and realtime vehicle data.
+- **OpenStreetMap:** map data and standard map tiles.
+- **Deplexo:** hosting for the current United Delhi API.
 - **Neon:** PostgreSQL database hosting for transit data and realtime vehicle-position records.
 - **GitHub:** source-code hosting and project infrastructure.
 
@@ -54,19 +52,19 @@ Unless this policy is changed and users are informed as required by applicable l
 - intentionally store a user's personal location history in the transit database;
 - use external automated model services to process user data.
 
-## 4. Legal basis and consent
+## 4. Consent and applicable law
 
-Where consent is required by applicable law, we will request it before the relevant processing. Location permission is controlled by the operating system, and the app explains the purpose before requesting permission.
+The first-launch screen asks users to review the Terms of Service and Privacy Policy before continuing.
 
-The Digital Personal Data Protection Act, 2023 (DPDP Act) establishes requirements concerning notice, consent, security safeguards, children's data, correction, erasure and grievance redressal. The DPDP Act and the Digital Personal Data Protection Rules, 2025 have phased commencement dates, so this policy is intended to be maintained as the applicable provisions become effective.
+Where consent or another legal basis is required by applicable law, United Delhi will use the legally appropriate basis and safeguards for the relevant processing. Location permission is also controlled by the operating system/browser.
+
+The Digital Personal Data Protection Act, 2023 and the Digital Personal Data Protection Rules, 2025 contain requirements concerning notice, consent, security safeguards, children's data, correction, erasure and grievance redressal, with phased commencement dates. This policy should be updated as applicable provisions become effective and as the implementation changes.
 
 ## 5. Children
 
-Until a legally appropriate parental-consent system is implemented, United Delhi is intended for users **18 years of age or older** and does not knowingly seek to process personal data from children.
+United Delhi does not use an 18+ interface gate. The current design minimizes personal-data collection and does not require an account or phone number.
 
-If you are under 18, do not use the production service. A parent or legal guardian may contact us if they believe a child has provided personal data.
-
-If United Delhi later supports users under 18, the service will be redesigned to address applicable child-data requirements, including legally required parental consent where applicable.
+If applicable law requires additional safeguards for children or another category of user, United Delhi will implement those safeguards before relying on the relevant processing. A parent or legal guardian may contact the service regarding a child's personal data.
 
 ## 6. Retention
 
@@ -77,7 +75,7 @@ United Delhi follows data minimisation.
 - Security and infrastructure logs may be retained for periods required by applicable law, security operations, hosting-provider requirements, or incident investigation.
 - When personal data is no longer needed for the purpose for which it was collected, we will delete or anonymise it unless retention is required by law.
 
-Because technical logs can be maintained by infrastructure providers, deletion requests may not remove information that a provider must independently retain under law or its own legitimate security obligations.
+Because technical logs can be maintained by infrastructure providers, deletion requests may not remove information that a provider must independently retain under law or legitimate security obligations.
 
 ## 7. Your rights
 
@@ -115,4 +113,4 @@ Please do not send passwords, API keys, database credentials, or other secrets i
 
 ## 12. Important legal note
 
-This policy describes the current United Delhi implementation and is not a promise that third-party services will never process technical information. It is not legal advice and does not replace advice from a qualified lawyer. If this project is commercially launched, especially while the operator is a minor, a parent/guardian and qualified Indian lawyer should review the final operator identity, contracts, privacy compliance, and publishing setup before launch.
+This policy describes the current United Delhi implementation and is not legal advice. If this project is commercially launched, especially while the operator is a minor, a parent/guardian and qualified Indian lawyer should review the final operator identity, contracts, privacy compliance, and publishing setup before launch.
