@@ -24,6 +24,18 @@ jobs:
       - run: npm test
       - run: npm audit --audit-level=low
 
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Validate web client
+        run: |
+          test -s web/index.html
+          test -s web/README.md
+          grep -q "united-delhi.de.deplexo.com" web/index.html
+          grep -q "/api/realtime/vehicles" web/index.html
+
   backend:
     runs-on: ubuntu-latest
     timeout-minutes: 15
