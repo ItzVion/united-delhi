@@ -12,14 +12,15 @@ import LegalScreen from './src/screens/LegalScreen';
 import AgeGate from './src/screens/AgeGate';
 import { colors } from './src/theme';
 import type { RootStackParamList } from './src/navigation/types';
+import ErrorBoundary from './src/components/ErrorBoundary';
 
 const Stack=createNativeStackNavigator<RootStackParamList>();
 const navTheme={...DefaultTheme,colors:{...DefaultTheme.colors,background:colors.background,card:colors.surface,text:colors.text,border:colors.border,primary:colors.accent}};
 
 export default function App(){
   const [consentGiven,setConsentGiven]=useState(false);
-  if(!consentGiven)return <SafeAreaProvider><AgeGate onConfirm={()=>setConsentGiven(true)}/></SafeAreaProvider>;
-  return <SafeAreaProvider><NavigationContainer theme={navTheme}>
+  if(!consentGiven)return <ErrorBoundary><SafeAreaProvider><AgeGate onConfirm={()=>setConsentGiven(true)}/></SafeAreaProvider></ErrorBoundary>;
+  return <ErrorBoundary><SafeAreaProvider><NavigationContainer theme={navTheme}>
     <Stack.Navigator screenOptions={{headerShown:false}}>
       <Stack.Screen name="Home" component={HomeScreen}/>
       <Stack.Screen name="Search" component={SearchScreen} options={{presentation:'modal'}}/>
@@ -29,5 +30,5 @@ export default function App(){
       <Stack.Screen name="RouteDetails" component={RouteDetailsScreen}/>
       <Stack.Screen name="Legal" component={LegalScreen}/>
     </Stack.Navigator>
-  </NavigationContainer></SafeAreaProvider>;
+  </NavigationContainer></SafeAreaProvider></ErrorBoundary>;
 }
