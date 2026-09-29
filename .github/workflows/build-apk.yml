@@ -13,26 +13,38 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install JavaScript dependencies
         run: npm ci
 
-      - name: Install EAS CLI
-        run: npm install --global eas-cli@24.8.0
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --no-install
 
-      - name: Link EAS project
-        run: eas init --account itzvion --non-interactive
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
 
-      - name: Build APK on Expo
-        run: eas build --platform android --profile preview --non-interactive --no-wait
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: united-delhi-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
