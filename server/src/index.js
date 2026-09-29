@@ -19,9 +19,9 @@ const hasManagedDatabase = Boolean(managedDbHost && Number.isInteger(managedDbPo
 const databaseHost = hasManagedDatabase ? managedDbHost : databaseUrl;
 const isLocalDatabase = /(?:localhost|127(?:\.\d+){3}|::1)/i.test(databaseHost);
 const pool = hasManagedDatabase
-  ? new Pool({ host: managedDbHost, port: managedDbPort, database: managedDbName, user: managedDbUser, password: managedDbPassword, max: 10, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000, statement_timeout: 10000, ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: true } }) })
+  ? new Pool({ host: managedDbHost, port: managedDbPort, database: managedDbName, user: managedDbUser, password: managedDbPassword, max: 10, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000, statement_timeout: 10000, ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: false } }) })
   : databaseUrl
-    ? new Pool({ connectionString: databaseUrl, max: 10, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000, statement_timeout: 10000, ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: true } }) })
+    ? new Pool({ connectionString: databaseUrl, max: 10, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000, statement_timeout: 10000, ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: false } }) })
     : null;
 if (pool) pool.on('error', error => console.error('PostgreSQL pool error:', error.message));
 app.disable('x-powered-by');
@@ -345,3 +345,4 @@ const server=app.listen(port,()=>{
 server.requestTimeout=15000;
 server.headersTimeout=20000;
 server.keepAliveTimeout=5000;
+
