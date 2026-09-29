@@ -5,7 +5,7 @@ import {api,Vehicle} from './api';
 
 const routeName=(s:string)=>String(s||'Bus').replace(/(?:UP|DOWN|DWN)$/i,'').replace(/^AIR-0+/i,'AIR-');
 const fresh=(s?:string)=>{if(!s)return'Live';const n=Date.parse(s);if(!Number.isFinite(n))return'Live';const x=Math.max(0,Math.round((Date.now()-n)/1000));return x<60?'Just now':Math.floor(x/60)+' min ago'};
-function Fit({points}:{points:[number,number][]}){const m=useMap();useEffect(()=>{if(points.length>1)m.fitBounds(points as any,{padding:[25,25],maxZoom:13})},[m,points]);return null}
+function Fit({points}:{points:[number,number][]}){const m=useMap();useEffect(()=>{if(points.length>1)m.fitBounds(points as any,{padding:[25,25],maxZoom:14}); else m.setView([28.6139,77.209],11)},[m,points]);return null}
 
 const metroLines=[
  ['Red','Rithala → Shaheed Sthal (New Bus Adda)','29'],
@@ -38,7 +38,7 @@ export default function App(){
  const nav=(x:string)=>{setTab(x);setDetail(null);setError('')};
  const points=vehicles.map(v=>[v.latitude,v.longitude] as [number,number]);
  return <div className="app">
-  <header className="top"><div className="brand"><div className="logo">UD</div><div><b>UNITED DELHI</b><span>Delhi transit, made simple</span></div></div>
+  <header className="top"><div className="brand"><img className="logo logo-image" src="/united-delhi-logo.png" alt="United Delhi logo"/><div><b>UNITED DELHI</b><span>Delhi transit, made simple</span></div></div>
    <div className="search"><input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="Search routes, stops or places"/><button className="btn" onClick={search}>Search</button></div>
   </header>
   <nav className="nav">{[['home','Home'],['search','Search'],['planner','Plan trip'],['metro','Metro'],['nearby','Nearby'],['legal','Legal']].map(([id,label])=><button className={tab===id?'active':''} onClick={()=>nav(id)} key={id}>{label}</button>)}</nav>
@@ -53,7 +53,7 @@ export default function App(){
 
 function ConsentScreen({checked,setChecked,onContinue,onLegal,legalView,closeLegal}:{checked:boolean;setChecked:(v:boolean)=>void;onContinue:()=>void;onLegal:(v:'terms'|'privacy')=>void;legalView:'terms'|'privacy'|null;closeLegal:()=>void}){
  return <div className="gate"><motion.div className="card consent-card" initial={{opacity:0,y:18}} animate={{opacity:1,y:0}}>
-   <div className="logo">UD</div><div className="eyebrow">WELCOME TO UNITED DELHI</div><h1>Delhi transit,<br/>made simple.</h1>
+   <img className="logo logo-image gate-logo" src="/united-delhi-logo.png" alt="United Delhi logo"/><div className="eyebrow">WELCOME TO UNITED DELHI</div><h1>Delhi transit,<br/>made simple.</h1>
    <p>By continuing to United Delhi, you agree to our <button className="inline-link" onClick={()=>onLegal('terms')}>Terms of Service</button> and acknowledge our <button className="inline-link" onClick={()=>onLegal('privacy')}>Privacy Policy</button>.</p>
    <label className="consent-check"><input type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)}/><span>I agree to the Terms of Service and acknowledge the Privacy Policy.</span></label>
    <button className="btn continue" disabled={!checked} onClick={onContinue}>Continue to United Delhi</button>
@@ -73,7 +73,7 @@ function PrivacyText(){return <div className="legal-copy"><p><b>United Delhi is 
 
 function Home({vehicles,points,open}:{vehicles:Vehicle[];points:[number,number][];open:(x:any)=>void}){
  return <><section className="hero"><div><div className="eyebrow">LIVE TRANSIT</div><h1>Delhi transit,<br/>made simple.</h1><p>Track DTC buses, explore routes, understand the Metro network and plan your next trip.</p></div><div className="pill">{vehicles.length} buses live</div></section>
- <div className="map"><MapContainer center={[28.6139,77.209]} zoom={11} scrollWheelZoom><TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="© OpenStreetMap contributors"/><Fit points={points}/>{vehicles.map(v=><CircleMarker key={v.id} center={[v.latitude,v.longitude]} radius={7} pathOptions={{color:'#fff',weight:2,fillColor:'#f28c28',fillOpacity:1}} eventHandlers={{click:()=>open({type:'route',id:v.routeId})}}/>)}</MapContainer></div>
+ <div className="map home-map"><MapContainer center={[28.6139,77.209]} zoom={11} scrollWheelZoom><TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="© OpenStreetMap contributors"/><Fit points={points}/>{vehicles.map(v=><CircleMarker key={v.id} center={[v.latitude,v.longitude]} radius={7} pathOptions={{color:'#fff',weight:2,fillColor:'#f28c28',fillOpacity:1}} eventHandlers={{click:()=>open({type:'route',id:v.routeId})}}/>)}</MapContainer></div>
  <div className="cards"><div className="card"><div className="eyebrow">LIVE NETWORK</div><b>{vehicles.length}</b><span>vehicles currently visible</span></div><div className="card"><div className="eyebrow">BUS</div><b>Routes & stops</b><span>Find exact route variants, directions and live buses.</span></div><div className="card"><div className="eyebrow">METRO</div><b>Network & planning</b><span>Explore Delhi Metro lines and open the official planner when needed.</span></div></div></>
 }
 
