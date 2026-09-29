@@ -38,7 +38,7 @@ The repository should retain the package-lock files and package metadata so depe
 
 ## Hosting and infrastructure
 
-The production backend uses third-party infrastructure including Render and Neon. Their own terms, privacy policies, security practices, and data-processing arrangements apply to their services.
+The production backend uses Wasmer Edge for the United Delhi API, Vercel for the realtime relay, and Neon for PostgreSQL data storage. Their own terms, privacy policies, security practices, and data-processing arrangements apply to their services.
 
 ## No government affiliation
 
