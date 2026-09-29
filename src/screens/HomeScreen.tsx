@@ -92,7 +92,7 @@ export default function HomeScreen(){
   return <SafeAreaView style={styles.safe}>
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <View style={styles.brandRow}><UnitedDelhiMark size={42}/><View style={styles.brandCopy}><Text style={styles.brand}>UNITED DELHI</Text><Text style={styles.tagline}>Delhi transit, made simple</Text></View></View>
+        <View style={styles.brandRow}><UnitedDelhiMark size={50}/><View style={styles.brandCopy}><Text style={styles.brand}>UNITED DELHI</Text><Text style={styles.tagline}>Delhi transit, made simple</Text></View></View>
         <StatusPill label={liveLabel} tone={fresh==='ok'?'ok':fresh==='unavailable'?'danger':'muted'}/>
       </View>
 
@@ -223,7 +223,7 @@ function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':
 const styles=StyleSheet.create({
  safe:{flex:1,backgroundColor:colors.background},
  scroll:{paddingHorizontal:16,paddingTop:7,paddingBottom:24},
- header:{height:58,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
+ header:{height:64,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
  brandRow:{flexDirection:'row',alignItems:'center'},brandCopy:{marginLeft:9},brand:{fontSize:18,fontWeight:'900',letterSpacing:1,color:colors.text},tagline:{fontSize:9,color:colors.textMuted,marginTop:2},
  search:{height:48,borderRadius:15,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,flexDirection:'row',alignItems:'center',paddingHorizontal:13,marginTop:7},
  searchIcon:{fontSize:23,color:colors.text,marginRight:8},searchText:{flex:1,fontSize:13,color:colors.textMuted},searchKey:{fontSize:13,fontWeight:'800',color:colors.textMuted},
