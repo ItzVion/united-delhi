@@ -15,7 +15,7 @@ United Delhi is designed to work without a user account. We do not currently ask
 
 Location is optional.
 
-If you choose the **Nearby** feature, the web client requests browser location permission and sends a reduced-precision latitude/longitude to the United Delhi API so the server can calculate nearby DTC stops. The web client does not intentionally store that location in the United Delhi database.
+If you choose the **Nearby** feature, the mobile app requests foreground location permission and sends a reduced-precision latitude/longitude to the United Delhi API so the server can calculate nearby DTC stops. The web client does not intentionally store that location in the United Delhi database.
 
 Core route and stop search does not require location permission.
 
@@ -35,6 +35,7 @@ United Delhi currently uses or may rely on:
 - **Delhi Open Transit Data (OTD):** transit route, stop and realtime vehicle data.
 - **OpenStreetMap:** map data and standard map tiles.
 - **Wasmer Edge:** hosting for the current United Delhi API.
+- **Vercel:** hosting for a protected realtime-feed relay.
 - **Neon:** PostgreSQL database hosting for transit data and realtime vehicle-position records.
 - **GitHub:** source-code hosting and project infrastructure.
 
