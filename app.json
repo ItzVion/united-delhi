@@ -2,7 +2,7 @@
   "expo": {
     "name": "United Delhi",
     "slug": "united-delhi",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
@@ -15,15 +15,12 @@
     },
     "android": {
       "package": "com.uniteddelhi.app",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0B746B"
-      },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
       ],
-      "backgroundColor": "#F4F7F4"
+      "backgroundColor": "#F4F7F4",
+      "icon": "./assets/icon.png"
     },
     "web": {
       "bundler": "metro",
@@ -34,6 +31,15 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "United Delhi uses your location to find nearby DTC bus stops."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F4F7F4",
+          "image": "./assets/united-delhi-logo.png",
+          "imageWidth": 180,
+          "resizeMode": "contain"
         }
       ]
     ]
