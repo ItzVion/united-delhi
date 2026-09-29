@@ -5,7 +5,7 @@
 
 These Terms of Service ("Terms") govern access to and use of the United Delhi application, website, and related API (together, the "Service").
 
-**Operator/contact placeholder:** Before public release, replace **the developer contact email shown on the United Delhi Google Play listing** with a monitored legal/support email address. Do not publish the placeholder.
+**Privacy and legal contact:** Use the developer contact email shown on the United Delhi Google Play listing for privacy and legal inquiries.
 
 ## 1. Acceptance
 
