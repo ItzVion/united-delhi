@@ -34,7 +34,7 @@ United Delhi does not currently use advertising SDKs, analytics SDKs, crash-repo
 United Delhi currently uses or may rely on:
 - **Delhi Open Transit Data (OTD):** transit route, stop and realtime vehicle data.
 - **OpenStreetMap:** map data and standard map tiles.
-- **Deplexo:** hosting for the current United Delhi API.
+- **Wasmer Edge:** hosting for the current United Delhi API.
 - **Neon:** PostgreSQL database hosting for transit data and realtime vehicle-position records.
 - **GitHub:** source-code hosting and project infrastructure.
 
