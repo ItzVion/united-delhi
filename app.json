@@ -21,7 +21,10 @@
       ],
       "backgroundColor": "#F4F7F4",
       "icon": "./assets/icon.png",
-      "predictiveBackGestureEnabled": true
+      "predictiveBackGestureEnabled": true,
+      "blockedPermissions": [
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
