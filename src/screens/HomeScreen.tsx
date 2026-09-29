@@ -25,7 +25,8 @@ export default function HomeScreen(){
   const [locationStatus,setLocationStatus]=useState('Finding your location…');
   const [nearbyStops,setNearbyStops]=useState<Stop[]>([]);
   const [vehicles,setVehicles]=useState<Vehicle[]>([]);
-  const [fresh,setFresh]=useState<'loading'|'ok'|'unavailable'>('loading');
+  const [fresh,setFresh]=useState<'loading'|'ok'|'stale'|'unavailable'>('loading');
+  const [lastRealtimeAt,setLastRealtimeAt]=useState<string|null>(null);
   const [mapReady,setMapReady]=useState(false);
   const [bounds,setBounds]=useState<MapBounds|null>(null);
   const [selectedBus,setSelectedBus]=useState<Vehicle|null>(null);
@@ -59,8 +60,14 @@ export default function HomeScreen(){
   },[]);
 
   const loadVehicles=useCallback(async()=>{
-    try{const result=await api.vehicles();setVehicles(result.status==='OK'?result.vehicles:[]);setFresh(result.status==='OK'?'ok':'unavailable');}
-    catch{setFresh('unavailable');}
+    try{
+      const result=await api.vehicles();
+      if(Array.isArray(result.vehicles))setVehicles(result.vehicles);
+      setLastRealtimeAt(result.fetchedAt||null);
+      setFresh(result.status==='OK'?'ok':result.status==='STALE'?'stale':'unavailable');
+    }catch{
+      setFresh('unavailable');
+    }
   },[]);
 
   useEffect(()=>{void requestLocation();},[requestLocation]);
@@ -87,13 +94,15 @@ export default function HomeScreen(){
     mapRef.current?.injectJavaScript(`window.updateMap(${JSON.stringify(payload)});true;`);
   },[mapReady,bounds,location,nearbyStops,vehicles]);
 
-  const liveLabel=fresh==='ok'?(`${vehicles.length} live buses`):fresh==='loading'?'Checking live buses':'Live data unavailable';
+  const realtimeAge=lastRealtimeAt?Math.max(0,Math.round((Date.now()-Date.parse(lastRealtimeAt))/1000)):null;
+  const realtimeAgeLabel=realtimeAge===null?'':realtimeAge<60?'just now':`${Math.floor(realtimeAge/60)} min ago`;
+  const liveLabel=fresh==='ok'?(`${vehicles.length} live buses`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='loading'?'Checking live buses':vehicles.length?(`${vehicles.length} buses · connection lost`):'Live data unavailable';
 
   return <SafeAreaView style={styles.safe}>
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={styles.brandRow}><UnitedDelhiMark size={50}/><View style={styles.brandCopy}><Text style={styles.brand}>UNITED DELHI</Text><Text style={styles.tagline}>Delhi transit, made simple</Text></View></View>
-        <StatusPill label={liveLabel} tone={fresh==='ok'?'ok':fresh==='unavailable'?'danger':'muted'}/>
+        <StatusPill label={liveLabel} tone={fresh==='ok'?'ok':fresh==='unavailable'?'danger':fresh==='stale'?'muted':'muted'}/>
       </View>
 
       <Pressable style={styles.search} onPress={()=>navigation.navigate('Search')}>
@@ -133,7 +142,7 @@ export default function HomeScreen(){
         />
         <View pointerEvents="none" style={styles.mapTop}>
           <View style={styles.liveDot}/>
-          <Text style={styles.mapTopText}>{fresh==='ok'?(`${vehicles.length} buses live`):'Live map'}</Text>
+          <Text style={styles.mapTopText}>{fresh==='ok'?(`${vehicles.length} buses live`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='unavailable'?'Live data unavailable':'Checking live buses'}</Text>
         </View>
         <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
