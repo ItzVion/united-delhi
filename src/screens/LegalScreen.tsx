@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
 
 const BASE='https://united-delhi.vercel.app/';
+const APP_VERSION='1.0.6';
 const links=[
   ['Privacy Policy','privacy.html'],
   ['Terms of Service','terms.html']
@@ -38,6 +39,8 @@ export default function LegalScreen() {
           United Delhi is not a transport authority and does not guarantee arrival
           times or vehicle availability.
         </Text>
+        <Text style={styles.section}>App version</Text>
+        <Text style={styles.body}>United Delhi {APP_VERSION}. Android build numbers are managed by EAS for production releases.</Text>
         <Text style={styles.section}>Contact</Text>
         <Text style={styles.body}>
           Privacy and legal inquiries can be submitted using the developer contact email shown on the United Delhi Google Play listing.
