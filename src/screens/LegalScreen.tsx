@@ -3,12 +3,10 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
 
-const BASE='https://github.com/ItzVion/united-delhi/blob/main/';
+const BASE='https://united-delhi.vercel.app/';
 const links=[
-  ['Privacy Policy','PRIVACY_POLICY.md'],
-  ['Terms of Service','TERMS_OF_SERVICE.md'],
-  ['Third-Party Notices','THIRD_PARTY_NOTICES.md'],
-  ['Security Policy','SECURITY.md']
+  ['Privacy Policy','privacy.html'],
+  ['Terms of Service','terms.html']
 ] as const;
 
 export default function LegalScreen() {
@@ -19,8 +17,7 @@ export default function LegalScreen() {
         <Text style={styles.title}>Legal & privacy</Text>
         <Text style={styles.intro}>
           United Delhi is an independent transit-information app. These documents
-          explain how the service handles data, third-party services, security,
-          and use of the app.
+          explain how the service handles data, privacy, and use of the app.
         </Text>
         <View style={styles.card}>
           {links.map(([label,file]) => (
@@ -43,10 +40,7 @@ export default function LegalScreen() {
         </Text>
         <Text style={styles.section}>Contact</Text>
         <Text style={styles.body}>
-          Privacy and legal contact: [LEGAL CONTACT EMAIL]
-        </Text>
-        <Text style={styles.warning}>
-          The contact placeholder must be replaced before public release.
+          Privacy and legal inquiries can be submitted using the developer contact email shown on the United Delhi Google Play listing.
         </Text>
       </ScrollView>
     </SafeAreaView>
