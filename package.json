@@ -18,12 +18,12 @@
     "@react-navigation/native-stack": "^7.3.29",
     "expo": "~57.0.25",
     "expo-location": "~57.0.20",
+    "expo-splash-screen": "~57.0.9",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
-    "react-native-webview": "13.16.1",
-    "expo-splash-screen": "~57.0.9"
+    "react-native-webview": "13.16.1"
   },
   "devDependencies": {
     "@types/react": "~19.2.4",
