@@ -366,7 +366,9 @@ app.use((error,_req,res,_next)=>{
 const server=app.listen(port,()=>{
   console.log('United Delhi API listening on :'+port);
   void ensureStaticData().then(()=>startRealtimePolling()).catch(error=>{
-    console.error('Static GTFS bootstrap failed:',error.message);
+    staticDataCache.status='ERROR';
+    staticDataCache.reason=error instanceof Error?error.message:'Static GTFS bootstrap failed';
+    console.error('Static GTFS bootstrap failed:',staticDataCache.reason);
     startRealtimePolling();
   });
 });
