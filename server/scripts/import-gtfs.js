@@ -1,13 +1,42 @@
-import 'dotenv/config';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {fileURLToPath} from 'node:url';import pg from 'pg';import {readGtfsCsv,parseStops,parseRoutes,buildRouteStops} from '../src/lib/gtfsImport.js';
-const{Pool}=pg;const arg=process.argv[2];const scriptDir=path.dirname(fileURLToPath(import.meta.url));let dir=arg,tempDir=null;const databaseUrl=String(process.env.DATABASE_URL||'').trim();const managedDbHost=String(process.env.DB_HOST||'').trim();const managedDbPort=Number(process.env.DB_PORT||0);const managedDbName=String(process.env.DB_NAME||'').trim();const managedDbUser=String(process.env.DB_USERNAME||'').trim();const managedDbPassword=String(process.env.DB_PASSWORD||'');const hasManagedDatabase=Boolean(managedDbHost&&Number.isInteger(managedDbPort)&&managedDbPort>0&&managedDbName&&managedDbUser&&managedDbPassword);if(!hasManagedDatabase&&!databaseUrl)throw new Error('Wasmer DB_* variables or DATABASE_URL is required');const databaseHost=hasManagedDatabase?managedDbHost:databaseUrl;const isLocalDatabase=/(?:localhost|127(?:\.\d+){3}|::1)/i.test(databaseHost);const pool=hasManagedDatabase?new Pool({host:managedDbHost,port:managedDbPort,database:managedDbName,user:managedDbUser,password:managedDbPassword,max:5,connectionTimeoutMillis:5000,...(isLocalDatabase?{}:{ssl:{rejectUnauthorized:false}})}):new Pool({connectionString:databaseUrl,max:5,connectionTimeoutMillis:5000,...(isLocalDatabase?{}:{ssl:{rejectUnauthorized:true}})});pool.on('error',e=>console.error('PostgreSQL pool error:',e.message));
-const GTFS_SOURCE_COMMIT='8d573d0c67cb8269b0fa16019d192a0e49172d4f';const GTFS_RAW_BASE=`https://raw.githubusercontent.com/Anusharana510/CommuteLive/${GTFS_SOURCE_COMMIT}/data/otd_gtfs`;const GTFS_FILES=['routes.txt','stops.txt','trips.txt','stop_times.txt'];const MAX_GTFS_FILE_BYTES=100*1024*1024;
-async function fetchWithTimeout(url,timeoutMs=30000){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);try{const response=await fetch(url,{headers:{accept:'text/plain,text/csv,*/*'},signal:controller.signal});if(!response.ok)throw new Error(`GTFS source failed: HTTP ${response.status}`);const length=Number(response.headers.get('content-length')||0);if(Number.isFinite(length)&&length>MAX_GTFS_FILE_BYTES)throw new Error('GTFS source file is unexpectedly large');const buffer=Buffer.from(await response.arrayBuffer());if(buffer.byteLength>MAX_GTFS_FILE_BYTES)throw new Error('GTFS source file exceeded the 100 MB safety limit');return buffer;}catch(error){if(error?.name==='AbortError')throw new Error('GTFS source request timed out');throw error;}finally{clearTimeout(timer);}}
-async function downloadGtfs(){tempDir=fs.mkdtempSync(path.join(os.tmpdir(),'united-delhi-gtfs-'));console.log('Downloading fallback Delhi GTFS '+GTFS_SOURCE_COMMIT.slice(0,7)+'...');for(const name of GTFS_FILES)fs.writeFileSync(path.join(tempDir,name),await fetchWithTimeout(GTFS_RAW_BASE+'/'+name));return tempDir;}
-async function applyMigrations(client){
-  const files=fs.readdirSync(path.join(scriptDir,'..','sql')).filter(name=>/^\d+.*\.sql$/i.test(name)).sort();
-  for(const name of files){
-    const sql=fs.readFileSync(path.join(scriptDir,'..','sql',name),'utf8');
-    await client.query(sql);
-  }
+import 'dotenv/config';
+import pg from 'pg';
+import { importGtfs } from '../src/lib/gtfsBootstrap.js';
+
+const { Pool } = pg;
+const databaseUrl = String(process.env.DATABASE_URL || '').trim();
+const managedDbHost = String(process.env.DB_HOST || '').trim();
+const managedDbPort = Number(process.env.DB_PORT || 0);
+const managedDbName = String(process.env.DB_NAME || '').trim();
+const managedDbUser = String(process.env.DB_USERNAME || '').trim();
+const managedDbPassword = String(process.env.DB_PASSWORD || '');
+const hasManagedDatabase = Boolean(
+  managedDbHost && Number.isInteger(managedDbPort) && managedDbPort > 0 &&
+  managedDbName && managedDbUser && managedDbPassword
+);
+if (!hasManagedDatabase && !databaseUrl) throw new Error('Wasmer DB_* variables or DATABASE_URL is required');
+
+const databaseHost = hasManagedDatabase ? managedDbHost : databaseUrl;
+const isLocalDatabase = /(?:localhost|127(?:\.\d+){3}|::1)/i.test(databaseHost);
+const pool = hasManagedDatabase
+  ? new Pool({
+      host: managedDbHost,
+      port: managedDbPort,
+      database: managedDbName,
+      user: managedDbUser,
+      password: managedDbPassword,
+      max: 2,
+      connectionTimeoutMillis: 5000,
+      ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: false } })
+    })
+  : new Pool({
+      connectionString: databaseUrl,
+      max: 2,
+      connectionTimeoutMillis: 5000,
+      ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: false } })
+    });
+
+try {
+  await importGtfs({ pool });
+} finally {
+  await pool.end().catch(() => {});
 }
-async function importGtfs(){if(!dir||arg==='--download')dir=await downloadGtfs();console.log('Parsing GTFS files...');const stops=parseStops(readGtfsCsv(dir,'stops.txt')),routes=parseRoutes(readGtfsCsv(dir,'routes.txt')),rows=buildRouteStops(readGtfsCsv(dir,'trips.txt'),readGtfsCsv(dir,'stop_times.txt'));if(!stops.length||!routes.length||!rows.length)throw new Error('GTFS validation failed');const client=await pool.connect();try{await client.query('BEGIN');await client.query("SET LOCAL statement_timeout='60000'");await applyMigrations(client);const routeChunk=100;for(let i=0;i<routes.length;i+=routeChunk){const chunk=routes.slice(i,i+routeChunk),values=[];const placeholders=chunk.map((row,index)=>{const base=index*5;values.push(row.routeId,row.shortName,row.longName,row.routeColor,row.routeTextColor);return '($'+(base+1)+',$'+(base+2)+',$'+(base+3)+',$'+(base+4)+',$'+(base+5)+')';}).join(',');await client.query('INSERT INTO routes(route_id,short_name,long_name,route_color,route_text_color) VALUES '+placeholders+' ON CONFLICT(route_id) DO UPDATE SET short_name=EXCLUDED.short_name,long_name=EXCLUDED.long_name,route_color=EXCLUDED.route_color,route_text_color=EXCLUDED.route_text_color,updated_at=NOW()',values);}const stopChunk=100;for(let i=0;i<stops.length;i+=stopChunk){const chunk=stops.slice(i,i+stopChunk),values=[];const placeholders=chunk.map((row,index)=>{const base=index*4;values.push(row.stopId,row.name,row.lat,row.lon);return '($'+(base+1)+',$'+(base+2)+',$'+(base+3)+',$'+(base+4)+')';}).join(',');await client.query('INSERT INTO stops(stop_id,name,latitude,longitude) VALUES '+placeholders+' ON CONFLICT(stop_id) DO UPDATE SET name=EXCLUDED.name,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,updated_at=NOW()',values);}await client.query('DELETE FROM route_stops');const linkChunk=100;for(let i=0;i<rows.length;i+=linkChunk){const chunk=rows.slice(i,i+linkChunk),values=[];const placeholders=chunk.map((row,index)=>{const base=index*3;values.push(row.routeId,row.stopId,row.stopSequence);return '($'+(base+1)+',$'+(base+2)+',$'+(base+3)+')';}).join(',');await client.query('INSERT INTO route_stops(route_id,stop_id,stop_sequence) VALUES '+placeholders+' ON CONFLICT(route_id,stop_id) DO UPDATE SET stop_sequence=LEAST(route_stops.stop_sequence,EXCLUDED.stop_sequence)',values);}await client.query('COMMIT');console.log('Import completed: '+stops.length+' stops, '+routes.length+' routes, '+rows.length+' route-stop links.');}catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}}try{await importGtfs();}finally{await pool.end().catch(()=>{});if(tempDir)fs.rmSync(tempDir,{recursive:true,force:true});}
