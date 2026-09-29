@@ -20,7 +20,8 @@
         "ACCESS_FINE_LOCATION"
       ],
       "backgroundColor": "#F4F7F4",
-      "icon": "./assets/icon.png"
+      "icon": "./assets/icon.png",
+      "predictiveBackGestureEnabled": true
     },
     "web": {
       "bundler": "metro",
