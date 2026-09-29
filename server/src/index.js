@@ -3,8 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import pg from 'pg';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
-import { spawn } from 'node:child_process';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
+import { importGtfs } from './lib/gtfsBootstrap.js';
 
 const { Pool } = pg;
 const app = express();
@@ -328,7 +328,29 @@ async function applyMigrations(){
     }finally{client.release();}
   }
 }
-async function ensureStaticData(){if(!pool)return;await applyMigrations();const tables=await pool.query("SELECT to_regclass('public.stops') stops_table,to_regclass('public.routes') routes_table,to_regclass('public.route_stops') route_stops_table");const row=tables.rows[0];if(row.stops_table&&row.routes_table&&row.route_stops_table){const counts=(await pool.query('SELECT (SELECT COUNT(*) FROM stops) stops,(SELECT COUNT(*) FROM routes) routes,(SELECT COUNT(*) FROM route_stops) route_stops')).rows[0];if(Number(counts.stops)>=1000&&Number(counts.routes)>=500&&Number(counts.route_stops)>=10000)return;}console.log('Static GTFS data is missing/incomplete; starting fallback import...');await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['scripts/import-gtfs.js'],{cwd:process.cwd(),env:process.env,stdio:'inherit'});child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(new Error('GTFS import exited with code '+code)));});}
+async function ensureStaticData(){
+  if(!pool)return;
+  await applyMigrations();
+  const lockClient=await pool.connect();
+  try{
+    console.log('Waiting for static GTFS bootstrap lock...');
+    await lockClient.query("SELECT pg_advisory_lock(hashtext('united-delhi-static-gtfs'))");
+    const tables=await lockClient.query("SELECT to_regclass('public.stops') stops_table,to_regclass('public.routes') routes_table,to_regclass('public.route_stops') route_stops_table");
+    const row=tables.rows[0];
+    if(row.stops_table&&row.routes_table&&row.route_stops_table){
+      const counts=(await lockClient.query('SELECT (SELECT COUNT(*) FROM stops) stops,(SELECT COUNT(*) FROM routes) routes,(SELECT COUNT(*) FROM route_stops) route_stops')).rows[0];
+      if(Number(counts.stops)>=1000&&Number(counts.routes)>=500&&Number(counts.route_stops)>=10000){
+        console.log('Static GTFS data is already complete.');
+        return;
+      }
+    }
+    console.log('Static GTFS data is missing/incomplete; starting memory-efficient inline import...');
+    await importGtfs({pool});
+  }finally{
+    await lockClient.query("SELECT pg_advisory_unlock(hashtext('united-delhi-static-gtfs'))").catch(()=>{});
+    lockClient.release();
+  }
+}
 app.use((_req,res)=>res.status(404).json({status:'NOT_FOUND',reason:'Endpoint not found'}));
 app.use((error,_req,res,_next)=>{
   console.error('Unhandled request error:',error instanceof Error?error.message:String(error));
