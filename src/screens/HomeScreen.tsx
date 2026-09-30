@@ -150,6 +150,7 @@ export default function HomeScreen(){
                 const bus=vehicles.find(v=>v.id===m.busId);
                 if(bus)setSelectedBus(bus);
               }else if(m.type==='bounds'&&m.bounds)setBounds(m.bounds);
+              else if(m.type==='locate')void requestLocation();
             }catch{}
           }}
         />
@@ -197,7 +198,7 @@ export default function HomeScreen(){
         <View style={styles.stopCopy}><Text style={styles.stopName} numberOfLines={1}>{stop.name}</Text><Text style={styles.stopDistance}>{stop.distance_m!=null?`${Math.round(stop.distance_m)} m away`:'Nearby stop'}</Text></View>
         <Text style={styles.arrow}>›</Text>
       </Pressable>)}
-      {!nearbyStops.length?<View style={styles.emptyCard}><Text style={styles.emptyTitle}>No nearby stops yet</Text><Text style={styles.emptyText}>Turn on location to find stops around you.</Text></View>:null}
+      {!nearbyStops.length?<View style={styles.emptyCard}><Text style={styles.emptyTitle}>No nearby stops yet</Text><Text style={styles.emptyText}>Location is optional; use the map or enable location to find nearby stops.</Text></View>:null}
 
       <Pressable style={styles.legal} onPress={()=>navigation.navigate('Legal')}><Text style={styles.legalText}>Legal & privacy</Text></Pressable>
     </ScrollView>
@@ -220,26 +221,29 @@ function BottomItem({icon,label,onPress,active=false}:{icon:string;label:string;
 function buildMapHtml(){
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""><style>
 html,body,#map{margin:0;width:100%;height:100%;background:#eef2f1}.leaflet-control-zoom{border:0!important;box-shadow:0 2px 12px rgba(23,49,47,.16)!important;border-radius:12px!important;overflow:hidden}.leaflet-control-zoom a{border:0!important;color:#17312f!important}
-.stop-label{width:10px;height:10px;border-radius:50%;background:#0b746b;border:2px solid #fff;box-shadow:0 2px 6px rgba(23,49,47,.28)}.bus-label{font:800 9px system-ui,sans-serif;white-space:nowrap;border-radius:8px;padding:3px 5px;border:2px solid #fff;box-shadow:0 2px 7px rgba(23,49,47,.22)}
+.leaflet-control-locate{margin:0 8px 32px 0}.leaflet-control-locate button{width:40px;height:40px;border:1px solid #d8e4e0;border-radius:12px;background:#fff;color:#0b746b;font:900 21px system-ui;line-height:40px;box-shadow:0 3px 14px rgba(23,49,47,.18);cursor:pointer}.leaflet-control-locate button:active{transform:scale(.96)}
+.stop-label{width:10px;height:10px;border-radius:50%;background:#0b746b;border:2px solid #fff;box-shadow:0 2px 6px rgba(23,49,47,.28)}.bus-pin{width:34px;height:34px;border-radius:50%;background:#f28c28;color:#fff;border:3px solid #fff;box-shadow:0 3px 10px rgba(23,49,47,.30);display:flex;align-items:center;justify-content:center;font:900 8px system-ui,sans-serif;line-height:1;text-align:center}.bus-pin span{max-width:27px;overflow:hidden;text-overflow:clip}
 </style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script>
-const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5}).setView([28.6139,77.209],12.5);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,keepBuffer:2,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
+let currentLocation=null;
+const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5}).setView([28.6139,77.209],10.5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:2,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
 const stopLayer=L.layerGroup().addTo(map),busLayer=L.layerGroup().addTo(map),userLayer=L.layerGroup().addTo(map),busMarkers=new Map();
+const locateControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-locate'),button=L.DomUtil.create('button','');button.type='button';button.textContent='◎';button.title='Center on my location';button.setAttribute('aria-label','Center on my location');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>{if(currentLocation){map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.2,easeLinearity:.2})}else{window.ReactNativeWebView.postMessage(JSON.stringify({type:'locate'}));}});wrap.appendChild(button);return wrap;}});map.addControl(new locateControl());
 function reportBounds(){const b=map.getBounds();window.ReactNativeWebView.postMessage(JSON.stringify({type:'bounds',bounds:{south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()}}));}
 map.on('moveend',reportBounds);setTimeout(reportBounds,300);
 window.updateMap=function(data){
- stopLayer.clearLayers();busLayer.clearLayers();userLayer.clearLayers();busMarkers.clear();
+ stopLayer.clearLayers();busLayer.clearLayers();userLayer.clearLayers();busMarkers.clear();currentLocation=data.location||null;
  const stopIcon=L.divIcon({className:'',html:'<div class="stop-label"></div>',iconSize:[14,14],iconAnchor:[7,7]});
- data.stops.forEach(s=>{const popup=document.createElement('div'),title=document.createElement('b'),button=document.createElement('button');title.textContent=s.name;button.textContent='View stop';button.type='button';button.style.marginTop='6px';button.onclick=()=>openStop(s.id);popup.append(title,document.createElement('br'),button);L.marker([s.lat,s.lon],{icon:stopIcon}).addTo(stopLayer).bindPopup(popup);});
- data.buses.forEach(v=>{const bg=validColor(v.color)?v.color:'#0b746b',fg=validColor(v.textColor)?v.textColor:'#fff';const marker=L.marker([v.lat,v.lon],{icon:L.divIcon({className:'',html:'<div class="bus-label" style="background:'+bg+';color:'+fg+'">'+escapeHtml(v.route)+'</div>',iconSize:[56,22],iconAnchor:[28,11]})});marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);busMarkers.set(v.id,marker);});
- if(data.location)L.circleMarker([data.location.lat,data.location.lon],{radius:6,color:'#fff',weight:2,fillColor:'#0b746b',fillOpacity:1}).addTo(userLayer);
+ data.stops.forEach(s=>{const popup=document.createElement('div'),title=document.createElement('b'),button=document.createElement('button');title.textContent=s.name;button.textContent='View stop';button.type='button';button.style.marginTop='6px';button.onclick=()=>openStop(s.id);popup.append(title,document.createElement('br'),button);L.marker([s.lat,s.lon],{icon:stopIcon,zIndexOffset:300}).addTo(stopLayer).bindPopup(popup);});
+ data.buses.forEach(v=>{const bg=validColor(v.color)?v.color:'#f28c28',fg=validColor(v.textColor)?v.textColor:'#fff';const marker=L.marker([v.lat,v.lon],{zIndexOffset:700,icon:L.divIcon({className:'',html:'<div class="bus-pin" style="background:'+bg+';color:'+fg+'"><span>'+escapeHtml(v.route)+'</span></div>',iconSize:[34,34],iconAnchor:[17,17]})});marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);busMarkers.set(v.id,marker);});
+ if(currentLocation)L.circleMarker([currentLocation.lat,currentLocation.lon],{radius:9,color:'#fff',weight:3,fillColor:'#0b746b',fillOpacity:1}).addTo(userLayer);
 };
+function centerOnUser(){if(currentLocation)map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.2,easeLinearity:.2});}
 function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}function openBus(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'bus',busId:id}));}
 function validColor(x){return /^#[0-9a-f]{6}$/i.test(String(x));}
-function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);}
 </script></body></html>`;
 }
-
 const styles=StyleSheet.create({
  safe:{flex:1,backgroundColor:colors.background},
  scroll:{paddingHorizontal:16,paddingTop:7,paddingBottom:24},
