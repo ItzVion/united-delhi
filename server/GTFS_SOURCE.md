@@ -1,13 +1,36 @@
 # United Delhi GTFS source
 
-United Delhi now uses the official Delhi Open Transit Data (OTD) static bus GTFS ZIP:
+United Delhi uses one pinned OTD-derived GTFS snapshot for **operational route-ID mapping and bus stop/route topology**:
 
-https://otd.delhi.gov.in/data/static/GTFS.zip
+https://github.com/Anusharana510/CommuteLive/tree/8d573d0c67cb8269b0fa16019d192a0e49172d4f/data/otd_gtfs
 
-The OTD site currently lists the bus static dataset as 3464 stops, 543 routes, 16562 trips and 378324 stop-time records, last updated June 20, 2024. The realtime VehiclePositions feed is a separate live source.
+Pinned commit: `8d573d0c67cb8269b0fa16019d192a0e49172d4f`
 
-Route labels are never inferred from GPS coordinates, vehicle IDs, or route-number patterns. A realtime vehicle carries OTD's internal `trip.routeId`; United Delhi only attaches a public route label when that exact route ID exists in the official OTD static `routes.txt`. When there is no exact static match, the UI displays the internal ID (for example `ID 1547`) rather than inventing a public route number.
+Files bundled under `server/data/otd_gtfs/`:
+- routes.txt
+- trips.txt
+- stops.txt
+- stop_times.txt
+- agency.txt
+- calendar.txt
 
-The server stores the static feed identity in `static_feed_meta` and automatically refreshes the database when the configured GTFS source changes or the static data is incomplete.
+The snapshot contains 2,403 route records, 10,559 stops and 99,286 stop-time records. It is OTD-derived and is pinned so a changing upstream source cannot silently change the realtime route-ID mapping.
 
-The official OTD documentation notes that static `stop_times.txt` times are approximate, so journey-planning durations are not treated as live schedule guarantees.
+Realtime route identity is handled separately:
+1. OTD VehiclePositions provides the live `trip.routeId` and `trip.tripId`.
+2. United Delhi performs an exact lookup against the pinned OTD-derived operational routes/trips.
+3. Only the matching `route_short_name` is shown as the public route label.
+4. A missing match is shown as `LIVE`, never as `ID 684`, `684STL`, or another guessed public number.
+5. If the realtime route ID and trip-to-route mapping conflict, no public route label is attached.
+
+The pinned GTFS `route_color` field is intentionally **not used as a bus-livery colour**. The source generator synthesised those colours from route IDs, so keeping them would make the app display invented colours.
+
+The server also classifies live vehicles for map colouring:
+- `electric`: light blue for the verified Delhi electric-bus registration series `DL51EV` / `DL51GD`
+- `dtc`: green when the operational route is marked `DTC`
+- `cluster`: orange when the operational route is marked `DIMTS`
+- `unknown`: neutral gray
+
+These are service/category colours, not claims that every physical bus has exactly that paint scheme. The OTD realtime protobuf does not expose a verified per-vehicle livery-colour field.
+
+The database keeps the pinned operational dataset because the realtime route IDs are operational/internal IDs and do not equal the public route numbers. Do not replace the 2,403-route operational dataset with the separate 543-route public static listing without also redesigning the realtime route-ID mapping.
