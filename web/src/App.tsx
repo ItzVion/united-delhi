@@ -48,6 +48,7 @@ export default function App(){
   const[location,setLocation]=useState<Point|null>(null);
   const[locationStatus,setLocationStatus]=useState('');
   const[error,setError]=useState('');
+  const[locationRequesting,setLocationRequesting]=useState(false);
   const[detail,setDetail]=useState<any>(null);
   const[detailBusy,setDetailBusy]=useState(false);
   const[legendOpen,setLegendOpen]=useState(false);
@@ -56,21 +57,23 @@ export default function App(){
   useEffect(()=>{const pop=()=>setPage(parsePath());window.addEventListener('popstate',pop);return()=>window.removeEventListener('popstate',pop);},[]);
 
   const locate=useCallback(()=>{
+    if(locationRequesting)return;
     if(!navigator.geolocation){setLocationStatus('Location unavailable. Showing whole Delhi.');return;}
-    setLocationStatus('Finding your location…');
+    setLocationRequesting(true);setLocationStatus('Finding your location…');
     navigator.geolocation.getCurrentPosition(p=>{
       const next={lat:p.coords.latitude,lon:p.coords.longitude};
-      setLocation(next);
+      setLocation(next);setLocationRequesting(false);
       try{localStorage.setItem('ud-last-location',JSON.stringify(next));}catch{}
       setLocationStatus('');
     },()=>{
+      setLocationRequesting(false);
       try{
         const cached=JSON.parse(localStorage.getItem('ud-last-location')||'null');
         if(Number.isFinite(cached?.lat)&&Number.isFinite(cached?.lon)){setLocation({lat:cached.lat,lon:cached.lon});setLocationStatus('Using your last known location.');return;}
       }catch{}
       setLocationStatus('Location not available. Showing whole Delhi.');
     },{enableHighAccuracy:true,maximumAge:300000,timeout:20000});
-  },[]);
+  },[locationRequesting]);
 
   useEffect(()=>{if(accepted)locate();},[accepted,locate]);
 
