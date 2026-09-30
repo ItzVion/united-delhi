@@ -209,7 +209,7 @@ function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|
         if(Number.isFinite(p.lat)&&Number.isFinite(p.lon)){initial=[p.lat,p.lon];initialZoom=14;}
       }
     }catch{}
-    const map:any=L.map(el.current,{center:initial,zoom:initialZoom,scrollWheelZoom:true,zoomControl:true,minZoom:9,maxBounds:BOUNDS,maxBoundsViscosity:.85,attributionControl:true,preferCanvas:true});
+    const map:any=L.map(el.current,{center:initial,zoom:initialZoom,scrollWheelZoom:true,zoomControl:true,minZoom:9,maxBounds:BOUNDS,maxBoundsViscosity:.18,attributionControl:true,preferCanvas:true,inertia:true,inertiaDeceleration:1800,inertiaMaxSpeed:1800,bounceAtZoomLimits:false});
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true,attribution:'© OpenStreetMap contributors'}).addTo(map);
     userRef.current=L.layerGroup().addTo(map);
     const locate=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const b:any=L.DomUtil.create('button','map-locate');b.type='button';b.innerHTML='◎';b.title='Center on my location';L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',()=>{if(location)map.flyTo([location.lat,location.lon],14,{duration:1.0,easeLinearity:.2})});return b;}});
