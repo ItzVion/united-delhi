@@ -34,7 +34,21 @@ jobs:
           cache: npm
       - run: npm install
       - run: npm run typecheck
-      - run: npm run build
+      - name: Build web and capture log
+        shell: bash
+        run: |
+          set +e
+          npm run build > ../../web-build.log 2>&1
+          code=$?
+          cat ../../web-build.log
+          exit $code
+      - name: Upload web build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build-log
+          path: web-build.log
+          if-no-files-found: warn
       - run: npm audit --audit-level=high
   backend:
     runs-on: ubuntu-latest
