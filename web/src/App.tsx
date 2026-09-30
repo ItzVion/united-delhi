@@ -133,6 +133,8 @@ export default function App(){
 }
 
 function Status({label,tone}:{label:string;tone:'ok'|'muted'}){return <span className={'status '+tone}><i/>{label}</span>}
+function RouteBadge({name,routeColor,routeTextColor}:{name:string;routeColor?:string|null;routeTextColor?:string|null}){const bg=validHex(routeColor)?String(routeColor):'#00695C';const fg=validHex(routeTextColor)?String(routeTextColor):contrastText(bg);return <span className="route-badge" style={{backgroundColor:bg,color:fg}}>{name}</span>}
+function contrastText(bg:string){const h=bg.replace('#','');const rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.55?'#17313B':'#FFFFFF'}
 
 function SearchResults({loading,error,results,open,close}:{loading:boolean;error:string;results:any[];open:(x:any)=>void;close:()=>void}){
   return <section className="search-results">
@@ -140,9 +142,9 @@ function SearchResults({loading,error,results,open,close}:{loading:boolean;error
     {loading?<div className="empty-line">Searching…</div>:error?<div className="empty-line danger-text">{error}</div>:results.length?results.map((x:any,i:number)=>{
       const name=x.type==='route'?routeName(x.label||x.short_name):x.label;
       return <button className="search-result" key={x.type+x.id+i} onClick={()=>open(x)}>
-        <span className={x.type==='route'?'route-badge':'stop-square'}>{x.type==='route'?name:'●'}</span>
+        <>{x.type==='route'?<RouteBadge name={name} routeColor={x.routeColor} routeTextColor={x.routeTextColor}/>:<span className="stop-square">●</span>}</>
         <span className="result-copy"><b>{x.type==='route'?'Bus route':x.label}</b><small>{x.type==='route'?(x.fromStop||'Start')+' → '+(x.toStop||'Destination'):'Bus stop'}</small></span>
-        <span className="chevron" onClick={()=>open(x)}>›</span>
+        <span className="chevron">›</span>
       </button>
     }):<div className="empty-line">No matching routes or stops found.</div>}
   </section>;
@@ -197,7 +199,7 @@ function BusPreview({bus,go}:{bus:Vehicle;go:(path:string)=>void}){
   return <div className="bus-preview">
     <button className="preview-close" onClick={()=>go('/')}>×</button>
     <button className="preview-body" onClick={()=>go('/routes/'+encodeURIComponent(bus.routeId||''))}>
-      <span className="route-badge">{name}</span>
+      <RouteBadge name={name} routeColor={r.route_color} routeTextColor={r.route_text_color}/>
       <span><small>LIVE BUS</small><b>To {bus.toStop||'Destination'}</b><em>{bus.id} · {fresh(bus.observedAt)} · View route</em></span>
       <strong>›</strong>
     </button>
@@ -262,7 +264,7 @@ function Planner({go}:{go:(p:string)=>void}){
     {options.length?<h2 className="result-heading">{options.length} journey options</h2>:null}
     {options.map((o,i)=><div className={'flat-card journey '+(i===0?'featured':'')} key={i}>
       <div className="journey-top"><div><span className="eyebrow">{o.type==='direct'?'DIRECT BUS':'ONE CHANGE'}</span><strong>{o.durationMinutes} min</strong></div><span className="walk-tag">Walk {o.walkingMinutes} min</span></div>
-      {(o.legs||[]).map((l:any,j:number)=><div className="journey-leg" key={l.routeId+j}><span className="route-badge">{routeName(l.routeName)}</span><div><b>Bus {routeName(l.routeName)}</b><small>{l.fromStop} → {l.toStop}</small></div></div>)}
+      {(o.legs||[]).map((l:any,j:number)=><div className="journey-leg" key={l.routeId+j}><RouteBadge name={routeName(l.routeName)} routeColor={l.routeColor} routeTextColor={l.routeTextColor}/><div><b>Bus {routeName(l.routeName)}</b><small>{l.fromStop} → {l.toStop}</small></div></div>)}
       {o.transferStop?<div className="transfer">Change buses at {o.transferStop}</div>:null}
     </div>)}
     {!loading&&!error&&!options.length?<div className="empty-panel"><span className="empty-icon">↗</span><b>Where are you going?</b><p>Enter two Delhi stops or place names and United Delhi will find direct and one-change bus journeys.</p></div>:null}
@@ -285,8 +287,8 @@ function StopDetail({d,back}:{d:any;back:()=>void}){
   return <section className="screen">
     <div className="page-top"><button className="back-button" onClick={back}>‹</button><div><span className="eyebrow">BUS STOP</span><h1>{stop.name||'Bus stop'}</h1></div></div>
     <div className="flat-card stop-hero"><span className="square-icon">●</span><div><h2>{stop.name||'Bus stop'}</h2><p>{stop.stop_id||'DTC stop'}</p></div><Status label={arrivals.length?'Live':'Live unavailable'} tone={arrivals.length?'ok':'muted'}/></div>
-    <section className="flat-card detail-section"><div className="section-head-inline"><h2>Buses at this stop</h2><small>Updates every 30s</small></div>{arrivals.length?arrivals.map((a:any)=><button className="arrival-row" key={a.vehicleId||a.id} onClick={()=>backRoute('/routes/'+(a.routeId||''))}><span className="route-badge">{vehicleRoute(a as Vehicle)}</span><span className="row-copy"><b>{vehicleRoute(a as Vehicle)}</b><small>To {a.toStop||'Destination'} · {a.observedAgeSeconds<60?'Updated just now':'Updated '+Math.floor((a.observedAgeSeconds||0)/60)+' min ago'}</small></span><strong>{Math.round(a.distanceMeters||0)} m</strong></button>):<p className="muted">No live buses are reporting on these routes right now.</p>}</section>
-    <section className="flat-card detail-section"><div className="section-head-inline"><h2>Routes at this stop</h2><span className="count-box">{routes.length}</span></div>{routes.map((r:any)=><button className="route-row" key={r.route_id} onClick={()=>backRoute('/routes/'+encodeURIComponent(r.route_id))}><span className="route-badge">{routeName(r.short_name)}</span><span className="row-copy"><b>{r.fromStop||'Starting stop'}</b><small>to {r.toStop||'Ending stop'}</small></span><span className="chevron">›</span></button>)}</section>
+    <section className="flat-card detail-section"><div className="section-head-inline"><h2>Buses at this stop</h2><small>Updates every 30s</small></div>{arrivals.length?arrivals.map((a:any)=><button className="arrival-row" key={a.vehicleId||a.id} onClick={()=>backRoute('/routes/'+(a.routeId||''))}><RouteBadge name={vehicleRoute(a as Vehicle)} routeColor={a.routeColor} routeTextColor={a.routeTextColor}/><span className="row-copy"><b>{vehicleRoute(a as Vehicle)}</b><small>To {a.toStop||'Destination'} · {a.observedAgeSeconds<60?'Updated just now':'Updated '+Math.floor((a.observedAgeSeconds||0)/60)+' min ago'}</small></span><strong>{Math.round(a.distanceMeters||0)} m</strong></button>):<p className="muted">No live buses are reporting on these routes right now.</p>}</section>
+    <section className="flat-card detail-section"><div className="section-head-inline"><h2>Routes at this stop</h2><span className="count-box">{routes.length}</span></div>{routes.map((r:any)=><button className="route-row" key={r.route_id} onClick={()=>backRoute('/routes/'+encodeURIComponent(r.route_id))}><RouteBadge name={routeName(r.short_name)} routeColor={r.route_color} routeTextColor={r.route_text_color}/><span className="row-copy"><b>{r.fromStop||'Starting stop'}</b><small>to {r.toStop||'Ending stop'}</small></span><span className="chevron">›</span></button>)}</section>
   </section>;
 }
 
@@ -294,10 +296,10 @@ function RouteDetail({d,back}:{d:any;back:()=>void}){
   const r=d.route||{},stops=d.stops||[],buses=d.vehicles||[];const name=routeName(r.publicRouteName||r.short_name);
   return <section className="screen">
     <div className="page-top"><button className="back-button" onClick={back}>‹</button><div><span className="eyebrow">BUS ROUTE</span><h1>{name}</h1></div><Status label={buses.length?buses.length+' live':'No live buses'} tone={buses.length?'ok':'muted'}/></div>
-    <div className="flat-card route-hero"><span className="route-badge route-hero-badge">{name}</span><div className="direction-stack"><b>{r.fromStop||stops[0]?.name||'Starting stop'}</b><span><i/><b/><i/></span><b>{r.toStop||stops[stops.length-1]?.name||'Ending stop'}</b></div></div>
+    <div className="flat-card route-hero"><RouteBadge name={name} routeColor={r.route_color} routeTextColor={r.route_text_color}/><div className="direction-stack"><b>{r.fromStop||stops[0]?.name||'Starting stop'}</b><span><i/><b/><i/></span><b>{r.toStop||stops[stops.length-1]?.name||'Ending stop'}</b></div></div>
     <div className="route-map"><DtcMap vehicles={buses} location={null} onSelect={()=>{}}/><div className="map-topbar"><i/><b>{buses.length?buses.length+' live on route':'No live position on route'}</b></div><div className="map-attribution">© OpenStreetMap contributors</div></div>
     <div className="metric-row"><div><b>{stops.length}</b><small>stops</small></div><div><b>{buses.length}</b><small>live buses</small></div><div><b>DTC</b><small>service</small></div></div>
-    <section className="flat-card detail-section"><div className="section-head-inline"><div><h2>Live buses</h2><small>Fresh positions on this route</small></div><span className="count-box">{buses.length}</span></div>{buses.length?buses.slice(0,6).map((v:Vehicle)=><div className="arrival-row" key={v.id}><span className="route-badge">{name}</span><span className="row-copy"><b>Live bus · {v.id}</b><small>To {v.toStop||r.toStop||'Destination'} · {fresh(v.observedAt)}</small></span><strong>›</strong></div>):<p className="muted">No live buses on this exact route variant right now.</p>}</section>
+    <section className="flat-card detail-section"><div className="section-head-inline"><div><h2>Live buses</h2><small>Fresh positions on this route</small></div><span className="count-box">{buses.length}</span></div>{buses.length?buses.slice(0,6).map((v:Vehicle)=><div className="arrival-row" key={v.id}><RouteBadge name={name} routeColor={r.route_color} routeTextColor={r.route_text_color}/><span className="row-copy"><b>Live bus · {v.id}</b><small>To {v.toStop||r.toStop||'Destination'} · {fresh(v.observedAt)}</small></span><strong>›</strong></div>):<p className="muted">No live buses on this exact route variant right now.</p>}</section>
     <section className="flat-card detail-section"><div className="section-head-inline"><h2>Stops in order</h2><small>Tap a stop for live arrivals</small></div>{stops.map((s:any,i:number)=><button className="ordered-stop" key={s.stop_id} onClick={()=>backRoute('/stops/'+encodeURIComponent(s.stop_id))}><span className="timeline"><i/>{i<stops.length-1?<b/>:null}</span><span><small>{String(i+1).padStart(2,'0')}</small><b>{s.name}</b></span><span className="chevron">›</span></button>)}</section>
   </section>;
 }
