@@ -95,11 +95,14 @@ function loadOperationalMappings(){
   }
 }
 
-function serviceColorForAgency(agencyId){
+function classifyService(vehicleId,agencyId){
+  const id=String(vehicleId||'').trim().toUpperCase();
+  // Delhi EV bus registration series used by DTC.
+  if(/^DL51(?:EV|GD)/.test(id))return{type:'electric',color:'#81D4FA'};
   const agency=String(agencyId||'').trim().toUpperCase();
-  if(agency==='DIMTS')return '#F57C00';
-  if(agency==='DTC')return '#2E7D32';
-  return null;
+  if(agency==='DIMTS')return{type:'cluster',color:'#F57C00'};
+  if(agency==='DTC')return{type:'dtc',color:'#2E7D32'};
+  return{type:'unknown',color:'#607D8B'};
 }
 
 function resolveOperationalRoute(vehicle){
@@ -136,7 +139,7 @@ function entityToVehicle(entity){
   const timestamp=Number(vehicle.timestamp||0);
   const observedAt=timestamp>0?observedAtFromTimestamp(timestamp):new Date().toISOString();
   if(!observedAt)return null;
-  return{id,routeId,routeShortName:null,routeColor:null,routeTextColor:null,tripId,stopId,vehicleLabel:ok(descriptor.label)?boundedText(descriptor.label,120):null,licensePlate:ok(descriptor.licensePlate)?boundedText(descriptor.licensePlate,120):null,operator:null,serviceColor:null,latitude:lat,longitude:lon,bearing:normalizeBearing(position.bearing),observedAt};
+  return{id,routeId,routeShortName:null,routeColor:null,routeTextColor:null,tripId,stopId,vehicleLabel:ok(descriptor.label)?boundedText(descriptor.label,120):null,licensePlate:ok(descriptor.licensePlate)?boundedText(descriptor.licensePlate,120):null,operator:null,serviceType:'unknown',serviceColor:'#607D8B',latitude:lat,longitude:lon,bearing:normalizeBearing(position.bearing),observedAt};
 }
 async function getRealtimeVehicles(){
   const relayUrl = String(process.env.DTC_REALTIME_RELAY_URL || '').trim();
@@ -192,10 +195,12 @@ async function getRealtimeVehicles(){
     });
     for(const v of vehicles){
       const operational=resolveOperationalRoute(v);
+      const service=classifyService(v.id,operational?.agencyId);
+      v.serviceType=service.type;
+      v.serviceColor=service.color;
       if(operational){
         v.routeShortName=operational.shortName;
         v.operator=operational.agencyId;
-        v.serviceColor=serviceColorForAgency(operational.agencyId);
       }
     }
 
