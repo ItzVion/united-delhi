@@ -85,11 +85,10 @@ export default function HomeScreen(){
     const center=bounds
       ? {lat:(bounds.south+bounds.north)/2,lon:(bounds.west+bounds.east)/2}
       : {lat:location?.coords.latitude??DELHI.latitude,lon:location?.coords.longitude??DELHI.longitude};
-    const visible=bounds?vehicles.filter(v=>v.latitude>=bounds.south&&v.latitude<=bounds.north&&v.longitude>=bounds.west&&v.longitude<=bounds.east):vehicles;
     const payload={
       center,
       stops:nearbyStops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
-      buses:visible.flatMap(v=>{
+      buses:vehicles.flatMap(v=>{
         const route=displayRouteName(v.routeShortName);
         if(!route || !v.routeId) return [];
         const c=resolveRouteColor(route,v.routeColor,v.routeTextColor);
@@ -235,7 +234,7 @@ window.updateMap=function(data){
  stopLayer.clearLayers();busLayer.clearLayers();userLayer.clearLayers();busMarkers.clear();currentLocation=data.location||null;
  const stopIcon=L.divIcon({className:'',html:'<div class="stop-label"></div>',iconSize:[14,14],iconAnchor:[7,7]});
  data.stops.forEach(s=>{const popup=document.createElement('div'),title=document.createElement('b'),button=document.createElement('button');title.textContent=s.name;button.textContent='View stop';button.type='button';button.style.marginTop='6px';button.onclick=()=>openStop(s.id);popup.append(title,document.createElement('br'),button);L.marker([s.lat,s.lon],{icon:stopIcon,zIndexOffset:300}).addTo(stopLayer).bindPopup(popup);});
- data.buses.forEach(v=>{const bg=validColor(v.color)?v.color:'#f28c28',fg=validColor(v.textColor)?v.textColor:'#fff';const marker=L.marker([v.lat,v.lon],{zIndexOffset:700,icon:L.divIcon({className:'',html:'<div class="bus-pin" style="background:'+bg+';color:'+fg+'"><span>'+escapeHtml(v.route)+'</span></div>',iconSize:[34,34],iconAnchor:[17,17]})});marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);busMarkers.set(v.id,marker);});
+ data.buses.forEach(v=>{const bg=validColor(v.color)?v.color:'#7aae4b';const marker=L.circleMarker([v.lat,v.lon],{radius:7,weight:2,color:'#fff',fillColor:bg,fillOpacity:1,opacity:1});marker.bindTooltip(escapeHtml(v.route),{direction:'top',offset:[0,-8]});marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);busMarkers.set(v.id,marker);});
  if(currentLocation)L.circleMarker([currentLocation.lat,currentLocation.lon],{radius:9,color:'#fff',weight:3,fillColor:'#0b746b',fillOpacity:1}).addTo(userLayer);
 };
 function centerOnUser(){if(currentLocation)map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.2,easeLinearity:.2});}
