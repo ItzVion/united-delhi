@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
@@ -25,6 +25,9 @@ const SERVICE_COLORS={dtc:BUS_COLORS.cngNonAcGreen,cluster:BUS_COLORS.evDeviOran
 
 export default function HomeScreen(){
   const navigation=useNavigation<Nav>();
+  const { width:windowWidth }=useWindowDimensions();
+  const contentWidth=Math.min(windowWidth,760);
+  const mapHeight=Math.min(380,Math.max(275,contentWidth*0.36));
   const mapRef=useRef<WebView|null>(null);
   const [location,setLocation]=useState<Location.LocationObject|null>(null);
   const [locationStatus,setLocationStatus]=useState('Finding your location…');
@@ -278,7 +281,7 @@ function renderBuses(){
  lastBusData.forEach(v=>{const lat=Number(v.lat),lon=Number(v.lon);if(!Number.isFinite(lat)||!Number.isFinite(lon)||!bounds.contains([lat,lon]))return;visible.set(v.id,v);});
  for(const [id,marker] of busMarkers){if(!visible.has(id)){const frame=busAnimations.get(marker);if(frame)cancelAnimationFrame(frame);busAnimations.delete(marker);busLayer.removeLayer(marker);busMarkers.delete(id);}}
  for(const [id,v] of visible){
-   const bg=validColor(v.color)?v.color:'#607D8B';
+   const bg=validColor(v.color)?v.color:'#3D82CE';
    const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
    const existing=busMarkers.get(id);
    if(existing){
@@ -310,14 +313,14 @@ function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':
 }
 const styles=StyleSheet.create({
  safe:{flex:1,backgroundColor:colors.background},
- scroll:{paddingHorizontal:16,paddingTop:7,paddingBottom:24},
+ scroll:{width:'100%',maxWidth:760,alignSelf:'center',paddingHorizontal:16,paddingTop:7,paddingBottom:24},
  header:{height:64,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
  brandRow:{flexDirection:'row',alignItems:'center'},brandCopy:{marginLeft:9},brand:{fontSize:18,fontWeight:'900',letterSpacing:1,color:colors.text},tagline:{fontSize:9,color:colors.textMuted,marginTop:2},
  search:{height:48,borderRadius:0,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,flexDirection:'row',alignItems:'center',paddingHorizontal:13,marginTop:7},
  searchIcon:{fontSize:23,color:colors.text,marginRight:8},searchInput:{flex:1,fontSize:13,color:colors.text,paddingVertical:0},searchKey:{fontSize:20,fontWeight:'800',color:colors.textMuted,paddingHorizontal:3},
  searchResults:{marginTop:7,borderRadius:0,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,overflow:'hidden'},searchResult:{minHeight:52,paddingHorizontal:12,paddingVertical:9,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderBottomColor:colors.border},searchBadge:{minWidth:48,height:30,borderRadius:0,alignItems:'center',justifyContent:'center',paddingHorizontal:6},searchBadgeText:{fontSize:10,fontWeight:'900'},searchStopIcon:{width:30,height:30,borderRadius:0,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},searchStopDot:{fontSize:9,color:colors.accent},searchCopy:{flex:1,marginLeft:9},searchTitle:{fontSize:11,fontWeight:'900',color:colors.text},searchMeta:{fontSize:9,color:colors.textMuted,marginTop:2},searchArrow:{fontSize:21,color:colors.textMuted},searchEmpty:{padding:13,fontSize:10,color:colors.textMuted},searchError:{padding:13,fontSize:10,color:colors.danger},
  sectionLine:{paddingHorizontal:2,paddingTop:13,paddingBottom:7,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionKicker:{fontSize:10,fontWeight:'900',letterSpacing:1.1,color:colors.textMuted},locationLink:{fontSize:11,fontWeight:'900',color:colors.accent},
- mapCard:{height:275,borderRadius:0,overflow:'hidden',borderWidth:1,borderColor:colors.border,backgroundColor:'#eef2f1'},map:{flex:1},
+ mapCard:{height:mapHeight,borderRadius:0,overflow:'hidden',borderWidth:1,borderColor:colors.border,backgroundColor:'#eef2f1'},map:{flex:1},
  mapTop:{position:'absolute',left:10,top:10,flexDirection:'row',alignItems:'center',backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:9,paddingVertical:6,borderRadius:0},liveDot:{width:7,height:7,borderRadius:0,backgroundColor:colors.success,marginRight:6},mapTopText:{fontSize:10,fontWeight:'900',color:colors.text},mapAttribution:{position:'absolute',right:7,bottom:6,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:5,paddingVertical:2,borderRadius:0},mapAttributionText:{fontSize:7,color:'#52625f'},mapLegend:{position:'absolute',left:7,bottom:7,flexDirection:'row',gap:7,backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:7,paddingVertical:5,borderRadius:0,borderWidth:1,borderColor:colors.border},legendItem:{flexDirection:'row',alignItems:'center',gap:3},legendDot:{width:7,height:7,borderRadius:0},legendText:{fontSize:8,fontWeight:'800',color:colors.text},
  locationNotice:{position:'absolute',left:10,right:10,bottom:10,padding:9,borderRadius:0,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,flexDirection:'row',justifyContent:'space-between'},
  busPreview:{position:'absolute',left:9,right:9,bottom:9,borderRadius:0,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,shadowColor:'#17312F',shadowOpacity:.14,shadowRadius:12,shadowOffset:{width:0,height:4},elevation:6},
@@ -336,5 +339,5 @@ const styles=StyleSheet.create({
  stopCard:{flexDirection:'row',alignItems:'center',padding:11,borderRadius:0,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,marginBottom:7},stopIcon:{width:34,height:34,borderRadius:0,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},stopIconText:{fontSize:10,color:colors.accent},stopCopy:{flex:1,marginLeft:10},stopName:{fontSize:13,fontWeight:'800',color:colors.text},stopDistance:{fontSize:10,color:colors.textMuted,marginTop:2},arrow:{fontSize:24,color:colors.textMuted,marginLeft:7},
  emptyCard:{padding:18,borderRadius:0,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},emptyTitle:{fontSize:13,fontWeight:'900',color:colors.text},emptyText:{fontSize:11,color:colors.textMuted,marginTop:3},
  legal:{alignItems:'center',paddingVertical:18},legalText:{fontSize:10,fontWeight:'800',color:colors.textMuted},
- bottomNav:{height:64,borderTopWidth:1,borderTopColor:colors.border,backgroundColor:colors.surface,flexDirection:'row',alignItems:'center',justifyContent:'space-around',paddingBottom:4},bottomItem:{width:72,alignItems:'center'},bottomIcon:{fontSize:19,fontWeight:'900'},bottomLabel:{fontSize:9,fontWeight:'800',marginTop:3}
+ bottomNav:{width:'100%',maxWidth:760,alignSelf:'center',height:64,borderTopWidth:1,borderTopColor:colors.border,backgroundColor:colors.surface,flexDirection:'row',alignItems:'center',justifyContent:'space-around',paddingBottom:4},bottomItem:{width:72,alignItems:'center'},bottomIcon:{fontSize:19,fontWeight:'900'},bottomLabel:{fontSize:9,fontWeight:'800',marginTop:3}
 });
