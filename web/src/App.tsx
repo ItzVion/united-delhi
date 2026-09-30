@@ -50,6 +50,7 @@ export default function App(){
   const[error,setError]=useState('');
   const[detail,setDetail]=useState<any>(null);
   const[detailBusy,setDetailBusy]=useState(false);
+  const[legendOpen,setLegendOpen]=useState(false);
 
   const go=useCallback((path:string)=>{window.history.pushState({},'',path);setPage(parsePath(path));setSearchOpen(false);setError('');window.scrollTo(0,0);},[]);
   useEffect(()=>{const pop=()=>setPage(parsePath());window.addEventListener('popstate',pop);return()=>window.removeEventListener('popstate',pop);},[]);
@@ -57,7 +58,18 @@ export default function App(){
   const locate=useCallback(()=>{
     if(!navigator.geolocation){setLocationStatus('Location unavailable. Showing whole Delhi.');return;}
     setLocationStatus('Finding your location…');
-    navigator.geolocation.getCurrentPosition(p=>{setLocation({lat:p.coords.latitude,lon:p.coords.longitude});setLocationStatus('');},()=>setLocationStatus('Location not available. Showing whole Delhi.'),{enableHighAccuracy:false,maximumAge:120000,timeout:15000});
+    navigator.geolocation.getCurrentPosition(p=>{
+      const next={lat:p.coords.latitude,lon:p.coords.longitude};
+      setLocation(next);
+      try{localStorage.setItem('ud-last-location',JSON.stringify(next));}catch{}
+      setLocationStatus('');
+    },()=>{
+      try{
+        const cached=JSON.parse(localStorage.getItem('ud-last-location')||'null');
+        if(Number.isFinite(cached?.lat)&&Number.isFinite(cached?.lon)){setLocation({lat:cached.lat,lon:cached.lon});setLocationStatus('Using your last known location.');return;}
+      }catch{}
+      setLocationStatus('Location not available. Showing whole Delhi.');
+    },{enableHighAccuracy:true,maximumAge:300000,timeout:20000});
   },[]);
 
   useEffect(()=>{if(accepted)locate();},[accepted,locate]);
@@ -133,7 +145,7 @@ export default function App(){
       {searchOpen&&q.trim().length>=2?<SearchResults loading={searchBusy} error={searchError} results={searchResults} go={go}/>:null}
       {error?<div className="error-box"><b>Live data issue</b><span>{error}</span></div>:null}
 
-      {page.kind==='home'?<Home vehicles={vehicles} location={location} locationStatus={locationStatus} locate={locate} go={go}/>
+      {page.kind==='home'?<Home vehicles={vehicles} location={location} locationStatus={locationStatus} locate={locate} go={go} onLegend={()=>setLegendOpen(true)}/>
        :page.kind==='plan'?<Planner go={go}/>
        :page.kind==='legal'?<Legal go={go}/>
        :page.kind==='privacy'?<Privacy go={go}/>
@@ -164,7 +176,7 @@ function SearchResults({loading,error,results,go}:{loading:boolean;error:string;
   </section>;
 }
 
-function Home({vehicles,location,locationStatus,locate,go}:{vehicles:Vehicle[];location:Point|null;locationStatus:string;locate:()=>void;go:(path:string)=>void}){
+function Home({vehicles,location,locationStatus,locate,go,onLegend}:{vehicles:Vehicle[];location:Point|null;locationStatus:string;locate:()=>void;go:(path:string)=>void;onLegend:()=>void}){
   const[stops,setStops]=useState<any[]>([]);
   const[selected,setSelected]=useState<Vehicle|null>(null);
 
@@ -178,7 +190,7 @@ function Home({vehicles,location,locationStatus,locate,go}:{vehicles:Vehicle[];l
   return <>
     <section className="section-line live-section"><span className="eyebrow">LIVE TRANSIT</span><button className="text-button" onClick={locate}>{location?'Recenter':'Use my location'}</button></section>
     <div className="map-card">
-      <DtcMap vehicles={vehicles} location={location} onSelect={setSelected}/>
+      <DtcMap vehicles={vehicles} location={location} onSelect={setSelected} onLegend={onLegend}/>
       <div className="map-topbar"><i/><b>{vehicles.length?vehicles.length+' buses live':'Checking live buses'}</b></div>
       <div className="map-attribution">© OpenStreetMap contributors</div><div className="map-legend"><span><i style={{background:BUS_COLORS.cngNonAcGreen}}/>DTC</span><span><i style={{background:BUS_COLORS.evDeviOrange}}/>Cluster</span><span><i style={{background:BUS_COLORS.evAc}}/>Electric</span></div>
       {selected?<BusPreview bus={selected} go={go}/>:null}
@@ -196,7 +208,31 @@ function Home({vehicles,location,locationStatus,locate,go}:{vehicles:Vehicle[];l
   </>;
 }
 
-function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|null;onSelect:(v:Vehicle)=>void}){
+
+function BusLegend({open,onClose}:{open:boolean;onClose:()=>void}){
+  if(!open)return null;
+  const rows=[
+    [['#2FAFBC','EV AC (12 mtr)']],
+    [['#E57D43','EV DEVI AC (9 mtr)'],['#168F49','EV DEVI AC (9 mtr)']],
+    [['#3D82CE','CNG AC (12 mtr)'],['#E35F67','CNG AC (12 mtr)']],
+    [['#E5A16E','CNG NonAC (12 mtr)'],['#24C88B','CNG NonAC (12 mtr)']]
+  ];
+  return <div className="legend-overlay" role="dialog" aria-modal="true" aria-label="Bus Color Legend" onClick={onClose}>
+    <div className="legend-dialog" onClick={e=>e.stopPropagation()}>
+      <div className="legend-title">Bus Color Legend</div>
+      <div className="legend-head"><span>Bus Icon</span><span>Type</span></div>
+      <div className="legend-body">
+        {rows.map((row,i)=><div className="legend-row" key={i}>
+          <div className="legend-icons">{row.map(([color],j)=><span className="legend-bus" style={{background:color}} key={j}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="white" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round"/></svg></span>)}</div>
+          <span className="legend-type">{row[0][1]}</span>
+        </div>)}
+      </div>
+      <button className="legend-close" onClick={onClose}>Got it</button>
+    </div>
+  </div>;
+}
+
+function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];location:Point|null;onSelect:(v:Vehicle)=>void;onLegend:()=>void}){
   const el=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<any>(null);
   const markersRef=useRef<Map<string,any>>(new Map());
@@ -221,6 +257,8 @@ function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|
     userRef.current=L.layerGroup().addTo(map);
     const locate=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const b:any=L.DomUtil.create('button','map-locate');b.type='button';b.innerHTML='◎';b.title='Center on my location';L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',()=>{if(location)map.flyTo([location.lat,location.lon],14,{duration:1.0,easeLinearity:.2})});return b;}});
     map.addControl(new locate());
+    const legendControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const b:any=L.DomUtil.create('button','map-legend-control');b.type='button';b.title='Bus color legend';b.setAttribute('aria-label','Bus color legend');b.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',onLegend);return b;}});
+    map.addControl(new legendControl());
 
     const renderVisible=()=>{
       const visible=new Map<string,Vehicle>();
