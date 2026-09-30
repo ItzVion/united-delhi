@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -18,15 +18,31 @@ export default function PlannerScreen() {
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState<TripPlanOption[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [fromSuggestions, setFromSuggestions] = useState<{id:string;label:string}[]>([]);
+  const [toSuggestions, setToSuggestions] = useState<{id:string;label:string}[]>([]);
+  const [fromFocus, setFromFocus] = useState(false);
+  const [toFocus, setToFocus] = useState(false);
 
+  useEffect(() => {
+    const value=from.trim();
+    if(value.length<2){setFromSuggestions([]);return;}
+    const timer=setTimeout(async()=>{try{const r=await api.search(value);setFromSuggestions((r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label})));}catch{setFromSuggestions([]);}},180);
+    return()=>clearTimeout(timer);
+  },[from]);
+  useEffect(() => {
+    const value=to.trim();
+    if(value.length<2){setToSuggestions([]);return;}
+    const timer=setTimeout(async()=>{try{const r=await api.search(value);setToSuggestions((r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label})));}catch{setToSuggestions([]);}},180);
+    return()=>clearTimeout(timer);
+  },[to]);
   const swap = () => { const value = from; setFrom(to); setTo(value); };
 
   const plan = async () => {
     if (from.trim().length < 2 || to.trim().length < 2) {
-      setError('Enter both a starting place and destination.');
+      setError('Select a starting bus stop and destination.');
       return;
     }
-    setLoading(true); setError(null); setOptions([]);
+    setLoading(true); setError(null); setOptions([]); setFromFocus(false); setToFocus(false);
     try {
       const result = await api.plan(from.trim(), to.trim());
       if (result.status === 'OK') setOptions(result.options);
@@ -55,10 +71,16 @@ export default function PlannerScreen() {
             <View style={styles.rail}><View style={styles.originDot}/><View style={styles.railLine}/><View style={styles.destinationDot}/></View>
             <View style={styles.fields}>
               <Text style={styles.fieldLabel}>FROM</Text>
-              <TextInput value={from} onChangeText={setFrom} placeholder="Starting stop or place" placeholderTextColor={colors.textMuted} style={styles.input}/>
+              <View style={styles.inputWrap}>
+                <TextInput value={from} onFocus={()=>setFromFocus(true)} onChangeText={value=>{setFrom(value);setFromFocus(true);}} placeholder="Starting stop or place" placeholderTextColor={colors.textMuted} style={styles.input}/>
+                {fromFocus && fromSuggestions.length>0 ? <View style={styles.suggestions}>{fromSuggestions.map(s=><Pressable key={s.id} style={styles.suggestion} onPress={()=>{setFrom(s.label);setFromSuggestions([]);setFromFocus(false);}}><View style={styles.suggestionIcon}><Text style={styles.suggestionDot}>●</Text></View><View style={styles.suggestionCopy}><Text style={styles.suggestionTitle} numberOfLines={1}>{s.label}</Text><Text style={styles.suggestionMeta}>Bus stop · {s.id}</Text></View><Text style={styles.suggestionArrow}>›</Text></Pressable>)}</View> : null}
+              </View>
               <View style={styles.divider}/>
               <Text style={styles.fieldLabel}>TO</Text>
-              <TextInput value={to} onChangeText={setTo} placeholder="Where do you want to go?" placeholderTextColor={colors.textMuted} style={styles.input}/>
+              <View style={styles.inputWrap}>
+                <TextInput value={to} onFocus={()=>setToFocus(true)} onChangeText={value=>{setTo(value);setToFocus(true);}} placeholder="Where do you want to go?" placeholderTextColor={colors.textMuted} style={styles.input}/>
+                {toFocus && toSuggestions.length>0 ? <View style={styles.suggestions}>{toSuggestions.map(s=><Pressable key={s.id} style={styles.suggestion} onPress={()=>{setTo(s.label);setToSuggestions([]);setToFocus(false);}}><View style={styles.suggestionIcon}><Text style={styles.suggestionDot}>●</Text></View><View style={styles.suggestionCopy}><Text style={styles.suggestionTitle} numberOfLines={1}>{s.label}</Text><Text style={styles.suggestionMeta}>Bus stop · {s.id}</Text></View><Text style={styles.suggestionArrow}>›</Text></Pressable>)}</View> : null}
+              </View>
             </View>
             <Pressable onPress={swap} style={styles.swap}><Text style={styles.swapText}>↕</Text></Pressable>
           </View>
@@ -106,6 +128,10 @@ export default function PlannerScreen() {
 
 const styles=StyleSheet.create({
  safe:{flex:1,backgroundColor:colors.background},content:{paddingBottom:32},
+ inputWrap:{position:'relative',zIndex:10},
+ suggestions:{position:'absolute',left:0,right:0,top:39,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,zIndex:100,elevation:12,shadowColor:'#000',shadowOpacity:.12,shadowRadius:8,shadowOffset:{width:0,height:3}},
+ suggestion:{minHeight:50,paddingHorizontal:9,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderBottomColor:colors.border},
+ suggestionIcon:{width:28,height:28,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},suggestionDot:{fontSize:8,color:colors.accent},suggestionCopy:{flex:1,marginLeft:8},suggestionTitle:{fontSize:11,fontWeight:'800',color:colors.text},suggestionMeta:{fontSize:9,color:colors.textMuted,marginTop:2},suggestionArrow:{fontSize:20,color:colors.textMuted},
  header:{paddingHorizontal:18,paddingTop:8,paddingBottom:14,flexDirection:'row',alignItems:'center'},back:{width:42,height:42,alignItems:'center',justifyContent:'center'},backText:{fontSize:36,color:colors.text,lineHeight:40},headerCopy:{marginLeft:2},eyebrow:{fontSize:10,fontWeight:'900',letterSpacing:1,color:colors.accent},title:{fontSize:24,fontWeight:'900',color:colors.text,marginTop:2},subtitle:{fontSize:12,color:colors.textMuted,marginTop:2},
  form:{marginHorizontal:18,padding:16,borderRadius:0,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},
  fieldRow:{flexDirection:'row'},rail:{width:20,alignItems:'center',paddingTop:7},originDot:{width:9,height:9,borderRadius:0,borderWidth:2,borderColor:colors.accent,backgroundColor:colors.surface},destinationDot:{width:9,height:9,borderRadius:0,backgroundColor:colors.secondary},railLine:{width:2,flex:1,backgroundColor:colors.border,marginVertical:4},fields:{flex:1},fieldLabel:{fontSize:9,fontWeight:'900',letterSpacing:1,color:colors.textMuted},input:{height:38,fontSize:15,color:colors.text,fontWeight:'700'},divider:{height:1,backgroundColor:colors.border,marginVertical:5},swap:{width:38,height:38,borderRadius:0,backgroundColor:colors.surfaceAlt,alignItems:'center',justifyContent:'center',marginLeft:7,marginTop:15},swapText:{fontSize:20,fontWeight:'900',color:colors.accent},
