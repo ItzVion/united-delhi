@@ -115,7 +115,7 @@ export default function App(){
       {searchOpen&&q.trim().length>=2?<SearchResults loading={searchLoading} error={searchError} results={results} open={openResult} close={()=>setSearchOpen(false)}/>:null}
       {error?<div className="error-box">{error}</div>:null}
 
-      {page.kind==='home'?<Home vehicles={vehicles} location={location} locationStatus={locationStatus} requestLocation={requestLocation} open={openResult}/>
+      {page.kind==='home'?<Home vehicles={vehicles} location={location} locationStatus={locationStatus} requestLocation={requestLocation} go={go}/>
        :page.kind==='plan'?<Planner go={go}/>
        :page.kind==='legal'?<Legal go={go}/>
        :page.kind==='privacy'?<PrivacyPage go={go}/>
@@ -139,7 +139,7 @@ function SearchResults({loading,error,results,open,close}:{loading:boolean;error
     <div className="section-line"><b>Search results</b><button className="text-button" onClick={close}>Close</button></div>
     {loading?<div className="empty-line">Searching…</div>:error?<div className="empty-line danger-text">{error}</div>:results.length?results.map((x:any,i:number)=>{
       const name=x.type==='route'?routeName(x.label||x.short_name):x.label;
-      return <button className="search-result" key={x.type+x.id+i}>
+      return <button className="search-result" key={x.type+x.id+i} onClick={()=>open(x)}>
         <span className={x.type==='route'?'route-badge':'stop-square'}>{x.type==='route'?name:'●'}</span>
         <span className="result-copy"><b>{x.type==='route'?'Bus route':x.label}</b><small>{x.type==='route'?(x.fromStop||'Start')+' → '+(x.toStop||'Destination'):'Bus stop'}</small></span>
         <span className="chevron" onClick={()=>open(x)}>›</span>
@@ -148,7 +148,7 @@ function SearchResults({loading,error,results,open,close}:{loading:boolean;error
   </section>;
 }
 
-function Home({vehicles,location,locationStatus,requestLocation,open}:{vehicles:Vehicle[];location:{lat:number;lon:number}|null;locationStatus:string;requestLocation:()=>void;open:(x:any)=>void}){
+function Home({vehicles,location,locationStatus,requestLocation,go}:{vehicles:Vehicle[];location:{lat:number;lon:number}|null;locationStatus:string;requestLocation:()=>void;go:(path:string)=>void}){
   const [stops,setStops]=useState<any[]>([]);
   const [selectedBus,setSelectedBus]=useState<Vehicle|null>(null);
 
@@ -169,13 +169,13 @@ function Home({vehicles,location,locationStatus,requestLocation,open}:{vehicles:
       <DtcMap vehicles={vehicles} location={location} onSelect={setSelectedBus}/>
       <div className="map-topbar"><i/><b>{vehicles.length?vehicles.length+' buses live':'Checking live buses'}</b></div>
       <div className="map-attribution">© OpenStreetMap contributors</div>
-      {selectedBus?<BusPreview bus={selectedBus}/>:null}
+      {selectedBus?<BusPreview bus={selectedBus} go={go}/>:null}
     </div>
 
     {locationStatus?<button className="location-notice" onClick={requestLocation}><span>{locationStatus}</span><b>Retry</b></button>:null}
 
     <div className="quick-row">
-      <button className="quick-card" onClick={()=>window.history.pushState({},'', '/plan')}><span className="quick-icon">↗</span><b>Plan trip</b><small>Find your bus</small></button>
+      <button className="quick-card" onClick={()=>go('/plan')}><span className="quick-icon">↗</span><b>Plan trip</b><small>Find your bus</small></button>
       <button className="quick-card" onClick={requestLocation}><span className="quick-icon location">◎</span><b>Location</b><small>{location?'Recenter map':'Use my location'}</small></button>
     </div>
 
@@ -184,19 +184,19 @@ function Home({vehicles,location,locationStatus,requestLocation,open}:{vehicles:
       <button className="text-button" onClick={requestLocation}>{location?'Recenter':'Use location'}</button>
     </section>
 
-    {stops.length?stops.slice(0,4).map((s:any)=><button className="stop-card" key={s.stop_id} onClick={()=>window.history.pushState({},'', '/stops/'+encodeURIComponent(s.stop_id))}>
+    {stops.length?stops.slice(0,4).map((s:any)=><button className="stop-card" key={s.stop_id} onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}>
       <span className="stop-icon">●</span><span className="stop-copy"><b>{s.name}</b><small>{s.distance_m!=null?Math.round(s.distance_m)+' m away':'Nearby stop'}</small></span><span className="chevron">›</span>
     </button>):<div className="flat-card empty-stop"><b>No nearby stops yet</b><small>Location is optional; use the map or enable location to find nearby stops.</small></div>}
 
-    <button className="legal-link" onClick={()=>window.history.pushState({},'', '/legal')}>Legal & privacy</button>
+    <button className="legal-link" onClick={()=>go('/legal')}>Legal & privacy</button>
   </>;
 }
 
-function BusPreview({bus}:{bus:Vehicle}){
+function BusPreview({bus,go}:{bus:Vehicle;go:(path:string)=>void}){
   const name=vehicleRoute(bus);
   return <div className="bus-preview">
-    <button className="preview-close" onClick={()=>window.history.back()}>×</button>
-    <button className="preview-body" onClick={()=>window.location.href='/routes/'+encodeURIComponent(bus.routeId||'')}>
+    <button className="preview-close" onClick={()=>go('/')}>×</button>
+    <button className="preview-body" onClick={()=>go('/routes/'+encodeURIComponent(bus.routeId||''))}>
       <span className="route-badge">{name}</span>
       <span><small>LIVE BUS</small><b>To {bus.toStop||'Destination'}</b><em>{bus.id} · {fresh(bus.observedAt)} · View route</em></span>
       <strong>›</strong>
