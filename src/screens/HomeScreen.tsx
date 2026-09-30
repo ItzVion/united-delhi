@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { api, Stop, Vehicle } from '../api/client';
+import { api, SearchResult, Stop, Vehicle } from '../api/client';
 import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
@@ -30,6 +30,10 @@ export default function HomeScreen(){
   const [mapReady,setMapReady]=useState(false);
   const [bounds,setBounds]=useState<MapBounds|null>(null);
   const [selectedBus,setSelectedBus]=useState<Vehicle|null>(null);
+  const [searchQuery,setSearchQuery]=useState('');
+  const [searchResults,setSearchResults]=useState<SearchResult[]>([]);
+  const [searchLoading,setSearchLoading]=useState(false);
+  const [searchError,setSearchError]=useState<string|null>(null);
 
   const requestLocation=useCallback(async()=>{
     if(!(await confirmLocationUse())){setLocationStatus('Showing Delhi without your location.');return;}
@@ -74,6 +78,8 @@ export default function HomeScreen(){
   useEffect(()=>{if(location)void loadNearby(location.coords.latitude,location.coords.longitude);},[location,loadNearby]);
   useEffect(()=>{void loadVehicles();const id=setInterval(()=>void loadVehicles(),15000);return()=>clearInterval(id);},[loadVehicles]);
 
+  useEffect(()=>{const value=searchQuery.trim();if(value.length<2){setSearchResults([]);setSearchError(null);setSearchLoading(false);return;}let cancelled=false;setSearchLoading(true);setSearchError(null);const timer=setTimeout(async()=>{try{const result=await api.search(value);if(!cancelled){const seen=new Set<string>();const cleaned=(result.status==='OK'?result.results:[]).filter(item=>{const key=item.type+'|'+item.id+'|'+item.label.toLowerCase();if(seen.has(key))return false;seen.add(key);return true}).slice(0,12);setSearchResults(cleaned);}}catch(e){if(!cancelled){setSearchResults([]);setSearchError((e as Error).message||'Search is temporarily unavailable.');}}finally{if(!cancelled)setSearchLoading(false);}},220);return()=>{cancelled=true;clearTimeout(timer);};},[searchQuery]);
+
   useEffect(()=>{
     if(!mapReady)return;
     const center=bounds
@@ -105,11 +111,18 @@ export default function HomeScreen(){
         <StatusPill label={liveLabel} tone={fresh==='ok'?'ok':fresh==='unavailable'?'danger':fresh==='stale'?'muted':'muted'}/>
       </View>
 
-      <Pressable style={styles.search} onPress={()=>navigation.navigate('Search')}>
+      <View style={styles.search}>
         <Text style={styles.searchIcon}>⌕</Text>
-        <Text style={styles.searchText}>Search routes, stops or places</Text>
-        <Text style={styles.searchKey}>⌘</Text>
-      </Pressable>
+        <TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="Search routes, stops or places" placeholderTextColor={colors.textMuted} style={styles.searchInput} autoCorrect={false} returnKeyType="search"/>
+        {searchLoading?<ActivityIndicator size="small" color={colors.accent}/>:null}
+        {searchQuery?<Pressable onPress={()=>setSearchQuery('')}><Text style={styles.searchKey}>×</Text></Pressable>:null}
+      </View>
+      {searchQuery.trim().length>=2?<View style={styles.searchResults}>
+        {searchError?<Text style={styles.searchError}>{searchError}</Text>:searchResults.length?searchResults.map((item,index)=>{const name=item.type==='route'?(displayRouteName(item.label)||item.label):item.label;const rc=item.type==='route'?resolveRouteColor(name,item.routeColor,item.routeTextColor):null;return <Pressable key={item.type+'-'+item.id+'-'+index} style={styles.searchResult} onPress={()=>item.type==='stop'?navigation.navigate('StopDetails',{stopId:item.id,stopName:item.label}):navigation.navigate('RouteDetails',{routeId:item.id,label:item.label})}>
+          {item.type==='route'?<View style={[styles.searchBadge,{backgroundColor:rc?.background}]}><Text style={[styles.searchBadgeText,{color:rc?.text}]}>{name}</Text></View>:<View style={styles.searchStopIcon}><Text style={styles.searchStopDot}>●</Text></View>}
+          <View style={styles.searchCopy}><Text style={styles.searchTitle} numberOfLines={1}>{item.type==='route'?'Bus route':item.label}</Text><Text style={styles.searchMeta} numberOfLines={1}>{item.type==='route'?(item.fromStop||'Start')+' → '+(item.toStop||'Destination'):'Bus stop'}</Text></View><Text style={styles.searchArrow}>›</Text>
+        </Pressable>}):<Text style={styles.searchEmpty}>{searchLoading?'Searching…':'No matching routes or stops found.'}</Text>}
+      </View>:null}
 
       <View style={styles.sectionLine}>
         <Text style={styles.sectionKicker}>LIVE TRANSIT</Text>
@@ -170,14 +183,13 @@ export default function HomeScreen(){
       </View>
 
       <View style={styles.quickRow}>
-        <QuickAction icon="⌕" title="Search" sub="Routes & stops" onPress={()=>navigation.navigate('Search')}/>
         <QuickAction icon="↗" title="Plan trip" sub="Find your bus" accent={colors.secondary} onPress={()=>navigation.navigate('Planner')}/>
-        <QuickAction icon="●" title="Nearby" sub="Around you" accent={colors.success} onPress={()=>navigation.navigate('Nearby')}/>
+        <QuickAction icon="◎" title="Location" sub={location?'Recenter map':'Use my location'} accent={colors.success} onPress={requestLocation}/>
       </View>
 
       <View style={styles.sectionHead}>
         <View><Text style={styles.sectionTitle}>Nearby stops</Text><Text style={styles.sectionSub}>Tap a stop for routes and live arrivals</Text></View>
-        <Pressable onPress={()=>navigation.navigate('Nearby')}><Text style={styles.seeAll}>See all</Text></Pressable>
+        <Pressable onPress={requestLocation}><Text style={styles.seeAll}>{location?'Recenter':'Use location'}</Text></Pressable>
       </View>
 
       {nearbyStops.slice(0,4).map(stop=><Pressable key={stop.stop_id} style={styles.stopCard} onPress={()=>navigation.navigate('StopDetails',{stopId:stop.stop_id,stopName:stop.name})}>
@@ -192,9 +204,8 @@ export default function HomeScreen(){
 
     <View style={styles.bottomNav}>
       <BottomItem icon="⌂" label="Home" active onPress={()=>{}}/>
-      <BottomItem icon="⌕" label="Search" onPress={()=>navigation.navigate('Search')}/>
       <BottomItem icon="↗" label="Plan" onPress={()=>navigation.navigate('Planner')}/>
-      <BottomItem icon="●" label="Nearby" onPress={()=>navigation.navigate('Nearby')}/>
+      <BottomItem icon="§" label="Legal" onPress={()=>navigation.navigate('Legal')}/>
     </View>
   </SafeAreaView>;
 }
@@ -235,7 +246,8 @@ const styles=StyleSheet.create({
  header:{height:64,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
  brandRow:{flexDirection:'row',alignItems:'center'},brandCopy:{marginLeft:9},brand:{fontSize:18,fontWeight:'900',letterSpacing:1,color:colors.text},tagline:{fontSize:9,color:colors.textMuted,marginTop:2},
  search:{height:48,borderRadius:15,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,flexDirection:'row',alignItems:'center',paddingHorizontal:13,marginTop:7},
- searchIcon:{fontSize:23,color:colors.text,marginRight:8},searchText:{flex:1,fontSize:13,color:colors.textMuted},searchKey:{fontSize:13,fontWeight:'800',color:colors.textMuted},
+ searchIcon:{fontSize:23,color:colors.text,marginRight:8},searchInput:{flex:1,fontSize:13,color:colors.text,paddingVertical:0},searchKey:{fontSize:20,fontWeight:'800',color:colors.textMuted,paddingHorizontal:3},
+ searchResults:{marginTop:7,borderRadius:15,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,overflow:'hidden'},searchResult:{minHeight:52,paddingHorizontal:12,paddingVertical:9,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderBottomColor:colors.border},searchBadge:{minWidth:48,height:30,borderRadius:8,alignItems:'center',justifyContent:'center',paddingHorizontal:6},searchBadgeText:{fontSize:10,fontWeight:'900'},searchStopIcon:{width:30,height:30,borderRadius:9,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},searchStopDot:{fontSize:9,color:colors.accent},searchCopy:{flex:1,marginLeft:9},searchTitle:{fontSize:11,fontWeight:'900',color:colors.text},searchMeta:{fontSize:9,color:colors.textMuted,marginTop:2},searchArrow:{fontSize:21,color:colors.textMuted},searchEmpty:{padding:13,fontSize:10,color:colors.textMuted},searchError:{padding:13,fontSize:10,color:colors.danger},
  sectionLine:{paddingHorizontal:2,paddingTop:13,paddingBottom:7,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionKicker:{fontSize:10,fontWeight:'900',letterSpacing:1.1,color:colors.textMuted},locationLink:{fontSize:11,fontWeight:'900',color:colors.accent},
  mapCard:{height:275,borderRadius:20,overflow:'hidden',borderWidth:1,borderColor:colors.border,backgroundColor:'#eef2f1'},map:{flex:1},
  mapTop:{position:'absolute',left:10,top:10,flexDirection:'row',alignItems:'center',backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:9,paddingVertical:6,borderRadius:10},liveDot:{width:7,height:7,borderRadius:4,backgroundColor:colors.success,marginRight:6},mapTopText:{fontSize:10,fontWeight:'900',color:colors.text},mapAttribution:{position:'absolute',right:7,bottom:6,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:5,paddingVertical:2,borderRadius:4},mapAttributionText:{fontSize:7,color:'#52625f'},

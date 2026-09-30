@@ -6,8 +6,8 @@ import { colors } from '../theme';
 const BASE='https://united-delhi.vercel.app/';
 const APP_VERSION='1.0.6';
 const links=[
-  ['Privacy Policy','privacy.html'],
-  ['Terms of Service','terms.html']
+  ['Privacy Policy','legal/privacy'],
+  ['Terms of Service','legal/terms']
 ] as const;
 
 export default function LegalScreen() {
