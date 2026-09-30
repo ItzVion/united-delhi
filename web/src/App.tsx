@@ -33,6 +33,7 @@ export default function App(){
   const[accepted,setAccepted]=useState(localStorage.getItem('ud-consent-v1')==='1');
   const[checked,setChecked]=useState(false);
   const[vehicles,setVehicles]=useState<Vehicle[]>([]);
+  const vehicleCountRef=useRef(0);
   const[q,setQ]=useState('');
   const[searchOpen,setSearchOpen]=useState(false);
   const[searchResults,setSearchResults]=useState<any[]>([]);
@@ -58,7 +59,7 @@ export default function App(){
   useEffect(()=>{
     if(!accepted)return;
     let active=true;
-    const load=async()=>{try{const r=await api.vehicles();if(active)setVehicles(Array.isArray(r.vehicles)?r.vehicles:[]);}catch(e){if(active)setError((e as Error).message||'Live data is unavailable.');}};
+    const load=async()=>{try{const r=await api.vehicles();if(active){const next=Array.isArray(r.vehicles)?r.vehicles:[];vehicleCountRef.current=next.length;setVehicles(next);setError('');}}catch(e){if(active&&vehicleCountRef.current===0)setError((e as Error).message||'Live data is unavailable.');}};
     void load();
     const id=window.setInterval(()=>void load(),15000);
     return()=>{active=false;window.clearInterval(id);};
