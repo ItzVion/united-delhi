@@ -13,7 +13,13 @@ const routeName=(value:any)=>{const text=String(value||'').trim();if(!text)retur
 const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||'LIVE';
 const isHex=(v:any)=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 const textFor=(bg:string)=>{const h=bg.replace('#','');const rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.55?'#17313B':'#FFFFFF';};
-const SERVICE_COLORS:any={dtc:'#2E7D32',cluster:'#F57C00',electric:'#81D4FA',unknown:'#607D8B'};
+const BUS_COLORS:any={evAc:'#2FAFBC',evDeviOrange:'#E57D43',evDeviGreen:'#168F49',cngAcBlue:'#3D82CE',cngAcRed:'#E35F67',cngNonAcPeach:'#E5A16E',cngNonAcGreen:'#24C88B'};
+const SERVICE_COLORS:any={dtc:BUS_COLORS.cngNonAcGreen,cluster:BUS_COLORS.evDeviOrange,electric:BUS_COLORS.evAc,unknown:BUS_COLORS.cngAcBlue};
+const busColorFor=(v:any)=>isHex(v.serviceColor)?String(v.serviceColor):
+  v.serviceType==='electric'?BUS_COLORS.evAc:
+  v.serviceType==='cluster'?BUS_COLORS.evDeviOrange:
+  v.serviceType==='dtc'?BUS_COLORS.cngNonAcGreen:
+  BUS_COLORS.cngAcBlue;
 const ageLabel=(value?:string)=>{const t=Date.parse(String(value||''));if(!Number.isFinite(t))return'Live';const s=Math.max(0,Math.round((Date.now()-t)/1000));return s<60?'Just now':Math.floor(s/60)+' min ago';};
 
 function parsePath(path:string=window.location.pathname):Page{
@@ -196,6 +202,7 @@ function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|
   const markersRef=useRef<Map<string,any>>(new Map());
   const userRef=useRef<any>(null);
   const vehiclesRef=useRef<Vehicle[]>([]);
+  const animationsRef=useRef<Map<string,number>>(new Map());
   const focused=useRef(false);
 
   useEffect(()=>{
@@ -223,16 +230,30 @@ function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|
         if(Number.isFinite(lat)&&Number.isFinite(lon)&&bounds.contains([lat,lon]))visible.set(v.id,v);
       }
       const markers=markersRef.current;
-      for(const [id,marker] of markers){if(!visible.has(id)){marker.remove();markers.delete(id);}}
+      for(const [id,marker] of markers){if(!visible.has(id)){const frame=animationsRef.current.get(id);if(frame)cancelAnimationFrame(frame);animationsRef.current.delete(id);marker.remove();markers.delete(id);}}
       for(const [id,v] of visible){
         const lat=Number(v.latitude),lon=Number(v.longitude);
-        const bg=isHex(v.routeColor)?String(v.routeColor):(isHex(v.serviceColor)?String(v.serviceColor):'#607D8B');
+        const bg=busColorFor(v);
         const name=displayVehicleRoute(v);
         const label=map.getZoom()>=12&&name!=='LIVE'?name.slice(0,12):'';
         const existing=markers.get(id);
         const wantedKind=map.getZoom()>=12&&name!=='LIVE'?'label':'dot';
         if(existing){
-          existing.setLatLng([lat,lon]);
+          const current=existing.getLatLng();
+          const frame=animationsRef.current.get(id);
+          if(frame)cancelAnimationFrame(frame);
+          const fromLat=Number(current.lat),fromLon=Number(current.lng),dLat=lat-fromLat,dLon=lon-fromLon;
+          if(Math.abs(dLat)+Math.abs(dLon)<0.0000002){existing.setLatLng([lat,lon]);animationsRef.current.delete(id);}
+          else{
+            const start=performance.now();
+            const ease=(t:number)=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+            const step=(now:number)=>{
+              const p=Math.min(1,(now-start)/1100),e=ease(p);
+              existing.setLatLng([fromLat+dLat*e,fromLon+dLon*e]);
+              if(p<1)animationsRef.current.set(id,requestAnimationFrame(step));else animationsRef.current.delete(id);
+            };
+            animationsRef.current.set(id,requestAnimationFrame(step));
+          }
           if(existing._udBg!==bg||existing._udKind!==wantedKind){
             existing.remove();
             markers.delete(id);
@@ -258,7 +279,7 @@ function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|
     window.setTimeout(()=>{map.invalidateSize();renderVisible();},100);
     mapRef.current=map;
     (map as any)._udRenderVisible=renderVisible;
-    return()=>{map.remove();mapRef.current=null;markersRef.current.clear();userRef.current=null;};
+    return()=>{for(const frame of animationsRef.current.values())cancelAnimationFrame(frame);animationsRef.current.clear();map.remove();mapRef.current=null;markersRef.current.clear();userRef.current=null;};
   },[]);
 
   useEffect(()=>{
