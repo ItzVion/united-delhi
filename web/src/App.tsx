@@ -234,53 +234,7 @@ function RouteBadge({name,routeColor,routeTextColor}:{name:string;routeColor?:st
   return <span className="route-badge" style={{backgroundColor:bg,color:validHex(routeTextColor)?String(routeTextColor):routeText(bg)}}>{name}</span>;
 }
 
-function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:LocationPoint|null;onSelect:(v:Vehicle)=>void}){
-  const mapEl=useRef<HTMLDivElement|null>(null);
-  const mapRef=useRef<any>(null);
-  const layersRef=useRef<any>(null);
-  const userRef=useRef<any>(null);
-  const focused=useRef(false);
-
-  useEffect(()=>{
-    if(!mapEl.current||mapRef.current)return;
-    const map:any=L.map(mapEl.current,{center:DELHI_CENTER,zoom:10.5,scrollWheelZoom:true,zoomControl:true,minZoom:9,maxBounds:DELHI_BOUNDS,maxBoundsViscosity:.85,attributionControl:true});
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:2,updateWhenZooming:false,updateWhenIdle:true,attribution:'© OpenStreetMap contributors'}).addTo(map);
-    layersRef.current=L.layerGroup().addTo(map);
-    userRef.current=L.layerGroup().addTo(map);
-    const locate:any=L.Control.extend({options:{position:'bottomright'},onAdd:()=>{const button:any=L.DomUtil.create('button','map-locate');button.type='button';button.innerHTML='◎';button.title='Center on my location';L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>{if(location)map.flyTo([location.lat,location.lon],14,{duration:1.1,easeLinearity:.2})});return button;}});
-    map.addControl(new locate());
-    const updateUser=()=>{userRef.current.clearLayers();if(location)L.marker([location.lat,location.lon],{icon:L.divIcon({className:'user-marker-icon',html:'<div class="user-marker"></div>',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(userRef.current)};
-    map.on('move zoom resize',updateUser);
-    window.setTimeout(()=>{map.invalidateSize();updateUser()},100);
-    mapRef.current=map;
-    return()=>{map.remove();mapRef.current=null;layersRef.current=null;userRef.current=null;};
-  },[]);
-
-  useEffect(()=>{
-    const layer=layersRef.current;if(!layer)return;
-    layer.clearLayers();
-    vehicles.forEach(v=>{
-      const lat=Number(v.latitude),lon=Number(v.longitude);
-      if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
-      const name=vehicleRoute(v);
-      const bg=validHex(v.routeColor)?String(v.routeColor):'#00695C';
-      const html='<div class="web-bus" style="background:'+escapeHtml(bg)+'">'+escapeHtml(name.slice(0,8))+'</div>';
-      const icon=L.divIcon({className:'web-bus-icon',html,iconSize:[38,38],iconAnchor:[19,19]});
-      L.marker([lat,lon],{icon,zIndexOffset:1000}).on('click',()=>onSelect(v)).addTo(layer);
-    });
-  },[vehicles,onSelect]);
-
-  useEffect(()=>{
-    const map=mapRef.current;
-    if(!map||!location)return;
-    if(!focused.current){focused.current=true;window.setTimeout(()=>map.flyTo([location.lat,location.lon],14,{duration:1.2,easeLinearity:.2}),80);}
-    userRef.current?.clearLayers();
-    L.marker([location.lat,location.lon],{icon:L.divIcon({className:'user-marker-icon',html:'<div class="user-marker"></div>',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(userRef.current);
-  },[location]);
-
-  return <div ref={mapEl} className="dtc-map"/>;
-}
-
+function DtcMap({vehicles: _vehicles, location: _location, onSelect: _onSelect}:{vehicles:Vehicle[];location:LocationPoint|null;onSelect:(v:Vehicle)=>void}){return <div className="dtc-map"/>}
 function escapeHtml(value:any){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'} as Record<string,string>)[c]);}
 
 function Planner({go}:{go:(path:string)=>void}){
