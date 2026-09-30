@@ -237,6 +237,10 @@ function BusLegend({open,onClose}:{open:boolean;onClose:()=>void}){
 }
 
 function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];location:Point|null;onSelect:(v:Vehicle)=>void;onLegend:()=>void}){
+  const locationRef=useRef<Point|null>(location);
+  const legendRef=useRef<()=>void>(onLegend);
+  useEffect(()=>{locationRef.current=location;},[location]);
+  useEffect(()=>{legendRef.current=onLegend;},[onLegend]);
   const el=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<any>(null);
   const markersRef=useRef<Map<string,any>>(new Map());
@@ -259,9 +263,9 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
     const map:any=L.map(el.current,{center:initial,zoom:initialZoom,scrollWheelZoom:true,zoomControl:true,minZoom:9,maxBounds:BOUNDS,maxBoundsViscosity:.18,attributionControl:true,preferCanvas:true,inertia:true,inertiaDeceleration:1800,inertiaMaxSpeed:1800,bounceAtZoomLimits:false});
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true,attribution:'© OpenStreetMap contributors'}).addTo(map);
     userRef.current=L.layerGroup().addTo(map);
-    const locate=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const b:any=L.DomUtil.create('button','map-locate');b.type='button';b.innerHTML='◎';b.title='Center on my location';L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',()=>{if(location)map.flyTo([location.lat,location.lon],14,{duration:1.0,easeLinearity:.2})});return b;}});
+    const locate=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const b:any=L.DomUtil.create('button','map-locate');b.type='button';b.innerHTML='◎';b.title='Center on my location';L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',()=>{const current=locationRef.current;if(current)map.flyTo([current.lat,current.lon],14,{duration:1.0,easeLinearity:.2});});return b;}});
     map.addControl(new locate());
-    const legendControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const b:any=L.DomUtil.create('button','map-legend-control');b.type='button';b.title='Bus color legend';b.setAttribute('aria-label','Bus color legend');b.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',onLegend);return b;}});
+    const legendControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const b:any=L.DomUtil.create('button','map-legend-control');b.type='button';b.title='Bus color legend';b.setAttribute('aria-label','Bus color legend');b.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',()=>legendRef.current());return b;}});
     map.addControl(new legendControl());
 
     const renderVisible=()=>{
