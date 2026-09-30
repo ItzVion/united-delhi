@@ -217,3 +217,5 @@ button:disabled{cursor:not-allowed}
   .metro-reference{display:block}
   .metro-reference .secondary-button{margin-top:12px}
 }
+
+.map-legend{position:absolute;left:8px;bottom:8px;z-index:1000;display:flex;gap:9px;align-items:center;padding:5px 7px;background:rgba(255,255,255,.94);border:1px solid #D4DDE0;font-size:8px;font-weight:800;color:#1F2A30}.map-legend span{display:flex;align-items:center;gap:4px}.map-legend i{width:7px;height:7px;display:block}
