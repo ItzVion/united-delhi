@@ -1,10 +1,19 @@
 export const API='https://united-delhi.wasmer.app';
 
 async function request<T>(path:string,init:RequestInit={}):Promise<T>{
-  const r=await fetch(API+path,{...init,headers:{Accept:'application/json',...(init.headers??{})}});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(d.reason||'Request failed');
-  return d as T;
+  const controller=new AbortController();
+  const timer=window.setTimeout(()=>controller.abort(),10000);
+  try{
+    const r=await fetch(API+path,{...init,signal:controller.signal,headers:{Accept:'application/json',...(init.headers??{})}});
+    const text=await r.text();
+    let d:any={};
+    try{d=text?JSON.parse(text):{};}catch{d={reason:text.slice(0,160)};}
+    if(!r.ok)throw new Error(d.reason||`Request failed with undefined`);
+    return d as T;
+  }catch(error){
+    if((error as Error)?.name==='AbortError')throw new Error('Request timed out');
+    throw error instanceof Error?error:new Error('Network error');
+  }finally{window.clearTimeout(timer);}
 }
 
 export type Vehicle={
