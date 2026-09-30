@@ -98,12 +98,13 @@ function loadOperationalMappings(){
 
 function classifyService(vehicleId,agencyId){
   const id=String(vehicleId||'').trim().toUpperCase();
-  // Delhi EV bus registration series used by DTC.
-  if(/^DL51(?:EV|GD)/.test(id))return{type:'electric',color:'#81D4FA'};
+  // Locked United Delhi bus palette, based on the supplied DTC/One Delhi legend.
+  // We only expose these colours for live bus markers; no arbitrary fallback colour.
+  if(/^DL51(?:EV|GD)/.test(id))return{type:'electric',color:'#2FAFBC'};       // EV AC
   const agency=String(agencyId||'').trim().toUpperCase();
-  if(agency==='DIMTS')return{type:'cluster',color:'#F57C00'};
-  if(agency==='DTC')return{type:'dtc',color:'#2E7D32'};
-  return{type:'unknown',color:'#607D8B'};
+  if(agency==='DIMTS')return{type:'cluster',color:'#E57D43'};                  // EV DEVI / cluster family
+  if(agency==='DTC')return{type:'dtc',color:'#24C88B'};                       // CNG Non-AC family
+  return{type:'unknown',color:'#3D82CE'};                                    // CNG AC family fallback
 }
 
 function resolveOperationalRoute(vehicle){
