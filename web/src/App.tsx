@@ -193,39 +193,76 @@ function Home({vehicles,location,locationStatus,locate,go}:{vehicles:Vehicle[];l
 function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|null;onSelect:(v:Vehicle)=>void}){
   const el=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<any>(null);
-  const layersRef=useRef<any>(null);
+  const markersRef=useRef<Map<string,any>>(new Map());
   const userRef=useRef<any>(null);
+  const vehiclesRef=useRef<Vehicle[]>([]);
   const focused=useRef(false);
 
   useEffect(()=>{
     if(!el.current||mapRef.current)return;
-    const map:any=L.map(el.current,{center:CENTER,zoom:10.5,scrollWheelZoom:true,zoomControl:true,minZoom:9,maxBounds:BOUNDS,maxBoundsViscosity:.85,attributionControl:true});
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:2,updateWhenZooming:false,updateWhenIdle:true,attribution:'© OpenStreetMap contributors'}).addTo(map);
-    layersRef.current=L.layerGroup().addTo(map);
+    let initial:Cordinate=[CENTER[0],CENTER[1]];
+    let initialZoom=10.5;
+    try{
+      const saved=localStorage.getItem('ud-map-center');
+      if(saved){
+        const p=JSON.parse(saved);
+        if(Number.isFinite(p.lat)&&Number.isFinite(p.lon)){initial=[p.lat,p.lon];initialZoom=14;}
+      }
+    }catch{}
+    const map:any=L.map(el.current,{center:initial,zoom:initialZoom,scrollWheelZoom:true,zoomControl:true,minZoom:9,maxBounds:BOUNDS,maxBoundsViscosity:.85,attributionControl:true,preferCanvas:true});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true,attribution:'© OpenStreetMap contributors'}).addTo(map);
     userRef.current=L.layerGroup().addTo(map);
-    const locate=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const b:any=L.DomUtil.create('button','map-locate');b.type='button';b.innerHTML='◎';b.title='Center on my location';L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',()=>{if(location)map.flyTo([location.lat,location.lon],14,{duration:1.1})});return b;}});
+    const locate=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const b:any=L.DomUtil.create('button','map-locate');b.type='button';b.innerHTML='◎';b.title='Center on my location';L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',()=>{if(location)map.flyTo([location.lat,location.lon],14,{duration:1.0,easeLinearity:.2})});return b;}});
     map.addControl(new locate());
-    window.setTimeout(()=>map.invalidateSize(),100);
+
+    const renderVisible=()=>{
+      const visible=new Map<string,Vehicle>();
+      const bounds=map.getBounds().pad(.12);
+      for(const v of vehiclesRef.current){
+        const lat=Number(v.latitude),lon=Number(v.longitude);
+        if(Number.isFinite(lat)&&Number.isFinite(lon)&&bounds.contains([lat,lon]))visible.set(v.id,v);
+      }
+      const markers=markersRef.current;
+      for(const [id,marker] of markers){if(!visible.has(id)){marker.remove();markers.delete(id);}}
+      for(const [id,v] of visible){
+        const lat=Number(v.latitude),lon=Number(v.longitude);
+        const bg=isHex(v.routeColor)?String(v.routeColor):(isHex(v.serviceColor)?String(v.serviceColor):'#607D8B');
+        const name=displayVehicleRoute(v);
+        const label=map.getZoom()>=12&&name!=='LIVE'?name.slice(0,12):'';
+        const existing=markers.get(id);
+        if(existing){
+          existing.setLatLng([lat,lon]);
+          const node=existing.getElement?.();
+          const labelNode=node?.querySelector?.('.web-bus-label');
+          if(labelNode)labelNode.textContent=label;
+          if(existing._udBg!==bg){
+            const next=L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:2,fillColor:bg,fillOpacity:1});
+            next.on('click',()=>onSelect(v));next._udBg=bg;next._udLabel=label;existing.remove();next.addTo(map);markers.set(id,next);
+          }else{existing._udLabel=label;}
+        }else{
+          if(map.getZoom()>=12&&name!=='LIVE'){
+            const icon=L.divIcon({className:'web-bus-icon',html:'<div class="web-bus" style="background:'+escapeHtml(bg)+'"><span class="web-bus-label">'+escapeHtml(label)+'</span></div>',iconSize:[38,38],iconAnchor:[19,19]});
+            const marker=L.marker([lat,lon],{icon,zIndexOffset:1000});marker.on('click',()=>onSelect(v));marker._udBg=bg;marker._udLabel=label;marker.addTo(map);markers.set(id,marker);
+          }else{
+            const marker=L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:2,fillColor:bg,fillOpacity:1});marker.on('click',()=>onSelect(v));marker._udBg=bg;marker._udLabel=label;marker.addTo(map);markers.set(id,marker);
+          }
+        }
+      }
+    };
+
+    const report=()=>{try{const c=map.getCenter();localStorage.setItem('ud-map-center',JSON.stringify({lat:c.lat,lon:c.lng}));}catch{}renderVisible();};
+    map.on('moveend',report);
+    map.on('zoomend',report);
+    window.setTimeout(()=>{map.invalidateSize();renderVisible();},100);
     mapRef.current=map;
-    return()=>{map.remove();mapRef.current=null;layersRef.current=null;userRef.current=null;};
+    (map as any)._udRenderVisible=renderVisible;
+    return()=>{map.remove();mapRef.current=null;markersRef.current.clear();userRef.current=null;};
   },[]);
 
   useEffect(()=>{
-    const layer=layersRef.current;
-    if(!layer)return;
-    layer.clearLayers();
-    vehicles.forEach(v=>{
-      const lat=Number(v.latitude),lon=Number(v.longitude);
-      if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
-      const name=displayVehicleRoute(v);
-      const bg=isHex(v.serviceColor)?String(v.serviceColor):(SERVICE_COLORS[v.serviceType||'unknown']||SERVICE_COLORS.unknown);
-      const zoom=map.getZoom();
-      const label=zoom>=12?name.slice(0,10):'';
-      const html='<div class="web-bus" style="background:'+escapeHtml(bg)+'">'+escapeHtml(label)+'</div>';
-      const icon=L.divIcon({className:'web-bus-icon',html,iconSize:[38,38],iconAnchor:[19,19]});
-      L.marker([lat,lon],{icon,zIndexOffset:1000}).on('click',()=>onSelect(v)).addTo(layer);
-    });
-  },[vehicles,onSelect]);
+    vehiclesRef.current=vehicles;
+    (mapRef.current as any)?._udRenderVisible?.();
+  },[vehicles]);
 
   useEffect(()=>{
     const map=mapRef.current;
@@ -233,12 +270,12 @@ function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|
     userRef.current?.clearLayers();
     if(location){
       L.marker([location.lat,location.lon],{icon:L.divIcon({className:'user-marker-icon',html:'<div class="user-marker"></div>',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(userRef.current);
-      if(!focused.current){focused.current=true;window.setTimeout(()=>map.flyTo([location.lat,location.lon],14,{duration:1.2}),80);}
+      if(!focused.current){focused.current=true;window.setTimeout(()=>map.flyTo([location.lat,location.lon],14,{duration:1.1,easeLinearity:.2}),80);}
     }
   },[location]);
-
-  return <div ref={el} className="dtc-map"/>;
 }
+
+type Cordinate=[number,number];
 
 function BusPreview({bus,go}:{bus:Vehicle;go:(path:string)=>void}){
   return <div className="bus-preview">
