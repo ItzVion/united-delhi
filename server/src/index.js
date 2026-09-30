@@ -193,37 +193,49 @@ async function getRealtimeVehicles(){
       const observed=Date.parse(v.observedAt);
       return Number.isFinite(observed)&&Date.now()-observed<=5*60*1000;
     });
+    const operationalByVehicle=new Map(vehicles.map(v=>[v.id,resolveOperationalRoute(v)]));
     for(const v of vehicles){
-      const operational=resolveOperationalRoute(v);
+      const operational=operationalByVehicle.get(v.id);
       const service=classifyService(v.id,operational?.agencyId);
       v.serviceType=service.type;
       v.serviceColor=service.color;
-      if(operational){
-        v.routeShortName=operational.shortName;
-        v.routeColor=operational.routeColor ? '#'+String(operational.routeColor).replace(/^#/,'') : null;
-        v.operator=operational.agencyId;
-      }
+      if(operational)v.operator=operational.agencyId;
     }
 
     if(pool&&vehicles.length){
-      const routeIds=[...new Set(vehicles.map(v=>v.routeId).filter(Boolean))];
+      const routeIds=[...new Set(vehicles.flatMap(v=>{
+        const ids=[];
+        if(v.routeId)ids.push(String(v.routeId));
+        const operational=operationalByVehicle.get(v.id);
+        if(operational?.routeId)ids.push(String(operational.routeId));
+        return ids;
+      }))];
       if(routeIds.length){
         try{
           const result=await pool.query(`SELECT r.route_id,r.short_name,r.route_color,r.route_text_color,start_stop.name AS from_stop,end_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.name,s.stop_id LIMIT 1) start_stop ON TRUE LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.name,s.stop_id LIMIT 1) end_stop ON TRUE WHERE r.route_id=ANY($1::text[])`,[routeIds]);
           const map=new Map(result.rows.map(row=>[String(row.route_id),row]));
           for(const v of vehicles){
-            const row=v.routeId?map.get(String(v.routeId)):null;
-            if(!row)continue;
-            // Static database metadata can enrich direction/stops, but never override
-            // the pinned operational route identity or service color.
-            if(!v.routeShortName && row.short_name)v.routeShortName=String(row.short_name).trim();
-            if(!v.routeColor && row.route_color)v.routeColor='#'+String(row.route_color).replace(/^#/,'');
-            if(row.from_stop)v.fromStop=String(row.from_stop).trim();
-            if(row.to_stop)v.toStop=String(row.to_stop).trim();
+            const operational=operationalByVehicle.get(v.id);
+            const row=(v.routeId?map.get(String(v.routeId)):null)||(operational?.routeId?map.get(String(operational.routeId)):null);
+            if(row){
+              if(row.short_name)v.routeShortName=String(row.short_name).trim();
+              if(row.route_color)v.routeColor='#'+String(row.route_color).replace(/^#/,'');
+              if(row.route_text_color)v.routeTextColor='#'+String(row.route_text_color).replace(/^#/,'');
+              if(row.from_stop)v.fromStop=String(row.from_stop).trim();
+              if(row.to_stop)v.toStop=String(row.to_stop).trim();
+              if(row.route_id&&operational&&String(row.route_id)===String(operational.routeId))v.operator=operational.agencyId;
+            }else if(operational){
+              // Fallback only when the verified static DB has no matching route.
+              v.routeShortName=operational.shortName;
+              v.routeColor=operational.routeColor ? '#'+String(operational.routeColor).replace(/^#/,'') : null;
+            }
           }
         }catch(error){
-          // Realtime GPS data is still useful without static-data enrichment.
           console.error('Realtime route enrichment failed:',error.message);
+          for(const v of vehicles){
+            const operational=operationalByVehicle.get(v.id);
+            if(operational)v.routeShortName=operational.shortName;
+          }
         }
       }
     }
