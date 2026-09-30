@@ -9,8 +9,8 @@ type Point={lat:number;lon:number};
 const CENTER:[number,number]=[28.6139,77.209];
 const BOUNDS:any=[[28.40,76.84],[28.88,77.35]];
 
-const routeName=(value:any)=>{const text=String(value||'').trim();if(!text)return'Bus';return text.replace(/(?:UP|DOWN|DWN)$/i,'').replace(/^AIR-0+/i,'AIR-')||'Bus';};
-const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||(v.routeId?'#'+v.routeId:'Bus');
+const routeName=(value:any)=>{const text=String(value||'').trim();if(!text)return null;return text.replace(/(?:UP|DOWN|DWN)$/i,'').replace(/^AIR-0+/i,'AIR-')||null;};
+const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||(v.routeId?'ID '+v.routeId:'LIVE BUS');
 const isHex=(v:any)=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 const textFor=(bg:string)=>{const h=bg.replace('#','');const rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.55?'#17313B':'#FFFFFF';};
 const ageLabel=(value?:string)=>{const t=Date.parse(String(value||''));if(!Number.isFinite(t))return'Live';const s=Math.max(0,Math.round((Date.now()-t)/1000));return s<60?'Just now':Math.floor(s/60)+' min ago';};
@@ -146,7 +146,7 @@ function SearchResults({loading,error,results,go}:{loading:boolean;error:string;
   return <section className="search-results">
     <div className="section-line"><b>Search results</b></div>
     {loading?<div className="empty-line">Searching…</div>:error?<div className="empty-line danger-text">{error}</div>:results.length?results.map((x:any,i:number)=>{
-      const name=x.type==='route'?routeName(x.label||x.short_name):x.label;
+      const name=x.type==='route'?(routeName(x.label||x.short_name)||'Route'):x.label;
       return <button className="search-result" key={String(x.type)+String(x.id)+i} onClick={()=>go(x.type==='route'?'/routes/'+encodeURIComponent(x.id):'/stops/'+encodeURIComponent(x.id))}>
         {x.type==='route'?<RouteBadge name={name} color={x.routeColor} textColor={x.routeTextColor}/>:<span className="stop-square">●</span>}
         <span className="result-copy"><b>{x.type==='route'?'Bus route':x.label}</b><small>{x.type==='route'?(x.fromStop||'Start')+' → '+(x.toStop||'Destination'):'Bus stop'}</small></span>
@@ -239,7 +239,7 @@ function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|
 function BusPreview({bus,go}:{bus:Vehicle;go:(path:string)=>void}){
   return <div className="bus-preview">
     <button className="preview-close" onClick={()=>go('/')}>×</button>
-    <button className="preview-body" onClick={()=>go('/routes/'+encodeURIComponent(bus.routeId||''))}>
+    <button className="preview-body" onClick={()=>{if(bus.routeShortName&&bus.routeId)go('/routes/'+encodeURIComponent(bus.routeId));}} disabled={!bus.routeShortName||!bus.routeId}>
       <RouteBadge name={displayVehicleRoute(bus)} color={bus.routeColor} textColor={bus.routeTextColor}/>
       <span><small>LIVE BUS</small><b>To {bus.toStop||'Destination'}</b><em>{bus.id} · {ageLabel(bus.observedAt)} · View route</em></span><strong>›</strong>
     </button>
