@@ -180,7 +180,7 @@ function Home({vehicles,location,locationStatus,locate,go}:{vehicles:Vehicle[];l
     <div className="map-card">
       <DtcMap vehicles={vehicles} location={location} onSelect={setSelected}/>
       <div className="map-topbar"><i/><b>{vehicles.length?vehicles.length+' buses live':'Checking live buses'}</b></div>
-      <div className="map-attribution">© OpenStreetMap contributors</div><div className="map-legend"><span><i style={{background:'#2E7D32'}}/>DTC</span><span><i style={{background:'#F57C00'}}/>Cluster</span><span><i style={{background:'#81D4FA'}}/>Electric</span></div>
+      <div className="map-attribution">© OpenStreetMap contributors</div><div className="map-legend"><span><i style={{background:BUS_COLORS.cngNonAcGreen}}/>DTC</span><span><i style={{background:BUS_COLORS.evDeviOrange}}/>Cluster</span><span><i style={{background:BUS_COLORS.evAc}}/>Electric</span></div>
       {selected?<BusPreview bus={selected} go={go}/>:null}
     </div>
     {locationStatus?<button className="location-notice" onClick={locate}><span>{locationStatus}</span><b>Retry</b></button>:null}
