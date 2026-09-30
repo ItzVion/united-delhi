@@ -17,6 +17,7 @@ import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type MapBounds = { south:number; west:number; north:number; east:number };
 const DELHI={latitude:28.6139,longitude:77.209};
+const SERVICE_COLORS={dtc:'#2E7D32',cluster:'#F57C00',electric:'#81D4FA',unknown:'#607D8B'} as const;
 
 export default function HomeScreen(){
   const navigation=useNavigation<Nav>();
@@ -91,7 +92,7 @@ export default function HomeScreen(){
       buses:vehicles.flatMap(v=>{
         const route=displayRouteName(v.routeShortName) || 'LIVE';
         if(!route) return [];
-        const c=v.serviceColor?{background:v.serviceColor,text:'#FFFFFF'}:resolveRouteColor(displayRouteName(v.routeShortName),null,null);
+        const c=v.serviceColor?{background:v.serviceColor,text:'#FFFFFF'}:{background:SERVICE_COLORS[v.serviceType||'unknown'],text:v.serviceType==='electric'?'#17313B':'#FFFFFF'};
         return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];
       }),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
@@ -157,12 +158,12 @@ export default function HomeScreen(){
           <View style={styles.liveDot}/>
           <Text style={styles.mapTopText}>{fresh==='ok'?(`${vehicles.length} buses live`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='unavailable'?'Live data unavailable':'Checking live buses'}</Text>
         </View>
-        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View>
+        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}><Text style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.dtc}]}/>DTC</Text><Text style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.cluster}]}/>Cluster</Text><Text style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.electric}]}/>Electric</Text></View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
           const name=displayRouteName(selectedBus.routeShortName) || 'Live bus';
           if(!selectedBus.routeId) return null;
-          const c=selectedBus.serviceColor?{background:selectedBus.serviceColor,text:'#FFFFFF'}:resolveRouteColor(displayRouteName(selectedBus.routeShortName),null,null);
+          const c=selectedBus.serviceColor?{background:selectedBus.serviceColor,text:'#FFFFFF'}:{background:SERVICE_COLORS[selectedBus.serviceType||'unknown'],text:selectedBus.serviceType==='electric'?'#17313B':'#FFFFFF'};
           const ageSeconds=Math.max(0,Math.round((Date.now()-Date.parse(selectedBus.observedAt))/1000));
           const freshness=Number.isFinite(ageSeconds)?(ageSeconds<60?'Updated just now':`Updated ${Math.floor(ageSeconds/60)} min ago`):'Live position';
           return <View style={styles.busPreview}>
@@ -234,7 +235,7 @@ window.updateMap=function(data){
  stopLayer.clearLayers();busLayer.clearLayers();userLayer.clearLayers();busMarkers.clear();currentLocation=data.location||null;if(currentLocation&&!autoFocused){autoFocused=true;setTimeout(()=>map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.35,easeLinearity:.2}),80);}
  const stopIcon=L.divIcon({className:'',html:'<div class="stop-label"></div>',iconSize:[14,14],iconAnchor:[7,7]});
  data.stops.forEach(s=>{const popup=document.createElement('div'),title=document.createElement('b'),button=document.createElement('button');title.textContent=s.name;button.textContent='View stop';button.type='button';button.style.marginTop='6px';button.onclick=()=>openStop(s.id);popup.append(title,document.createElement('br'),button);L.marker([s.lat,s.lon],{icon:stopIcon,zIndexOffset:300}).addTo(stopLayer).bindPopup(popup);});
- data.buses.forEach(v=>{const bg=validColor(v.color)?v.color:'#00695C';const marker=L.marker([Number(v.lat),Number(v.lon)],{zIndexOffset:1000,icon:L.divIcon({className:'ud-bus-icon',html:'<span style="display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:0;background:'+bg+';color:#fff;border:3px solid #fff;box-shadow:0 2px 8px rgba(28,54,34,.35);font:900 8px/1 system-ui,sans-serif;overflow:hidden;white-space:nowrap">'+escapeHtml(v.route)+'</span>',iconSize:[28,28],iconAnchor:[14,14]})});marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);marker.bringToFront();busMarkers.set(v.id,marker);});
+ data.buses.forEach(v=>{const bg=validColor(v.color)?v.color:'#607D8B';const label=map.getZoom()>=12?String(v.route).slice(0,10):''; const marker=L.marker([Number(v.lat),Number(v.lon)],{zIndexOffset:1000,icon:L.divIcon({className:'ud-bus-icon',html:'<span style="display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:0;background:'+bg+';color:#fff;border:3px solid #fff;box-shadow:0 2px 8px rgba(28,54,34,.35);font:900 8px/1 system-ui,sans-serif;overflow:hidden;white-space:nowrap">'+escapeHtml(label)+'</span>',iconSize:[28,28],iconAnchor:[14,14]})});marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);marker.bringToFront();busMarkers.set(v.id,marker);});
  if(currentLocation)L.circleMarker([currentLocation.lat,currentLocation.lon],{radius:9,color:'#fff',weight:3,fillColor:'#0b746b',fillOpacity:1}).addTo(userLayer);
 };
 function centerOnUser(){if(currentLocation)map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.2,easeLinearity:.2});}
