@@ -236,7 +236,7 @@ let currentLocation=null;let autoFocused=false;let lastBusData=[];
 const saved=localStorage.getItem('ud-map-center');
 let initialCenter=[28.6139,77.209],initialZoom=10.5;
 try{if(saved){const p=JSON.parse(saved);if(Number.isFinite(p.lat)&&Number.isFinite(p.lon)){initialCenter=[p.lat,p.lon];initialZoom=14;}}}catch{}
-const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5}).setView(initialCenter,initialZoom);
+const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5,inertia:true,inertiaDeceleration:1800,inertiaMaxSpeed:1800,bounceAtZoomLimits:false}).setView(initialCenter,initialZoom);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
 const stopLayer=L.layerGroup().addTo(map),busLayer=L.layerGroup().addTo(map),userLayer=L.layerGroup().addTo(map),busMarkers=new Map();
 const locateControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-locate'),button=L.DomUtil.create('button','');button.type='button';button.textContent='◎';button.title='Center on my location';button.setAttribute('aria-label','Center on my location');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>{if(currentLocation){map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.0,easeLinearity:.2})}else{window.ReactNativeWebView.postMessage(JSON.stringify({type:'locate'}));}});wrap.appendChild(button);return wrap;}});map.addControl(new locateControl());
