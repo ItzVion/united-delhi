@@ -108,13 +108,13 @@ function classifyService(vehicleId,agencyId){
 function resolveOperationalRoute(vehicle){
   const routeId=vehicle.routeId?String(vehicle.routeId):'';
   const tripId=vehicle.tripId?String(vehicle.tripId):'';
-  const direct=routeId?operationalRouteMap.get(routeId):null;
   const tripRouteId=tripId?operationalTripMap.get(tripId):null;
-  if(direct&&tripRouteId&&String(tripRouteId)!==routeId){
-    return null;
-  }
+  const tripRoute=tripRouteId?operationalRouteMap.get(String(tripRouteId)):null;
+  const direct=routeId?operationalRouteMap.get(routeId):null;
+  // Prefer the exact trip mapping: OTD realtime trip_id is the strongest
+  // identity for the public route. routeId is retained as a fallback.
+  if(tripRoute)return tripRoute;
   if(direct)return direct;
-  if(tripRouteId)return operationalRouteMap.get(String(tripRouteId))||null;
   return null;
 }
 function observedAtFromTimestamp(value){
@@ -200,6 +200,7 @@ async function getRealtimeVehicles(){
       v.serviceColor=service.color;
       if(operational){
         v.routeShortName=operational.shortName;
+        v.routeColor=operational.routeColor ? '#'+String(operational.routeColor).replace(/^#/,'') : null;
         v.operator=operational.agencyId;
       }
     }
@@ -216,6 +217,7 @@ async function getRealtimeVehicles(){
             // Static database metadata can enrich direction/stops, but never override
             // the pinned operational route identity or service color.
             if(!v.routeShortName && row.short_name)v.routeShortName=String(row.short_name).trim();
+            if(!v.routeColor && row.route_color)v.routeColor='#'+String(row.route_color).replace(/^#/,'');
             if(row.from_stop)v.fromStop=String(row.from_stop).trim();
             if(row.to_stop)v.toStop=String(row.to_stop).trim();
           }
