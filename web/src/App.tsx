@@ -365,3 +365,54 @@ function Planner({go}:{go:(path:string)=>void}){
   const suggestions=(items:any[],active:boolean,setter:(v:string)=>void)=><>{active&&items.length?<div className="planner-suggestions">{items.map((x:any)=><button type="button" className="planner-suggestion" key={x.id} onMouseDown={e=>e.preventDefault()} onClick={()=>{setter(x.label);setFromFocus(false);setToFocus(false);}}><span className="stop-square">●</span><span><b>{x.label}</b><small>Bus stop · {x.id}</small></span><span>›</span></button>)}</div>:null}</>;
   return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">JOURNEY PLANNER</span><h1>Plan your ride</h1><p>Bus journeys across Delhi</p></div></div><div className="flat-card planner-form"><div className="planner-row"><div className="route-rail"><i/><b/><i/></div><div className="planner-fields"><label>FROM<div className="planner-input-wrap"><input value={from} onFocus={()=>setFromFocus(true)} onChange={e=>{setFrom(e.target.value);setFromFocus(true);}} placeholder="Starting stop or place"/>{suggestions(fromSuggestions,fromFocus,setFrom)}</div></label><label>TO<div className="planner-input-wrap"><input value={to} onFocus={()=>setToFocus(true)} onChange={e=>{setTo(e.target.value);setToFocus(true);}} placeholder="Where do you want to go?"/>{suggestions(toSuggestions,toFocus,setTo)}</div></label></div><button className="swap-button" onClick={()=>{const v=from;setFrom(to);setTo(v);}}>↕</button></div><button className="primary-button" onClick={plan} disabled={busy}>{busy?'Finding buses…':'Find buses'}</button></div>{error?<div className="error-box"><b>Couldn't plan this trip</b><span>{error}</span></div>:null}{options.map((o:any,i:number)=><div className="flat-card journey" key={i}><div className="journey-top"><div><span className="eyebrow">{o.type==='direct'?'DIRECT BUS':'ONE CHANGE'}</span><strong>{o.durationMinutes} min</strong></div><span className="walk-tag">Walk {o.walkingMinutes} min</span></div>{(o.legs||[]).map((l:any,j:number)=><div className="journey-leg" key={String(l.routeId)+j}><RouteBadge name={routeName(l.routeName)} color={l.routeColor} textColor={l.routeTextColor}/><div><b>Bus {routeName(l.routeName)}</b><small>{l.fromStop} → {l.toStop}</small></div></div>)}</div>)}{!busy&&!error&&!options.length?<div className="empty-panel"><span className="empty-icon">↗</span><b>Where are you going?</b><p>Start typing a Delhi bus stop in either field to choose it from the list.</p></div>:null}</section>;
 }
+
+
+function Legal({go}:{go:(path:string)=>void}){
+  return <section className="screen">
+    <div className="page-top"><button className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">UNITED DELHI</span><h1>Legal & privacy</h1><p>How United Delhi handles transit information and privacy.</p></div></div>
+    <div className="flat-card detail-section"><button className="legal-row" onClick={()=>go('/legal/privacy')}><span><b>Privacy Policy</b><small>Data, location and privacy information</small></span><span className="chevron">›</span></button><button className="legal-row" onClick={()=>go('/legal/terms')}><span><b>Terms of Service</b><small>Rules for using United Delhi</small></span><span className="chevron">›</span></button></div>
+  </section>;
+}
+function Privacy({go}:{go:(path:string)=>void}){
+  return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/legal')}>‹</button><div><span className="eyebrow">PRIVACY</span><h1>Privacy Policy</h1><p>Effective 27 September 2026</p></div></div>
+    <div className="flat-card detail-section legal-copy">
+      <h3>What United Delhi collects</h3><p>United Delhi is designed to work without an account. The service does not currently ask for a name, phone number, email address, contacts, photos, microphone, camera, advertising identifier, or payment information.</p>
+      <h3>Location</h3><p>Location is optional. When you choose a location-based feature, foreground device location may be used to find nearby DTC stops and centre the map. Nearby coordinates are reduced in precision before being sent to the United Delhi API.</p>
+      <h3>Search and journey planning</h3><p>Search and journey-planning inputs are sent to the United Delhi API to return transit information. They are not intentionally used to create a user profile.</p>
+      <h3>Technical information</h3><p>Hosting, CDN, network and security infrastructure may process ordinary technical information such as IP addresses, timestamps, request metadata and error information.</p>
+      <h3>Third-party services</h3><p>United Delhi uses Delhi Open Transit Data, OpenStreetMap/Leaflet, the current API hosting provider, Vercel for the realtime-feed relay, PostgreSQL infrastructure and GitHub. These providers have their own terms and privacy policies.</p>
+      <h3>Security and retention</h3><p>Production API traffic uses HTTPS. Server-side credentials are kept on backend infrastructure. Rate limiting, input validation and database controls are used as appropriate. Realtime vehicle data may be retained for service operation and data quality.</p>
+      <h3>Your rights</h3><p>Subject to applicable law, privacy requests may include access, correction, deletion, withdrawal of consent and grievance redressal. Use the developer contact mechanism shown on the official app listing.</p>
+    </div></section>;
+}
+function Terms({go}:{go:(path:string)=>void}){
+  return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/legal')}>‹</button><div><span className="eyebrow">LEGAL</span><h1>Terms of Service</h1><p>Effective 27 September 2026</p></div></div>
+    <div className="flat-card detail-section legal-copy">
+      <h3>Service</h3><p>United Delhi is an independent transit-information service providing route, stop, map, journey-planning and realtime vehicle information. It is not a transport operator, government agency or emergency service.</p>
+      <h3>Transit information</h3><p>Transit information can be delayed, incomplete, changed, duplicated, incorrectly mapped or unavailable. Realtime positions, arrivals and journey-planning results are estimates and should not be treated as guarantees.</p>
+      <h3>Acceptable use</h3><p>Do not attack or interfere with the Service, bypass safeguards, obtain secrets, abuse upstream services, transmit malicious code, stalk or profile people, or misrepresent United Delhi or its data sources.</p>
+      <h3>Availability</h3><p>The Service may change, be suspended or become unavailable. Third-party data, maps and infrastructure have their own terms.</p>
+      <h3>Contact</h3><p>Privacy and legal inquiries may be submitted using the developer contact mechanism shown on the official app listing.</p>
+    </div></section>;
+}
+function Details({detail,go}:{detail:any;go:(path:string)=>void}){
+  const kind=detail?.kind, data=detail?.data||{};
+  if(kind==='route'){
+    const route=data.route||{},stops=Array.isArray(data.stops)?data.stops:[],buses=Array.isArray(data.vehicles)?data.vehicles:[];
+    const name=route.publicRouteName||routeName(route.short_name)||routeName(route.long_name)||'Bus route';
+    const bg=isHex(route.route_color)?route.route_color:BUS_COLORS.cngAcBlue,fg=isHex(route.route_text_color)?route.route_text_color:textFor(bg);
+    return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">BUS ROUTE</span><h1>{name}</h1><p>{route.fromStop||stops[0]?.name||'Starting stop'} → {route.toStop||stops[stops.length-1]?.name||'Ending stop'}</p></div></div>
+      <div className="flat-card route-hero"><span className="route-badge route-hero-badge" style={{backgroundColor:bg,color:fg}}>{name}</span><div className="direction-stack"><b>{route.fromStop||stops[0]?.name||'Starting stop'}</b><span><i/><b/><i/></span><b>{route.toStop||stops[stops.length-1]?.name||'Ending stop'}</b></div></div>
+      <div className="route-map" id="route-map-placeholder"><div className="empty-panel"><b>{buses.length?buses.length+' live buses':'No live buses on this route'}</b><p>Open the route map in the app for the full stop and vehicle map.</p></div></div>
+      <div className="metric-row"><div><b>{stops.length}</b><small>stops</small></div><div><b>{buses.length}</b><small>live buses</small></div><div><b>{String(buses[0]?.operator||'BUS')}</b><small>service</small></div></div>
+      <div className="flat-card detail-section"><div className="section-head-inline"><h2>Stops in order</h2><small>Tap a stop for live arrivals</small></div>{stops.map((s:any,i:number)=><button className="ordered-stop" key={s.stop_id} onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}><span className="timeline"><i/>{i<stops.length-1?<b/>:null}</span><span><small>{String(i+1).padStart(2,'0')}</small><b>{s.name}</b></span><span className="chevron">›</span></button>)}</div>
+    </section>;
+  }
+  const pair=data||{},stop=pair.stop||{},routes=Array.isArray(pair.routes)?pair.routes:[],arrivals=Array.isArray(pair.arrivals)?pair.arrivals:[];
+  const title=stop.name||'Bus stop';
+  return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">BUS STOP</span><h1>{title}</h1><p>{stop.stop_id||'Stop details'}</p></div></div>
+    <div className="flat-card stop-hero"><span className="square-icon">●</span><div><h2>{title}</h2><p>Bus stop</p></div></div>
+    <div className="flat-card detail-section"><div className="section-head-inline"><h2>Buses at this stop</h2><small>Live positions</small></div>{arrivals.length?arrivals.map((a:any)=><button className="arrival-row" key={a.vehicleId}><strong style={{background:a.serviceColor||BUS_COLORS.cngAcBlue,color:'#fff',padding:'6px 8px'}}>{routeName(a.routeShortName)||'Bus'}</strong><span className="row-copy"><b>To {a.toStop||'Destination'}</b><small>{a.observedAgeSeconds<60?'Updated just now':'Updated '+Math.floor(a.observedAgeSeconds/60)+' min ago'}</small></span><span className="chevron">›</span></button>):<p className="muted">No live buses are reporting at this stop right now.</p>}</div>
+    <div className="flat-card detail-section"><div className="section-head-inline"><h2>Routes at this stop</h2><span className="count-box">{routes.length}</span></div>{routes.map((r:any)=><button className="route-row" key={r.route_id} onClick={()=>go('/routes/'+encodeURIComponent(r.route_id))}><RouteBadge name={routeName(r.publicRouteName||r.short_name)||'Bus'} color={r.route_color} textColor={r.route_text_color}/><span className="row-copy"><b>{r.fromStop||'Starting stop'}</b><small>to {r.toStop||'Ending stop'}</small></span><span className="chevron">›</span></button>)}</div>
+  </section>;
+}
