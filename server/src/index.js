@@ -82,6 +82,7 @@ function loadOperationalMappings(){
         routeId,
         agencyId:String(row.agency_id??'').trim()||null,
         shortName:String(row.route_short_name??'').trim()||null,
+        routeColor:String(row.route_color??'').trim()||null,
       });
     }
     for(const row of trips){
