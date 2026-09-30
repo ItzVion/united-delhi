@@ -89,7 +89,7 @@ export default function HomeScreen(){
       center,
       stops:nearbyStops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
       buses:vehicles.flatMap(v=>{
-        const route=displayRouteName(v.routeShortName) || (v.routeId ? '#'+v.routeId : 'BUS');
+        const route=displayRouteName(v.routeShortName) || (v.routeId ? 'ID '+v.routeId : 'LIVE BUS');
         if(!route) return [];
         const c=resolveRouteColor(displayRouteName(v.routeShortName),v.routeColor,v.routeTextColor);
         return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];
@@ -160,15 +160,15 @@ export default function HomeScreen(){
         <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
-          const name=displayRouteName(selectedBus.routeShortName) || (selectedBus.routeId ? '#'+selectedBus.routeId : 'BUS');
-          if(!name || !selectedBus.routeId) return null;
+          const name=displayRouteName(selectedBus.routeShortName) || (selectedBus.routeId ? 'ID '+selectedBus.routeId : 'LIVE BUS');
+          if(!selectedBus.routeId) return null;
           const c=resolveRouteColor(name,selectedBus.routeColor,selectedBus.routeTextColor);
           const ageSeconds=Math.max(0,Math.round((Date.now()-Date.parse(selectedBus.observedAt))/1000));
           const freshness=Number.isFinite(ageSeconds)?(ageSeconds<60?'Updated just now':`Updated ${Math.floor(ageSeconds/60)} min ago`):'Live position';
           return <View style={styles.busPreview}>
             <Pressable style={styles.busPreviewClose} onPress={()=>setSelectedBus(null)}><Text style={styles.busPreviewCloseText}>×</Text></Pressable>
             <Pressable style={styles.busPreviewBody} onPress={()=>{
-              navigation.navigate('RouteDetails',{routeId:selectedBus.routeId!,label:name});
+              if(selectedBus.routeShortName) navigation.navigate('RouteDetails',{routeId:selectedBus.routeId!,label:name});
             }}>
               <View style={[styles.busPreviewBadge,{backgroundColor:c.background}]}><Text style={[styles.busPreviewBadgeText,{color:c.text}]}>{name}</Text></View>
               <View style={styles.busPreviewCopy}>
