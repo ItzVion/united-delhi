@@ -93,10 +93,10 @@ export default function StopDetailsScreen() {
           {arrivalsReason ? <Text style={styles.muted}>{arrivalsReason}</Text> : null}
           {!loading && !arrivalsReason && arrivals.length === 0 ? <Text style={styles.muted}>No live buses are reporting on these routes right now.</Text> : null}
           {arrivals.map(a => {
-            const name=displayRouteName(a.routeShortName) || (a.routeId ? '#'+a.routeId : 'BUS');
-            if(!name || !a.routeId)return null;
-            const rc=resolveRouteColor(name,a.routeColor,a.routeTextColor);
-            return <Pressable key={a.vehicleId} style={styles.arrival} onPress={() => navigation.navigate('RouteDetails', { routeId:a.routeId!, label:name })}>
+            const name=displayRouteName(a.routeShortName) || 'Live bus';
+            if(!a.routeId)return null;
+            const rc=a.serviceColor?{background:a.serviceColor,text:a.serviceType==='electric'?'#17313B':'#FFFFFF'}:resolveRouteColor(name,null,null);
+            return <Pressable key={a.vehicleId} style={styles.arrival} onPress={() => {if(a.routeShortName)navigation.navigate('RouteDetails', { routeId:a.routeId!, label:name });}} disabled={!a.routeShortName}>
               <View style={[styles.busIcon,{backgroundColor:rc.background}]}><Text style={{color:rc.text,fontWeight:'900',fontSize:11}}>{name}</Text></View>
               <View style={styles.arrivalMain}>
                 <Text style={styles.route}>{name}</Text>
