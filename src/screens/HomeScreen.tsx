@@ -42,6 +42,7 @@ export default function HomeScreen(){
   const [searchResults,setSearchResults]=useState<SearchResult[]>([]);
   const [searchLoading,setSearchLoading]=useState(false);
   const [searchError,setSearchError]=useState<string|null>(null);
+  const [legendOpen,setLegendOpen]=useState(false);
 
   const requestLocation=useCallback(async()=>{
     if(!(await confirmLocationUse())){setLocationStatus('Showing Delhi without your location.');return;}
@@ -165,6 +166,7 @@ export default function HomeScreen(){
                 const bus=vehicles.find(v=>v.id===m.busId);
                 if(bus)setSelectedBus(bus);
               }else if(m.type==='bounds'&&m.bounds)setBounds(m.bounds);
+              else if(m.type==='legend')setLegendOpen(true);
               else if(m.type==='locate')void requestLocation();
             }catch{}
           }}
@@ -197,6 +199,21 @@ export default function HomeScreen(){
           </View>;
         })() : null}
       </View>
+        <Modal visible={legendOpen} transparent animationType="fade" onRequestClose={()=>setLegendOpen(false)}>
+          <Pressable style={styles.legendOverlay} onPress={()=>setLegendOpen(false)}>
+            <Pressable style={styles.legendDialog} onPress={event=>event.stopPropagation()}>
+              <Text style={styles.legendTitle}>Bus Color Legend</Text>
+              <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Type</Text></View>
+              {[
+                [['#2FAFBC','EV AC (12 mtr)']],
+                [['#E57D43','EV DEVI AC (9 mtr)'],['#168F49','EV DEVI AC (9 mtr)']],
+                [['#3D82CE','CNG AC (12 mtr)'],['#E35F67','CNG AC (12 mtr)']],
+                [['#E5A16E','CNG NonAC (12 mtr)'],['#24C88B','CNG NonAC (12 mtr)']]
+              ].map((row,index)=><View key={index} style={styles.legendRow}><View style={styles.legendIcons}>{row.map(([color],j)=><View key={j} style={[styles.legendBus,{backgroundColor:color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View>)}</View><Text style={styles.legendType}>{row[0][1]}</Text></View>)}
+              <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Got it</Text></Pressable>
+            </Pressable>
+          </Pressable>
+        </Modal>
 
       <View style={styles.quickRow}>
         <QuickAction icon="↗" title="Plan trip" sub="Find your bus" accent={colors.secondary} onPress={()=>navigation.navigate('Planner')}/>
@@ -246,6 +263,7 @@ try{if(saved){const p=JSON.parse(saved);if(Number.isFinite(p.lat)&&Number.isFini
 const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5,minZoom:9,maxBounds:[[28.40,76.84],[28.88,77.35]],maxBoundsViscosity:.18,inertia:true,inertiaDeceleration:1800,inertiaMaxSpeed:1800,bounceAtZoomLimits:false}).setView(initialCenter,initialZoom);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
 const stopLayer=L.layerGroup().addTo(map),busLayer=L.layerGroup().addTo(map),userLayer=L.layerGroup().addTo(map),busMarkers=new Map(),busAnimations=new Map();
+const legendControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-legend'),button=L.DomUtil.create('button','');button.type='button';button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';button.title='Bus color legend';button.setAttribute('aria-label','Bus color legend');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'legend'})));wrap.appendChild(button);return wrap;}});map.addControl(new legendControl());
 const locateControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-locate'),button=L.DomUtil.create('button','');button.type='button';button.textContent='◎';button.title='Center on my location';button.setAttribute('aria-label','Center on my location');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>{if(currentLocation){map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.0,easeLinearity:.2})}else{window.ReactNativeWebView.postMessage(JSON.stringify({type:'locate'}));}});wrap.appendChild(button);return wrap;}});map.addControl(new locateControl());
 function reportBounds(){const b=map.getBounds();const c=map.getCenter();try{localStorage.setItem('ud-map-center',JSON.stringify({lat:c.lat,lon:c.lng}));}catch{}window.ReactNativeWebView.postMessage(JSON.stringify({type:'bounds',bounds:{south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()}}));}
 map.on('moveend',reportBounds);map.on('zoomend',reportBounds);setTimeout(reportBounds,250);
