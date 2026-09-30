@@ -247,7 +247,7 @@ const locateControl=L.Control.extend({options:{position:'bottomright'},onAdd:fun
 function reportBounds(){const b=map.getBounds();const c=map.getCenter();try{localStorage.setItem('ud-map-center',JSON.stringify({lat:c.lat,lon:c.lng}));}catch{}window.ReactNativeWebView.postMessage(JSON.stringify({type:'bounds',bounds:{south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()}}));}
 map.on('moveend',reportBounds);map.on('zoomend',reportBounds);setTimeout(reportBounds,250);
 function markerFor(v){
- const bg=validColor(v.color)?v.color:'#607D8B';
+ const bg=validColor(v.color)?v.color:'#3D82CE';
  const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
  return L.marker([Number(v.lat),Number(v.lon)],{zIndexOffset:1000,icon:L.divIcon({className:'ud-bus-icon',html:'<span style="display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:0;background:'+bg+';color:#fff;border:3px solid #fff;box-shadow:0 2px 8px rgba(28,54,34,.35);font:900 8px/1 system-ui,sans-serif;overflow:hidden;white-space:nowrap">'+escapeHtml(label)+'</span>',iconSize:[28,28],iconAnchor:[14,14]})});
 }
