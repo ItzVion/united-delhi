@@ -56,7 +56,7 @@ const styles=StyleSheet.create({
   eyebrow:{fontSize:10,fontWeight:'900',letterSpacing:1,color:colors.accent},
   title:{fontSize:28,fontWeight:'900',color:colors.text,marginTop:3},
   intro:{fontSize:14,lineHeight:21,color:colors.textMuted,marginTop:10},
-  card:{marginTop:18,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:16,overflow:'hidden'},
+  card:{marginTop:18,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:0,overflow:'hidden'},
   linkRow:{padding:15,borderBottomWidth:1,borderBottomColor:colors.border,flexDirection:'row',justifyContent:'space-between'},
   link:{fontSize:14,fontWeight:'900',color:colors.accent},
   arrow:{fontSize:24,color:colors.textMuted},
