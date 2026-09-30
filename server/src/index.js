@@ -5,6 +5,10 @@ import pg from 'pg';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import { importGtfs, GTFS_SOURCE_KEY, GTFS_SOURCE_URL } from './lib/gtfsBootstrap.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parse as parseCsv } from 'csv-parse/sync';
 
 const { Pool } = pg;
 const app = express();
@@ -60,6 +64,56 @@ function searchPattern(value){
   return stripped.length>=2?'%'+stripped+'%':null;
 }
 function normalizeBearing(value){const n=numberOrNull(value);return n!==null&&n>=0&&n<=360?n:null;}
+
+const operationalRouteMap=new Map();
+const operationalTripMap=new Map();
+
+function loadOperationalMappings(){
+  try{
+    const dataDir=path.join(path.dirname(fileURLToPath(import.meta.url)),'../data');
+    const routeText=fs.readFileSync(path.join(dataDir,'otd_operational_routes.csv'),'utf8');
+    const tripText=fs.readFileSync(path.join(dataDir,'otd_operational_trips.csv'),'utf8');
+    const routes=parseCsv(routeText,{columns:true,skip_empty_lines:true,bom:true,relax_column_count:true,trim:true});
+    const trips=parseCsv(tripText,{columns:true,skip_empty_lines:true,bom:true,relax_column_count:true,trim:true});
+    for(const row of routes){
+      const routeId=String(row.route_id??'').trim();
+      if(!routeId)continue;
+      operationalRouteMap.set(routeId,{
+        routeId,
+        agencyId:String(row.agency_id??'').trim()||null,
+        shortName:String(row.route_short_name??'').trim()||null,
+      });
+    }
+    for(const row of trips){
+      const tripId=String(row.trip_id??'').trim();
+      const routeId=String(row.route_id??'').trim();
+      if(tripId&&routeId)operationalTripMap.set(tripId,routeId);
+    }
+    console.log('Loaded pinned OTD operational mapping: '+operationalRouteMap.size+' routes, '+operationalTripMap.size+' trips.');
+  }catch(error){
+    console.error('Operational route mapping failed to load:',error instanceof Error?error.message:String(error));
+  }
+}
+
+function serviceColorForAgency(agencyId){
+  const agency=String(agencyId||'').trim().toUpperCase();
+  if(agency==='DIMTS')return '#F57C00';
+  if(agency==='DTC')return '#2E7D32';
+  return null;
+}
+
+function resolveOperationalRoute(vehicle){
+  const routeId=vehicle.routeId?String(vehicle.routeId):'';
+  const tripId=vehicle.tripId?String(vehicle.tripId):'';
+  const direct=routeId?operationalRouteMap.get(routeId):null;
+  const tripRouteId=tripId?operationalTripMap.get(tripId):null;
+  if(direct&&tripRouteId&&String(tripRouteId)!==routeId){
+    return null;
+  }
+  if(direct)return direct;
+  if(tripRouteId)return operationalRouteMap.get(String(tripRouteId))||null;
+  return null;
+}
 function observedAtFromTimestamp(value){
   const seconds=numberOrNull(value);
   const milliseconds=seconds===null?NaN:seconds*1000;
@@ -82,7 +136,7 @@ function entityToVehicle(entity){
   const timestamp=Number(vehicle.timestamp||0);
   const observedAt=timestamp>0?observedAtFromTimestamp(timestamp):new Date().toISOString();
   if(!observedAt)return null;
-  return{id,routeId,routeShortName:null,routeColor:null,routeTextColor:null,tripId,stopId,latitude:lat,longitude:lon,bearing:normalizeBearing(position.bearing),observedAt};
+  return{id,routeId,routeShortName:null,routeColor:null,routeTextColor:null,tripId,stopId,vehicleLabel:ok(descriptor.label)?boundedText(descriptor.label,120):null,licensePlate:ok(descriptor.licensePlate)?boundedText(descriptor.licensePlate,120):null,operator:null,serviceColor:null,latitude:lat,longitude:lon,bearing:normalizeBearing(position.bearing),observedAt};
 }
 async function getRealtimeVehicles(){
   const relayUrl = String(process.env.DTC_REALTIME_RELAY_URL || '').trim();
@@ -136,6 +190,15 @@ async function getRealtimeVehicles(){
       const observed=Date.parse(v.observedAt);
       return Number.isFinite(observed)&&Date.now()-observed<=5*60*1000;
     });
+    for(const v of vehicles){
+      const operational=resolveOperationalRoute(v);
+      if(operational){
+        v.routeShortName=operational.shortName;
+        v.operator=operational.agencyId;
+        v.serviceColor=serviceColorForAgency(operational.agencyId);
+      }
+    }
+
     if(pool&&vehicles.length){
       const routeIds=[...new Set(vehicles.map(v=>v.routeId).filter(Boolean))];
       if(routeIds.length){
@@ -145,9 +208,9 @@ async function getRealtimeVehicles(){
           for(const v of vehicles){
             const row=v.routeId?map.get(String(v.routeId)):null;
             if(!row)continue;
-            if(row.short_name)v.routeShortName=String(row.short_name).trim();
-            if(row.route_color)v.routeColor=String(row.route_color).trim();
-            if(row.route_text_color)v.routeTextColor=String(row.route_text_color).trim();
+            // Static database metadata can enrich direction/stops, but never override
+            // the pinned operational route identity or service color.
+            if(!v.routeShortName && row.short_name)v.routeShortName=String(row.short_name).trim();
             if(row.from_stop)v.fromStop=String(row.from_stop).trim();
             if(row.to_stop)v.toStop=String(row.to_stop).trim();
           }
@@ -447,6 +510,8 @@ app.use((error,_req,res,_next)=>{
   if(res.headersSent)return;
   res.status(500).json({status:'ERROR',reason:'Internal server error'});
 });
+loadOperationalMappings();
+
 const server=app.listen(port,()=>{
   console.log('United Delhi API listening on :'+port);
   void ensureStaticData().then(()=>startRealtimePolling()).catch(error=>{
