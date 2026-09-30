@@ -56,7 +56,7 @@ button:disabled{cursor:not-allowed}
 .error-box b{font-size:13px}
 .error-box span{font-size:11px;line-height:16px}
 
-.map-card{height:275px;position:relative;overflow:hidden;border:1px solid #D4DDE0;background:#E9EFF1}
+.map-card{height:clamp(275px,36vw,380px);position:relative;overflow:hidden;border:1px solid #D4DDE0;background:#E9EFF1}
 .dtc-map{width:100%;height:100%;background:#E9EFF1}
 .map-topbar{position:absolute;left:10px;top:10px;z-index:500;background:rgba(255,255,255,.95);padding:6px 9px;display:flex;align-items:center;gap:6px;font-size:10px}
 .map-topbar i{width:7px;height:7px;background:#2E7D32;display:block}
@@ -175,7 +175,7 @@ button:disabled{cursor:not-allowed}
 .direction-stack>span{display:flex;align-items:center;gap:4px}
 .direction-stack>span i,.direction-stack>span b{width:7px;height:7px;display:block;background:#00695C}
 .direction-stack>span b{width:20px;height:2px}
-.route-map{height:275px;position:relative;overflow:hidden;border:1px solid #D4DDE0;margin-top:10px;background:#E9EFF1}
+.route-map{height:clamp(275px,36vw,380px);position:relative;overflow:hidden;border:1px solid #D4DDE0;margin-top:10px;background:#E9EFF1}
 .metric-row{display:grid;grid-template-columns:repeat(3,1fr);margin:10px 0;gap:1px;background:#D4DDE0;border:1px solid #D4DDE0}
 .metric-row>div{background:#FFFFFF;padding:10px;text-align:center}
 .metric-row b{display:block;font-size:18px;color:#1F2A30}
