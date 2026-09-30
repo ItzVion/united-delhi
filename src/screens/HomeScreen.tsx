@@ -86,15 +86,23 @@ export default function HomeScreen(){
     const center=bounds
       ? {lat:(bounds.south+bounds.north)/2,lon:(bounds.west+bounds.east)/2}
       : {lat:location?.coords.latitude??DELHI.latitude,lon:location?.coords.longitude??DELHI.longitude};
+    // Fetch/cache the full realtime fleet, but only send buses inside the
+    // current map viewport to the WebView. This prevents thousands of DOM
+    // markers from being created outside the visible area.
+    const visible= bounds
+      ? vehicles.filter(v=>Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)&&
+          v.latitude>=bounds.south && v.latitude<=bounds.north &&
+          v.longitude>=bounds.west && v.longitude<=bounds.east)
+      : [];
     const payload={
       center,
       stops:nearbyStops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
-      buses:vehicles.flatMap(v=>{
+      buses:visible.map(v=>{
         const route=displayRouteName(v.routeShortName) || 'LIVE';
-        if(!route) return [];
-        const c=v.serviceColor?{background:v.serviceColor,text:'#FFFFFF'}:{background:SERVICE_COLORS[v.serviceType||'unknown'],text:v.serviceType==='electric'?'#17313B':'#FFFFFF'};
+        const fallback=v.serviceColor||SERVICE_COLORS[v.serviceType||'unknown'];
+        const c=v.routeColor?{background:v.routeColor,text:v.routeTextColor||'#FFFFFF'}:{background:fallback,text:v.serviceType==='electric'?'#17313B':'#FFFFFF'};
         return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];
-      }),
+      }).flat(),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
     };
     mapRef.current?.injectJavaScript(`window.updateMap(${JSON.stringify(payload)});true;`);
@@ -224,18 +232,48 @@ html,body,#map{margin:0;width:100%;height:100%;background:#eef2f1}.leaflet-contr
 .leaflet-control-locate{margin:0 8px 32px 0}.leaflet-control-locate button{width:40px;height:40px;border:1px solid #d8e4e0;border-radius:0;background:#fff;color:#0b746b;font:900 21px system-ui;line-height:40px;box-shadow:0 3px 14px rgba(23,49,47,.18);cursor:pointer}.leaflet-control-locate button:active{transform:scale(.96)}
 .stop-label{width:10px;height:10px;border-radius:0;background:#0b746b;border:2px solid #fff;box-shadow:0 2px 6px rgba(23,49,47,.28)}.bus-pin{width:34px;height:34px;border-radius:0;background:#f28c28;color:#fff;border:3px solid #fff;box-shadow:0 3px 10px rgba(23,49,47,.30);display:flex;align-items:center;justify-content:center;font:900 8px system-ui,sans-serif;line-height:1;text-align:center}.bus-pin span{max-width:27px;overflow:hidden;text-overflow:clip}
 </style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script>
-let currentLocation=null;let autoFocused=false;
-const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5}).setView([28.6139,77.209],10.5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:2,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
+let currentLocation=null;let autoFocused=false;let lastBusData=[];
+const saved=localStorage.getItem('ud-map-center');
+let initialCenter=[28.6139,77.209],initialZoom=10.5;
+try{if(saved){const p=JSON.parse(saved);if(Number.isFinite(p.lat)&&Number.isFinite(p.lon)){initialCenter=[p.lat,p.lon];initialZoom=14;}}}catch{}
+const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5,preferCanvas:true}).setView(initialCenter,initialZoom);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
 const stopLayer=L.layerGroup().addTo(map),busLayer=L.layerGroup().addTo(map),userLayer=L.layerGroup().addTo(map),busMarkers=new Map();
-const locateControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-locate'),button=L.DomUtil.create('button','');button.type='button';button.textContent='◎';button.title='Center on my location';button.setAttribute('aria-label','Center on my location');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>{if(currentLocation){map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.2,easeLinearity:.2})}else{window.ReactNativeWebView.postMessage(JSON.stringify({type:'locate'}));}});wrap.appendChild(button);return wrap;}});map.addControl(new locateControl());
-function reportBounds(){const b=map.getBounds();window.ReactNativeWebView.postMessage(JSON.stringify({type:'bounds',bounds:{south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()}}));}
-map.on('moveend',reportBounds);setTimeout(reportBounds,300);
+const locateControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-locate'),button=L.DomUtil.create('button','');button.type='button';button.textContent='◎';button.title='Center on my location';button.setAttribute('aria-label','Center on my location');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>{if(currentLocation){map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.0,easeLinearity:.2})}else{window.ReactNativeWebView.postMessage(JSON.stringify({type:'locate'}));}});wrap.appendChild(button);return wrap;}});map.addControl(new locateControl());
+function reportBounds(){const b=map.getBounds();const c=map.getCenter();try{localStorage.setItem('ud-map-center',JSON.stringify({lat:c.lat,lon:c.lng}));}catch{}window.ReactNativeWebView.postMessage(JSON.stringify({type:'bounds',bounds:{south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()}}));}
+map.on('moveend',reportBounds);map.on('zoomend',reportBounds);setTimeout(reportBounds,250);
+function markerFor(v){
+ const bg=validColor(v.color)?v.color:'#607D8B';
+ const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
+ return L.marker([Number(v.lat),Number(v.lon)],{zIndexOffset:1000,icon:L.divIcon({className:'ud-bus-icon',html:'<span style="display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:0;background:'+bg+';color:#fff;border:3px solid #fff;box-shadow:0 2px 8px rgba(28,54,34,.35);font:900 8px/1 system-ui,sans-serif;overflow:hidden;white-space:nowrap">'+escapeHtml(label)+'</span>',iconSize:[28,28],iconAnchor:[14,14]})});
+}
+function renderBuses(){
+ const visible=new Map();
+ const bounds=map.getBounds().pad(.12);
+ lastBusData.forEach(v=>{const lat=Number(v.lat),lon=Number(v.lon);if(!Number.isFinite(lat)||!Number.isFinite(lon)||!bounds.contains([lat,lon]))return;visible.set(v.id,v);});
+ for(const [id,marker] of busMarkers){if(!visible.has(id)){busLayer.removeLayer(marker);busMarkers.delete(id);}}
+ for(const [id,v] of visible){
+   const bg=validColor(v.color)?v.color:'#607D8B';
+   const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
+   const existing=busMarkers.get(id);
+   if(existing){
+     existing.setLatLng([Number(v.lat),Number(v.lon)]);
+     if(existing._udLabel!==label||existing._udBg!==bg){
+       const next=markerFor(v);next.on('click',()=>openBus(v.id));next._udLabel=label;next._udBg=bg;
+       busLayer.removeLayer(existing);busMarkers.set(id,next);next.addTo(busLayer);
+     }
+   }else{
+     const marker=markerFor(v);marker._udLabel=label;marker._udBg=bg;marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);busMarkers.set(id,marker);
+   }
+ }
+}
 window.updateMap=function(data){
- stopLayer.clearLayers();busLayer.clearLayers();userLayer.clearLayers();busMarkers.clear();currentLocation=data.location||null;if(currentLocation&&!autoFocused){autoFocused=true;setTimeout(()=>map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.35,easeLinearity:.2}),80);}
+ currentLocation=data.location||null;lastBusData=Array.isArray(data.buses)?data.buses:[];
+ stopLayer.clearLayers();userLayer.clearLayers();
  const stopIcon=L.divIcon({className:'',html:'<div class="stop-label"></div>',iconSize:[14,14],iconAnchor:[7,7]});
  data.stops.forEach(s=>{const popup=document.createElement('div'),title=document.createElement('b'),button=document.createElement('button');title.textContent=s.name;button.textContent='View stop';button.type='button';button.style.marginTop='6px';button.onclick=()=>openStop(s.id);popup.append(title,document.createElement('br'),button);L.marker([s.lat,s.lon],{icon:stopIcon,zIndexOffset:300}).addTo(stopLayer).bindPopup(popup);});
- data.buses.forEach(v=>{const bg=validColor(v.color)?v.color:'#607D8B';const label=map.getZoom()>=12?String(v.route).slice(0,10):''; const marker=L.marker([Number(v.lat),Number(v.lon)],{zIndexOffset:1000,icon:L.divIcon({className:'ud-bus-icon',html:'<span style="display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:0;background:'+bg+';color:#fff;border:3px solid #fff;box-shadow:0 2px 8px rgba(28,54,34,.35);font:900 8px/1 system-ui,sans-serif;overflow:hidden;white-space:nowrap">'+escapeHtml(label)+'</span>',iconSize:[28,28],iconAnchor:[14,14]})});marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);marker.bringToFront();busMarkers.set(v.id,marker);});
+ if(currentLocation&&!autoFocused){autoFocused=true;setTimeout(()=>map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.2,easeLinearity:.2}),80);}
+ renderBuses();
  if(currentLocation)L.circleMarker([currentLocation.lat,currentLocation.lon],{radius:9,color:'#fff',weight:3,fillColor:'#0b746b',fillOpacity:1}).addTo(userLayer);
 };
 function centerOnUser(){if(currentLocation)map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.2,easeLinearity:.2});}
