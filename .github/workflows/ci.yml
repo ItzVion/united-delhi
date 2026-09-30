@@ -36,12 +36,12 @@ jobs:
         shell: bash
         run: |
           set +e
-          : > ../../web-ci.log
-          npm install >> ../../web-ci.log 2>&1
+          : > web-ci.log
+          npm install  >> web-ci.log 2>&1
           code=$?
           if [ $code -eq 0 ]; then npm run typecheck >> ../../web-ci.log 2>&1; code=$?; fi
           if [ $code -eq 0 ]; then npm run build >> ../../web-ci.log 2>&1; code=$?; fi
-          cat ../../web-ci.log
+          cat web-ci.log
           exit $code
       - name: Upload web CI log
         if: always()
