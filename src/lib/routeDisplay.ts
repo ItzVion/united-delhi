@@ -3,7 +3,7 @@ export function normalizePublicRouteName(value: string | null | undefined): stri
   if (!route) return null;
   route = route.replace(/(?:UP|DOWN|DWN)$/i, '').trim() || route;
   route = route.replace(/^AIR-0+(?=\d)/i, 'AIR-');
-  return route;
+  return route || null;
 }
 
 export function displayRouteName(value: string | null | undefined): string | null {
