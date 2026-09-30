@@ -490,14 +490,18 @@ async function ensureStaticData(){
     const row=tables.rows[0];
     if(row.stops_table&&row.routes_table&&row.route_stops_table&&row.static_meta_table){
       const counts=(await lockClient.query('SELECT (SELECT COUNT(*) FROM stops) stops,(SELECT COUNT(*) FROM routes) routes,(SELECT COUNT(*) FROM route_stops) route_stops')).rows[0];
-      const meta=(await lockClient.query('SELECT source_key FROM static_feed_meta WHERE id=TRUE')).rows[0];
-      if(String(meta?.source_key||'')===GTFS_SOURCE_KEY&&Number(counts.stops)>=1000&&Number(counts.routes)>=500&&Number(counts.route_stops)>=10000){
-        console.log('Official OTD GTFS data is already complete.');
+      const complete=Number(counts.stops)>=9000&&Number(counts.routes)>=2000&&Number(counts.route_stops)>=50000;
+      if(complete){
+        await lockClient.query(
+          'INSERT INTO static_feed_meta(id,source_key,source_url,imported_at) VALUES(TRUE,$1,$2,NOW()) ' +
+          'ON CONFLICT(id) DO UPDATE SET source_key=EXCLUDED.source_key,source_url=EXCLUDED.source_url,imported_at=EXCLUDED.imported_at',
+          [GTFS_SOURCE_KEY,GTFS_SOURCE_URL]
+        );
+        console.log('Pinned OTD GTFS data is already complete.');
         staticDataCache.status='OK';
         staticDataCache.completedAt=new Date().toISOString();
         return;
       }
-      console.log('Static GTFS source changed or is incomplete; refreshing from official OTD.');
     }
     console.log('Static GTFS data is missing/incomplete; starting memory-efficient inline import...');
     staticDataCache.status='IMPORTING';
