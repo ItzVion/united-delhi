@@ -17,7 +17,6 @@ import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type MapBounds = { south:number; west:number; north:number; east:number };
 const DELHI={latitude:28.6139,longitude:77.209};
-const DELHI_BOUNDS=[[28.40,76.84],[28.88,77.35]] as const;
 const BUS_COLORS={
   evAc:'#2FAFBC', evDeviOrange:'#E57D43', evDeviGreen:'#168F49',
   cngAcBlue:'#3D82CE', cngAcRed:'#E35F67', cngNonAcPeach:'#E5A16E', cngNonAcGreen:'#24C88B'
