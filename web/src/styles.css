@@ -111,6 +111,8 @@ button:disabled{cursor:not-allowed}
 .page-top>div:nth-child(2){flex:1;min-width:0}
 
 .planner-form{padding:16px}
+.planner-input-wrap{position:relative}.planner-input-wrap input{position:relative;z-index:2}.planner-suggestions{position:absolute;left:0;right:0;top:39px;z-index:900;background:#FFFFFF;border:1px solid #D4DDE0;box-shadow:0 6px 18px rgba(31,42,48,.14);overflow:hidden}.planner-suggestion{width:100%;min-height:50px;padding:8px 10px;border:0;border-bottom:1px solid #D4DDE0;background:#FFFFFF;display:flex;align-items:center;gap:8px;text-align:left}.planner-suggestion:last-child{border-bottom:0}.planner-suggestion:hover{background:#F4F6F7}.planner-suggestion>span:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column}.planner-suggestion b{font-size:11px;color:#1F2A30;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.planner-suggestion small{font-size:9px;color:#68757B;margin-top:2px}.planner-suggestion>span:last-child{font-size:20px;color:#68757B}
+
 .planner-row{display:flex}
 .route-rail{width:20px;display:flex;flex-direction:column;align-items:center;padding-top:7px}
 .route-rail i{width:9px;height:9px;border:2px solid #00695C;background:#FFFFFF}
