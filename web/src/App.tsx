@@ -200,7 +200,7 @@ function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|
 
   useEffect(()=>{
     if(!el.current||mapRef.current)return;
-    let initial:Cordinate=[CENTER[0],CENTER[1]];
+    let initial:[number,number]=[CENTER[0],CENTER[1]];
     let initialZoom=10.5;
     try{
       const saved=localStorage.getItem('ud-map-center');
@@ -230,21 +230,23 @@ function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|
         const name=displayVehicleRoute(v);
         const label=map.getZoom()>=12&&name!=='LIVE'?name.slice(0,12):'';
         const existing=markers.get(id);
+        const wantedKind=map.getZoom()>=12&&name!=='LIVE'?'label':'dot';
         if(existing){
           existing.setLatLng([lat,lon]);
-          const node=existing.getElement?.();
-          const labelNode=node?.querySelector?.('.web-bus-label');
-          if(labelNode)labelNode.textContent=label;
-          if(existing._udBg!==bg){
-            const next=L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:2,fillColor:bg,fillOpacity:1});
-            next.on('click',()=>onSelect(v));next._udBg=bg;next._udLabel=label;existing.remove();next.addTo(map);markers.set(id,next);
-          }else{existing._udLabel=label;}
+          if(existing._udBg!==bg||existing._udKind!==wantedKind){
+            existing.remove();
+            markers.delete(id);
+            const next=wantedKind==='label'
+              ? L.marker([lat,lon],{icon:L.divIcon({className:'web-bus-icon',html:'<div class="web-bus" style="background:'+escapeHtml(bg)+'"><span class="web-bus-label">'+escapeHtml(label)+'</span></div>',iconSize:[38,38],iconAnchor:[19,19]}),zIndexOffset:1000})
+              : L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:2,fillColor:bg,fillOpacity:1});
+            next.on('click',()=>onSelect(v));next._udBg=bg;next._udKind=wantedKind;next.addTo(map);markers.set(id,next);
+          }
         }else{
-          if(map.getZoom()>=12&&name!=='LIVE'){
+          if(wantedKind==='label'){
             const icon=L.divIcon({className:'web-bus-icon',html:'<div class="web-bus" style="background:'+escapeHtml(bg)+'"><span class="web-bus-label">'+escapeHtml(label)+'</span></div>',iconSize:[38,38],iconAnchor:[19,19]});
-            const marker=L.marker([lat,lon],{icon,zIndexOffset:1000});marker.on('click',()=>onSelect(v));marker._udBg=bg;marker._udLabel=label;marker.addTo(map);markers.set(id,marker);
+            const marker=L.marker([lat,lon],{icon,zIndexOffset:1000});marker.on('click',()=>onSelect(v));marker._udBg=bg;marker._udKind='label';marker.addTo(map);markers.set(id,marker);
           }else{
-            const marker=L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:2,fillColor:bg,fillOpacity:1});marker.on('click',()=>onSelect(v));marker._udBg=bg;marker._udLabel=label;marker.addTo(map);markers.set(id,marker);
+            const marker=L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:2,fillColor:bg,fillOpacity:1});marker.on('click',()=>onSelect(v));marker._udBg=bg;marker._udKind='dot';marker.addTo(map);markers.set(id,marker);
           }
         }
       }
@@ -274,8 +276,6 @@ function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|
     }
   },[location]);
 }
-
-type Cordinate=[number,number];
 
 function BusPreview({bus,go}:{bus:Vehicle;go:(path:string)=>void}){
   return <div className="bus-preview">
