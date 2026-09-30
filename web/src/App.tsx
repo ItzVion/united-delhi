@@ -10,7 +10,7 @@ const CENTER:[number,number]=[28.6139,77.209];
 const BOUNDS:any=[[28.40,76.84],[28.88,77.35]];
 
 const routeName=(value:any)=>{const text=String(value||'').trim();if(!text)return null;return text.replace(/(?:UP|DOWN|DWN)$/i,'').replace(/^AIR-0+/i,'AIR-')||null;};
-const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||(v.routeId?'ID '+v.routeId:'LIVE BUS');
+const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||'LIVE';
 const isHex=(v:any)=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 const textFor=(bg:string)=>{const h=bg.replace('#','');const rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.55?'#17313B':'#FFFFFF';};
 const ageLabel=(value?:string)=>{const t=Date.parse(String(value||''));if(!Number.isFinite(t))return'Live';const s=Math.max(0,Math.round((Date.now()-t)/1000));return s<60?'Just now':Math.floor(s/60)+' min ago';};
@@ -216,7 +216,7 @@ function DtcMap({vehicles,location,onSelect}:{vehicles:Vehicle[];location:Point|
       const lat=Number(v.latitude),lon=Number(v.longitude);
       if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
       const name=displayVehicleRoute(v);
-      const bg=isHex(v.routeColor)?String(v.routeColor):'#00695C';
+      const bg=isHex(v.serviceColor)?String(v.serviceColor):'#607D8B';
       const html='<div class="web-bus" style="background:'+escapeHtml(bg)+'">'+escapeHtml(name.slice(0,8))+'</div>';
       const icon=L.divIcon({className:'web-bus-icon',html,iconSize:[38,38],iconAnchor:[19,19]});
       L.marker([lat,lon],{icon,zIndexOffset:1000}).on('click',()=>onSelect(v)).addTo(layer);
@@ -240,7 +240,7 @@ function BusPreview({bus,go}:{bus:Vehicle;go:(path:string)=>void}){
   return <div className="bus-preview">
     <button className="preview-close" onClick={()=>go('/')}>×</button>
     <button className="preview-body" onClick={()=>{if(bus.routeShortName&&bus.routeId)go('/routes/'+encodeURIComponent(bus.routeId));}} disabled={!bus.routeShortName||!bus.routeId}>
-      <RouteBadge name={displayVehicleRoute(bus)} color={bus.routeColor} textColor={bus.routeTextColor}/>
+      <RouteBadge name={displayVehicleRoute(bus)} color={bus.serviceColor} textColor={'#FFFFFF'}/>
       <span><small>LIVE BUS</small><b>To {bus.toStop||'Destination'}</b><em>{bus.id} · {ageLabel(bus.observedAt)} · View route</em></span><strong>›</strong>
     </button>
   </div>;
