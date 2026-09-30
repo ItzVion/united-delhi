@@ -154,6 +154,7 @@ export default function App(){
        :detail?<Details detail={detail} go={go}/>:null}
     </main>
 
+    <BusLegend open={legendOpen} onClose={()=>setLegendOpen(false)}/>
     <nav className="bottom-nav">
       <button className={page.kind==='home'?'active':''} onClick={()=>go('/')}><span>⌂</span><small>Home</small></button>
       <button className={page.kind==='plan'?'active':''} onClick={()=>go('/plan')}><span>↗</span><small>Plan</small></button>
