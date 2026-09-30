@@ -15,6 +15,8 @@ export type Vehicle={
   routeTextColor?:string|null;
   fromStop?:string|null;
   toStop?:string|null;
+  serviceType?:'dtc'|'cluster'|'electric'|'unknown';
+  serviceColor?:string|null;
   latitude:number;
   longitude:number;
   observedAt?:string;
