@@ -199,7 +199,7 @@ function BusPreview({bus,go}:{bus:Vehicle;go:(path:string)=>void}){
   return <div className="bus-preview">
     <button className="preview-close" onClick={()=>go('/')}>×</button>
     <button className="preview-body" onClick={()=>go('/routes/'+encodeURIComponent(bus.routeId||''))}>
-      <RouteBadge name={name} routeColor={r.route_color} routeTextColor={r.route_text_color}/>
+      <RouteBadge name={name} routeColor={bus.routeColor} routeTextColor={bus.routeTextColor}/>
       <span><small>LIVE BUS</small><b>To {bus.toStop||'Destination'}</b><em>{bus.id} · {fresh(bus.observedAt)} · View route</em></span>
       <strong>›</strong>
     </button>
