@@ -93,7 +93,7 @@ export default function HomeScreen(){
         if(!route) return [];
         const c=resolveRouteColor(displayRouteName(v.routeShortName),v.routeColor,v.routeTextColor);
         return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];
-      }).slice(0,220),
+      }),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
     };
     mapRef.current?.injectJavaScript(`window.updateMap(${JSON.stringify(payload)});true;`);
@@ -160,7 +160,7 @@ export default function HomeScreen(){
         <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
-          const name=displayRouteName(selectedBus.routeShortName);
+          const name=displayRouteName(selectedBus.routeShortName) || (selectedBus.routeId ? '#'+selectedBus.routeId : 'BUS');
           if(!name || !selectedBus.routeId) return null;
           const c=resolveRouteColor(name,selectedBus.routeColor,selectedBus.routeTextColor);
           const ageSeconds=Math.max(0,Math.round((Date.now()-Date.parse(selectedBus.observedAt))/1000));
