@@ -167,9 +167,9 @@ export async function importGtfs({ pool }) {
     await insertChunks(client, routeStops);
 
     await client.query(
-      'INSERT INTO static_feed_meta(id,source_key,source_url,imported_at) VALUES(TRUE,$1,$2,NOW()) ' +
-      'ON CONFLICT(id) DO UPDATE SET source_key=EXCLUDED.source_key,source_url=EXCLUDED.source_url,imported_at=EXCLUDED.imported_at',
-      [GTFS_SOURCE_KEY, GTFS_SOURCE_URL]
+      'INSERT INTO static_feed_meta(id,source_key,source_url,imported_at,imported_route_count,imported_stop_count,imported_route_stop_count) VALUES(TRUE,$1,$2,NOW(),$3,$4,$5) ' +
+      'ON CONFLICT(id) DO UPDATE SET source_key=EXCLUDED.source_key,source_url=EXCLUDED.source_url,imported_at=EXCLUDED.imported_at,imported_route_count=EXCLUDED.imported_route_count,imported_stop_count=EXCLUDED.imported_stop_count,imported_route_stop_count=EXCLUDED.imported_route_stop_count',
+      [GTFS_SOURCE_KEY, GTFS_SOURCE_URL, routes.length, stops.length, routeStops.length]
     );
 
     await client.query('COMMIT');
