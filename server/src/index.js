@@ -130,8 +130,9 @@ async function getRealtimeVehicles(){
       if(vehicle?.id)vehicleMap.set(vehicle.id,vehicle);
     }
     const rawVehicles=[...vehicleMap.values()];
+    // Keep every fresh, valid OTD vehicle. Static GTFS data is enrichment only:
+    // a route or stop mismatch must never make a realtime vehicle disappear.
     const vehicles=rawVehicles.filter(v=>{
-      if(!v.routeId)return false;
       const observed=Date.parse(v.observedAt);
       return Number.isFinite(observed)&&Date.now()-observed<=5*60*1000;
     });
@@ -141,33 +142,22 @@ async function getRealtimeVehicles(){
         try{
           const result=await pool.query(`SELECT r.route_id,r.short_name,r.route_color,r.route_text_color,start_stop.name AS from_stop,end_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.name,s.stop_id LIMIT 1) start_stop ON TRUE LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.name,s.stop_id LIMIT 1) end_stop ON TRUE WHERE r.route_id=ANY($1::text[])`,[routeIds]);
           const map=new Map(result.rows.map(row=>[String(row.route_id),row]));
-          const routeStops=new Map();
-          const stopRows=await pool.query(`SELECT rs.route_id,s.stop_id,s.latitude,s.longitude FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=ANY($1::text[])`,[routeIds]);
-          for(const row of stopRows.rows){
-            const key=String(row.route_id);
-            if(!routeStops.has(key))routeStops.set(key,{ids:new Set(),points:[]});
-            routeStops.get(key).ids.add(String(row.stop_id));
-            routeStops.get(key).points.push({lat:Number(row.latitude),lon:Number(row.longitude)});
-          }
           for(const v of vehicles){
             const row=v.routeId?map.get(String(v.routeId)):null;
-            if(!row?.short_name){v.routeShortName=null;continue;}
-            const meta=routeStops.get(String(v.routeId));
-            if(!meta||!meta.points.some(stop=>haversineMeters(v.latitude,v.longitude,stop.lat,stop.lon)<=3000)){v.routeShortName=null;continue;}
-            if(v.stopId&&!meta.ids.has(String(v.stopId))){v.routeShortName=null;continue;}
-            v.routeShortName=String(row.short_name).trim();
-            v.routeColor=row.route_color?String(row.route_color).trim():null;
-            v.routeTextColor=row.route_text_color?String(row.route_text_color).trim():null;
-            v.fromStop=row.from_stop?String(row.from_stop).trim():null;
-            v.toStop=row.to_stop?String(row.to_stop).trim():null;
+            if(!row)continue;
+            if(row.short_name)v.routeShortName=String(row.short_name).trim();
+            if(row.route_color)v.routeColor=String(row.route_color).trim();
+            if(row.route_text_color)v.routeTextColor=String(row.route_text_color).trim();
+            if(row.from_stop)v.fromStop=String(row.from_stop).trim();
+            if(row.to_stop)v.toStop=String(row.to_stop).trim();
           }
         }catch(error){
-          console.error('Realtime route lookup failed:',error.message);
-          return [];
+          // Realtime GPS data is still useful without static-data enrichment.
+          console.error('Realtime route enrichment failed:',error.message);
         }
       }
     }
-    return vehicles.filter(v=>Boolean(v.routeShortName));
+    return vehicles;
   }catch(error){
     if(error?.name==='AbortError')throw new Error('Realtime feed timed out after 15 seconds');
     const cause=error?.cause;
