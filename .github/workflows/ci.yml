@@ -32,24 +32,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Validate web and capture log
-        shell: bash
-        run: |
-          set +e
-          : > web-ci.log
-          npm install  >> web-ci.log 2>&1
-          code=$?
-          if [ $code -eq 0 ]; then npm run typecheck >> ../../web-ci.log 2>&1; code=$?; fi
-          if [ $code -eq 0 ]; then npm run build >> ../../web-ci.log 2>&1; code=$?; fi
-          cat web-ci.log
-          exit $code
-      - name: Upload web CI log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-ci-log
-          path: web-ci.log
-          if-no-files-found: warn
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm run build
       - run: npm audit --audit-level=high
   backend:
     runs-on: ubuntu-latest
