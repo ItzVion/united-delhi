@@ -237,8 +237,18 @@ function BusLegend({open,onClose}:{open:boolean;onClose:()=>void}){
 }
 
 function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];location:Point|null;onSelect:(v:Vehicle)=>void;onLegend:()=>void}){
+  const el=useRef<HTMLDivElement|null>(null);
+  const mapRef=useRef<any>(null);
+  const markersRef=useRef<Map<string,any>>(new Map());
+  const userRef=useRef<any>(null);
+  const vehiclesRef=useRef<Vehicle[]>([]);
+  const animationsRef=useRef<Map<string,number>>(new Map());
+  const focused=useRef(false);
   const locationRef=useRef<Point|null>(location);
   const legendRef=useRef<()=>void>(onLegend);
+  useEffect(()=>{locationRef.current=location;},[location]);
+  useEffect(()=>{legendRef.current=onLegend;},[onLegend]);
+
   useEffect(()=>{locationRef.current=location;},[location]);
   useEffect(()=>{legendRef.current=onLegend;},[onLegend]);
   const el=useRef<HTMLDivElement|null>(null);
