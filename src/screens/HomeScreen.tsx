@@ -89,9 +89,9 @@ export default function HomeScreen(){
       center,
       stops:nearbyStops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
       buses:vehicles.flatMap(v=>{
-        const route=displayRouteName(v.routeShortName) || (v.routeId ? 'ID '+v.routeId : 'LIVE BUS');
+        const route=displayRouteName(v.routeShortName) || 'LIVE';
         if(!route) return [];
-        const c=resolveRouteColor(displayRouteName(v.routeShortName),v.routeColor,v.routeTextColor);
+        const c=v.serviceColor?{background:v.serviceColor,text:'#FFFFFF'}:resolveRouteColor(displayRouteName(v.routeShortName),null,null);
         return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];
       }),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
@@ -160,9 +160,9 @@ export default function HomeScreen(){
         <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
-          const name=displayRouteName(selectedBus.routeShortName) || (selectedBus.routeId ? 'ID '+selectedBus.routeId : 'LIVE BUS');
+          const name=displayRouteName(selectedBus.routeShortName) || 'Live bus';
           if(!selectedBus.routeId) return null;
-          const c=resolveRouteColor(name,selectedBus.routeColor,selectedBus.routeTextColor);
+          const c=selectedBus.serviceColor?{background:selectedBus.serviceColor,text:'#FFFFFF'}:resolveRouteColor(displayRouteName(selectedBus.routeShortName),null,null);
           const ageSeconds=Math.max(0,Math.round((Date.now()-Date.parse(selectedBus.observedAt))/1000));
           const freshness=Number.isFinite(ageSeconds)?(ageSeconds<60?'Updated just now':`Updated ${Math.floor(ageSeconds/60)} min ago`):'Live position';
           return <View style={styles.busPreview}>
