@@ -17,7 +17,11 @@ import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type MapBounds = { south:number; west:number; north:number; east:number };
 const DELHI={latitude:28.6139,longitude:77.209};
-const SERVICE_COLORS={dtc:'#2E7D32',cluster:'#F57C00',electric:'#81D4FA',unknown:'#607D8B'} as const;
+const BUS_COLORS={
+  evAc:'#2FAFBC', evDeviOrange:'#E57D43', evDeviGreen:'#168F49',
+  cngAcBlue:'#3D82CE', cngAcRed:'#E35F67', cngNonAcPeach:'#E5A16E', cngNonAcGreen:'#24C88B'
+} as const;
+const SERVICE_COLORS={dtc:BUS_COLORS.cngNonAcGreen,cluster:BUS_COLORS.evDeviOrange,electric:BUS_COLORS.evAc,unknown:BUS_COLORS.cngAcBlue} as const;
 
 export default function HomeScreen(){
   const navigation=useNavigation<Nav>();
@@ -100,7 +104,7 @@ export default function HomeScreen(){
       buses:visible.map(v=>{
         const route=displayRouteName(v.routeShortName) || 'LIVE';
         const fallback=v.serviceColor||SERVICE_COLORS[v.serviceType||'unknown'];
-        const c=v.routeColor?{background:v.routeColor,text:v.routeTextColor||'#FFFFFF'}:{background:fallback,text:v.serviceType==='electric'?'#17313B':'#FFFFFF'};
+        const c={background:fallback,text:v.serviceType==='electric'?'#17313B':'#FFFFFF'};
         return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];
       }).flat(),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
@@ -171,7 +175,7 @@ export default function HomeScreen(){
         {selectedBus ? (() => {
           const name=displayRouteName(selectedBus.routeShortName) || 'Live bus';
           if(!selectedBus.routeId) return null;
-          const c=selectedBus.serviceColor?{background:selectedBus.serviceColor,text:'#FFFFFF'}:{background:SERVICE_COLORS[selectedBus.serviceType||'unknown'],text:selectedBus.serviceType==='electric'?'#17313B':'#FFFFFF'};
+          const c={background:selectedBus.serviceColor||SERVICE_COLORS[selectedBus.serviceType||'unknown'],text:selectedBus.serviceType==='electric'?'#17313B':'#FFFFFF'};
           const ageSeconds=Math.max(0,Math.round((Date.now()-Date.parse(selectedBus.observedAt))/1000));
           const freshness=Number.isFinite(ageSeconds)?(ageSeconds<60?'Updated just now':`Updated ${Math.floor(ageSeconds/60)} min ago`):'Live position';
           return <View style={styles.busPreview}>
@@ -238,7 +242,7 @@ let initialCenter=[28.6139,77.209],initialZoom=10.5;
 try{if(saved){const p=JSON.parse(saved);if(Number.isFinite(p.lat)&&Number.isFinite(p.lon)){initialCenter=[p.lat,p.lon];initialZoom=14;}}}catch{}
 const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5,inertia:true,inertiaDeceleration:1800,inertiaMaxSpeed:1800,bounceAtZoomLimits:false}).setView(initialCenter,initialZoom);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
-const stopLayer=L.layerGroup().addTo(map),busLayer=L.layerGroup().addTo(map),userLayer=L.layerGroup().addTo(map),busMarkers=new Map();
+const stopLayer=L.layerGroup().addTo(map),busLayer=L.layerGroup().addTo(map),userLayer=L.layerGroup().addTo(map),busMarkers=new Map(),busAnimations=new Map();
 const locateControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-locate'),button=L.DomUtil.create('button','');button.type='button';button.textContent='◎';button.title='Center on my location';button.setAttribute('aria-label','Center on my location');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>{if(currentLocation){map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.0,easeLinearity:.2})}else{window.ReactNativeWebView.postMessage(JSON.stringify({type:'locate'}));}});wrap.appendChild(button);return wrap;}});map.addControl(new locateControl());
 function reportBounds(){const b=map.getBounds();const c=map.getCenter();try{localStorage.setItem('ud-map-center',JSON.stringify({lat:c.lat,lon:c.lng}));}catch{}window.ReactNativeWebView.postMessage(JSON.stringify({type:'bounds',bounds:{south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()}}));}
 map.on('moveend',reportBounds);map.on('zoomend',reportBounds);setTimeout(reportBounds,250);
@@ -247,17 +251,39 @@ function markerFor(v){
  const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
  return L.marker([Number(v.lat),Number(v.lon)],{zIndexOffset:1000,icon:L.divIcon({className:'ud-bus-icon',html:'<span style="display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:0;background:'+bg+';color:#fff;border:3px solid #fff;box-shadow:0 2px 8px rgba(28,54,34,.35);font:900 8px/1 system-ui,sans-serif;overflow:hidden;white-space:nowrap">'+escapeHtml(label)+'</span>',iconSize:[28,28],iconAnchor:[14,14]})});
 }
+function animateMarker(marker,target,duration=1100){
+ const tLat=Number(target[0]),tLon=Number(target[1]);
+ if(!Number.isFinite(tLat)||!Number.isFinite(tLon))return;
+ const previous=busAnimations.get(marker);
+ if(previous)cancelAnimationFrame(previous);
+ const current=marker.getLatLng();
+ const fromLat=Number(current.lat),fromLon=Number(current.lng);
+ if(!Number.isFinite(fromLat)||!Number.isFinite(fromLon)){
+   marker.setLatLng([tLat,tLon]);return;
+ }
+ const dLat=tLat-fromLat,dLon=tLon-fromLon;
+ if(Math.abs(dLat)+Math.abs(dLon)<0.0000002){marker.setLatLng([tLat,tLon]);return;}
+ const start=performance.now();
+ const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+ const step=now=>{
+   const p=Math.min(1,(now-start)/duration),e=ease(p);
+   marker.setLatLng([fromLat+dLat*e,fromLon+dLon*e]);
+   if(p<1)busAnimations.set(marker,requestAnimationFrame(step));else busAnimations.delete(marker);
+ };
+ busAnimations.set(marker,requestAnimationFrame(step));
+}
 function renderBuses(){
  const visible=new Map();
  const bounds=map.getBounds().pad(.12);
  lastBusData.forEach(v=>{const lat=Number(v.lat),lon=Number(v.lon);if(!Number.isFinite(lat)||!Number.isFinite(lon)||!bounds.contains([lat,lon]))return;visible.set(v.id,v);});
- for(const [id,marker] of busMarkers){if(!visible.has(id)){busLayer.removeLayer(marker);busMarkers.delete(id);}}
+ for(const [id,marker] of busMarkers){if(!visible.has(id)){const frame=busAnimations.get(marker);if(frame)cancelAnimationFrame(frame);busAnimations.delete(marker);busLayer.removeLayer(marker);busMarkers.delete(id);}}
  for(const [id,v] of visible){
    const bg=validColor(v.color)?v.color:'#607D8B';
    const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
    const existing=busMarkers.get(id);
    if(existing){
-     existing.setLatLng([Number(v.lat),Number(v.lon)]);
+     animateMarker(existing,[Number(v.lat),Number(v.lon)]);
+
      if(existing._udLabel!==label||existing._udBg!==bg){
        const next=markerFor(v);next.on('click',()=>openBus(v.id));next._udLabel=label;next._udBg=bg;
        busLayer.removeLayer(existing);busMarkers.set(id,next);next.addTo(busLayer);
