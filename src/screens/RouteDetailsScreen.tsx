@@ -42,7 +42,7 @@ export default function RouteDetailsScreen(){
     if(!mapReady)return;
     const payload={
       stops:stops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
-      buses:vehicles.flatMap(v=>{const name=displayRouteName(v.routeShortName);if(!name)return [];const c=resolveRouteColor(name,v.routeColor,v.routeTextColor);return[{id:v.id,route:name,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];})
+      buses:vehicles.flatMap(v=>{const name=displayRouteName(v.routeShortName);if(!name)return [];const c=v.serviceColor?{background:v.serviceColor,text:v.serviceType==='electric'?'#17313B':'#FFFFFF'}:resolveRouteColor(name,null,null);return[{id:v.id,route:name,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];})
     };
     mapRef.current?.injectJavaScript(`window.updateRouteMap(${JSON.stringify(payload)});true;`);
   },[mapReady,stops,vehicles]);
@@ -80,7 +80,7 @@ export default function RouteDetailsScreen(){
     <View style={styles.summary}>
       <Metric value={String(stops.length)} label="stops"/>
       <Metric value={String(vehicles.length)} label="live buses"/>
-      <Metric value={route?.short_name ? 'DTC' : '—'} label="service"/>
+      <Metric value={selectedBus?.operator||'BUS'} label="service"/>
     </View>
 
     {vehicles.length>0?<View style={styles.liveCard}>
@@ -93,7 +93,7 @@ export default function RouteDetailsScreen(){
         <Pressable style={styles.modalDismissArea} onPress={()=>setSelectedBus(null)}/>
         {selectedBus ? (() => {
           const busName=displayRouteName(selectedBus.routeShortName)||routeName;
-          const busColor=resolveRouteColor(busName,selectedBus.routeColor,selectedBus.routeTextColor);
+          const busColor=selectedBus.serviceColor?{background:selectedBus.serviceColor,text:selectedBus.serviceType==='electric'?'#17313B':'#FFFFFF'}:resolveRouteColor(busName,null,null);
           const ageMs=Date.now()-Date.parse(selectedBus.observedAt);
           const age=Number.isFinite(ageMs)?Math.max(0,Math.round(ageMs/1000)):null;
           return <View style={styles.busSheet}>
