@@ -1,1 +1,1 @@
-{"extends":"expo/tsconfig.base","compilerOptions":{"strict":true,"skipLibCheck":true},"exclude":["web","src/lib/__tests__/**"]}
+{"extends":"expo/tsconfig.base","compilerOptions":{"strict":true,"skipLibCheck":true},"exclude":["web","server","realtime-relay","src/lib/__tests__/**"]}
