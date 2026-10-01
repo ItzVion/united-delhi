@@ -32,8 +32,20 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.set('etag', false);
 const appOrigins = String(process.env.APP_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean);
-const defaultOrigin = /^https:\/\/(?:[a-z0-9-]+\.)?vercel\.app$/i;
-app.use(cors({ origin: appOrigins.length ? appOrigins : defaultOrigin }));
+const defaultAllowedOrigin = /^https:\/\/(?:[a-z0-9-]+\.)?vercel\.app$/i;
+const extraAllowedOrigins = new Set([
+  'https://united-delhi.vercel.app',
+  'https://uniteddelhi.vercel.app',
+  'http://localhost',
+  'http://localhost:3000',
+  'http://localhost:5173',
+]);
+const allowedOrigin = (origin) => {
+  if (!origin) return true;
+  if (appOrigins.length) return appOrigins.includes(origin);
+  return defaultAllowedOrigin.test(origin) || extraAllowedOrigins.has(origin);
+};
+app.use(cors({ origin: allowedOrigin }));
 app.use(express.json({ limit: '32kb', strict: true }));
 app.use((_req,res,next)=>{
   res.setHeader('X-Content-Type-Options','nosniff');
