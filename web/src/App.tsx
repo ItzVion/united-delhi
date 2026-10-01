@@ -350,6 +350,39 @@ function BusPreview({bus,go}:{bus:Vehicle;go:(path:string)=>void}){
   </div>;
 }
 
+function RouteMiniMap({stops,buses}:{stops:any[];buses:Vehicle[]}) {
+  const el=useRef<HTMLDivElement|null>(null);
+  useEffect(()=>{
+    if(!el.current)return;
+    const validStops=stops.filter((s:any)=>Number.isFinite(Number(s.latitude))&&Number.isFinite(Number(s.longitude)));
+    if(!validStops.length)return;
+    const map:any=L.map(el.current,{zoomControl:true,attributionControl:true,preferCanvas:true,scrollWheelZoom:false,dragging:true}).setView([Number(validStops[0].latitude),Number(validStops[0].longitude)],13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,updateWhenIdle:true,keepBuffer:1,attribution:'© OpenStreetMap contributors'}).addTo(map);
+    const linePoints=validStops.map((s:any)=>[Number(s.latitude),Number(s.longitude)] as [number,number]);
+    L.polyline(linePoints,{color:'#00695C',weight:4,opacity:.78}).addTo(map);
+    const stopLayer=L.layerGroup().addTo(map);
+    validStops.forEach((s:any,i:number)=>{
+      L.circleMarker([Number(s.latitude),Number(s.longitude)],{radius:i===0||i===validStops.length-1?6:4,color:'#fff',weight:2,fillColor:i===0||i===validStops.length-1?'#00695C':'#1976D2',fillOpacity:1})
+        .bindTooltip(String(s.name||'Stop'),{direction:'top',offset:[0,-5]})
+        .addTo(stopLayer);
+    });
+    const busLayer=L.layerGroup().addTo(map);
+    buses.forEach((bus:any)=>{
+      const lat=Number(bus.latitude),lon=Number(bus.longitude);
+      if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
+      const color=busColorFor(bus);
+      L.circleMarker([lat,lon],{radius:7,color:'#fff',weight:2,fillColor:color,fillOpacity:1})
+        .bindTooltip(displayVehicleRoute(bus),{direction:'top',offset:[0,-6]})
+        .addTo(busLayer);
+    });
+    const bounds=L.latLngBounds(linePoints as any);
+    if(bounds.isValid())map.fitBounds(bounds.pad(.12),{maxZoom:14});
+    window.setTimeout(()=>map.invalidateSize(),80);
+    return()=>map.remove();
+  },[stops,buses]);
+  return <div className="route-map"><div ref={el} style={{width:'100%',height:'100%'}}/>{!buses.length?<div className="route-map-status">No live buses are reporting on this route right now.</div>:null}</div>;
+}
+
 function RouteBadge({name,color,textColor}:{name:string;color?:string|null;textColor?:string|null}){
   const bg=isHex(color)?String(color):'#00695C';
   return <span className="route-badge" style={{backgroundColor:bg,color:isHex(textColor)?String(textColor):textFor(bg)}}>{name}</span>;
@@ -407,7 +440,7 @@ function Details({detail,go}:{detail:any;go:(path:string)=>void}){
     const bg=isHex(route.route_color)?route.route_color:BUS_COLORS.cngAcBlue,fg=isHex(route.route_text_color)?route.route_text_color:textFor(bg);
     return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">BUS ROUTE</span><h1>{name}</h1><p>{route.fromStop||stops[0]?.name||'Starting stop'} → {route.toStop||stops[stops.length-1]?.name||'Ending stop'}</p></div></div>
       <div className="flat-card route-hero"><span className="route-badge route-hero-badge" style={{backgroundColor:bg,color:fg}}>{name}</span><div className="direction-stack"><b>{route.fromStop||stops[0]?.name||'Starting stop'}</b><span><i/><b/><i/></span><b>{route.toStop||stops[stops.length-1]?.name||'Ending stop'}</b></div></div>
-      <div className="route-map" id="route-map-placeholder"><div className="empty-panel"><b>{buses.length?buses.length+' live buses':'No live buses on this route'}</b><p>Open the route map in the app for the full stop and vehicle map.</p></div></div>
+      <RouteMiniMap stops={stops} buses={buses}/>
       <div className="metric-row"><div><b>{stops.length}</b><small>stops</small></div><div><b>{buses.length}</b><small>live buses</small></div><div><b>{String(buses[0]?.operator||'BUS')}</b><small>service</small></div></div>
       <div className="flat-card detail-section"><div className="section-head-inline"><h2>Stops in order</h2><small>Tap a stop for live arrivals</small></div>{stops.map((s:any,i:number)=><button className="ordered-stop" key={s.stop_id} onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}><span className="timeline"><i/>{i<stops.length-1?<b/>:null}</span><span><small>{String(i+1).padStart(2,'0')}</small><b>{s.name}</b></span><span className="chevron">›</span></button>)}</div>
     </section>;
