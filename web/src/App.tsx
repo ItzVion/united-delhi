@@ -9,6 +9,11 @@ type Point={lat:number;lon:number};
 const CENTER:[number,number]=[28.6139,77.209];
 const BOUNDS:any=[[28.40,76.84],[28.88,77.35]];
 
+type DtcMarker = (L.Marker | L.CircleMarker) & {
+  _udBg?: string;
+  _udKind?: 'label'|'dot';
+};
+
 const routeName=(value:any)=>{const text=String(value||'').trim();if(!text)return null;return text.replace(/(?:UP|DOWN|DWN)$/i,'').replace(/^AIR-0+/i,'AIR-')||null;};
 const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||'LIVE';
 const isHex=(v:any)=>/^#[0-9a-f]{6}$/i.test(String(v||''));
@@ -240,7 +245,7 @@ function BusLegend({open,onClose}:{open:boolean;onClose:()=>void}){
 function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];location:Point|null;onSelect:(v:Vehicle)=>void;onLegend:()=>void}){
   const el=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<any>(null);
-  const markersRef=useRef<Map<string,any>>(new Map());
+  const markersRef=useRef<Map<string,DtcMarker>>(new Map());
   const userRef=useRef<any>(null);
   const vehiclesRef=useRef<Vehicle[]>([]);
   const animationsRef=useRef<Map<string,number>>(new Map());
@@ -304,17 +309,17 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
           if(existing._udBg!==bg||existing._udKind!==wantedKind){
             existing.remove();
             markers.delete(id);
-            const next=wantedKind==='label'
+            const next=(wantedKind==='label'
               ? L.marker([lat,lon],{icon:L.divIcon({className:'web-bus-icon',html:'<div class="web-bus" style="background:'+escapeHtml(bg)+'"><span class="web-bus-label">'+escapeHtml(label)+'</span></div>',iconSize:[38,38],iconAnchor:[19,19]}),zIndexOffset:1000})
-              : L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:2,fillColor:bg,fillOpacity:1});
+              : L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:2,fillColor:bg,fillOpacity:1})) as DtcMarker;
             next.on('click',()=>onSelect(v));next._udBg=bg;next._udKind=wantedKind;next.addTo(map);markers.set(id,next);
           }
         }else{
           if(wantedKind==='label'){
             const icon=L.divIcon({className:'web-bus-icon',html:'<div class="web-bus" style="background:'+escapeHtml(bg)+'"><span class="web-bus-label">'+escapeHtml(label)+'</span></div>',iconSize:[38,38],iconAnchor:[19,19]});
-            const marker=L.marker([lat,lon],{icon,zIndexOffset:1000});marker.on('click',()=>onSelect(v));marker._udBg=bg;marker._udKind='label';marker.addTo(map);markers.set(id,marker);
+            const marker=L.marker([lat,lon],{icon,zIndexOffset:1000}) as DtcMarker;marker.on('click',()=>onSelect(v));marker._udBg=bg;marker._udKind='label';marker.addTo(map);markers.set(id,marker);
           }else{
-            const marker=L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:2,fillColor:bg,fillOpacity:1});marker.on('click',()=>onSelect(v));marker._udBg=bg;marker._udKind='dot';marker.addTo(map);markers.set(id,marker);
+            const marker=L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:2,fillColor:bg,fillOpacity:1}) as DtcMarker;marker.on('click',()=>onSelect(v));marker._udBg=bg;marker._udKind='dot';marker.addTo(map);markers.set(id,marker);
           }
         }
       }
