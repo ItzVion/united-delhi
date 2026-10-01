@@ -63,7 +63,7 @@ The Digital Personal Data Protection Act, 2023 and the Digital Personal Data Pro
 
 ## 5. Children
 
-United Delhi does not use an 18+ interface gate. The current design minimizes personal-data collection and does not require an account or phone number.
+United Delhi does not require an age-based 18+ gate. The current design minimizes personal-data collection and does not require an account or phone number. The mobile app and website do use a first-launch consent screen that asks the user to review the Terms of Service and Privacy Policy before continuing.
 
 If applicable law requires additional safeguards for children or another category of user, United Delhi will implement those safeguards before relying on the relevant processing. A parent or legal guardian may contact the service regarding a child's personal data.
 
