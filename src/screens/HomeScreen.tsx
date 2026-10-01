@@ -192,7 +192,7 @@ export default function HomeScreen(){
               <View style={styles.busPreviewCopy}>
                 <Text style={styles.busPreviewEyebrow}>LIVE BUS</Text>
                 <Text style={styles.busPreviewTitle} numberOfLines={1}>To {selectedBus.toStop || 'Destination'}</Text>
-                <Text style={styles.busPreviewMeta} numberOfLines={1}>{selectedBus.id} · {freshness} · View route</Text>
+                <Text style={styles.busPreviewMeta} numberOfLines={1}>{selectedBus.vehicleLabel || selectedBus.licensePlate || selectedBus.id} · {freshness} · View route</Text>
               </View>
               <Text style={styles.busPreviewArrow}>›</Text>
             </Pressable>
