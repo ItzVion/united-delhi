@@ -178,6 +178,7 @@ button:disabled{cursor:not-allowed}
 .direction-stack>span i,.direction-stack>span b{width:7px;height:7px;display:block;background:#00695C}
 .direction-stack>span b{width:20px;height:2px}
 .route-map{height:clamp(275px,36vw,380px);position:relative;overflow:hidden;border:1px solid #D4DDE0;margin-top:10px;background:#E9EFF1}
+.route-map-status{position:absolute;left:10px;right:10px;bottom:10px;z-index:500;padding:7px 9px;background:rgba(255,255,255,.94);border:1px solid #D4DDE0;color:#68757B;font-size:10px;text-align:center}
 .metric-row{display:grid;grid-template-columns:repeat(3,1fr);margin:10px 0;gap:1px;background:#D4DDE0;border:1px solid #D4DDE0}
 .metric-row>div{background:#FFFFFF;padding:10px;text-align:center}
 .metric-row b{display:block;font-size:18px;color:#1F2A30}
