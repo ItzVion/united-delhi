@@ -21,6 +21,7 @@ const busColorFor=(v:any)=>isHex(v.serviceColor)?String(v.serviceColor):
   v.serviceType==='dtc'?BUS_COLORS.cngNonAcGreen:
   BUS_COLORS.cngAcBlue;
 const ageLabel=(value?:string)=>{const t=Date.parse(String(value||''));if(!Number.isFinite(t))return'Live';const s=Math.max(0,Math.round((Date.now()-t)/1000));return s<60?'Just now':Math.floor(s/60)+' min ago';};
+const escapeHtml=(value:any)=>String(value??'').replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]||ch));
 
 function parsePath(path:string=window.location.pathname):Page{
   const p=path.replace(/\/+$/,'')||'/';
@@ -244,6 +245,10 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
   const vehiclesRef=useRef<Vehicle[]>([]);
   const animationsRef=useRef<Map<string,number>>(new Map());
   const focused=useRef(false);
+  const locationRef=useRef<Point|null>(location);
+  const legendRef=useRef<()=>void>(onLegend);
+  useEffect(()=>{locationRef.current=location;},[location]);
+  useEffect(()=>{legendRef.current=onLegend;},[onLegend]);
 
   useEffect(()=>{
     if(!el.current||mapRef.current)return;
