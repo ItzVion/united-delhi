@@ -109,11 +109,9 @@ CREATE TABLE static_feed_meta (
 
   CONSTRAINT static_feed_meta_singleton CHECK (id),
   CONSTRAINT static_feed_meta_imported_counts_valid CHECK (
-    imported_route_count IS NULL OR imported_route_count >= 0
-  ) AND (
-    imported_stop_count IS NULL OR imported_stop_count >= 0
-  ) AND (
-    imported_route_stop_count IS NULL OR imported_route_stop_count >= 0
+    (imported_route_count IS NULL OR imported_route_count >= 0)
+    AND (imported_stop_count IS NULL OR imported_stop_count >= 0)
+    AND (imported_route_stop_count IS NULL OR imported_route_stop_count >= 0)
   )
 );
 
@@ -124,51 +122,11 @@ ALTER TABLE route_stops ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vehicle_positions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE static_feed_meta ENABLE ROW LEVEL SECURITY;
 
--- Force RLS for table owners too. PostgreSQL normally exempts owners from RLS;
--- FORCE makes the policy model apply to them as well.
-ALTER TABLE stops FORCE ROW LEVEL SECURITY;
-ALTER TABLE routes FORCE ROW LEVEL SECURITY;
-ALTER TABLE route_stops FORCE ROW LEVEL SECURITY;
-ALTER TABLE vehicle_positions FORCE ROW LEVEL SECURITY;
-ALTER TABLE static_feed_meta FORCE ROW LEVEL SECURITY;
-
--- Explicit default-deny policies.
--- The backend owns/administers the tables and performs trusted imports through its
--- database connection; no broad PUBLIC direct-access policy is created here.
-CREATE POLICY stops_deny ON stops
-  AS RESTRICTIVE
-  FOR ALL
-  TO PUBLIC
-  USING (FALSE)
-  WITH CHECK (FALSE);
-
-CREATE POLICY routes_deny ON routes
-  AS RESTRICTIVE
-  FOR ALL
-  TO PUBLIC
-  USING (FALSE)
-  WITH CHECK (FALSE);
-
-CREATE POLICY route_stops_deny ON route_stops
-  AS RESTRICTIVE
-  FOR ALL
-  TO PUBLIC
-  USING (FALSE)
-  WITH CHECK (FALSE);
-
-CREATE POLICY vehicle_positions_deny ON vehicle_positions
-  AS RESTRICTIVE
-  FOR ALL
-  TO PUBLIC
-  USING (FALSE)
-  WITH CHECK (FALSE);
-
-CREATE POLICY static_feed_meta_deny ON static_feed_meta
-  AS RESTRICTIVE
-  FOR ALL
-  TO PUBLIC
-  USING (FALSE)
-  WITH CHECK (FALSE);
+-- RLS is enabled for direct clients. The current backend uses its PostgreSQL
+-- owner/admin connection for imports and queries, so we intentionally do not
+-- FORCE RLS on that role. Non-owner roles still need an explicit policy and
+-- therefore receive PostgreSQL's default-deny behavior when no policy applies.
+-- Do not expose these tables directly to an untrusted client role.
 
 COMMIT;
 
