@@ -145,7 +145,7 @@ export default function HomeScreen(){
         <Pressable onPress={requestLocation}><Text style={styles.locationLink}>{location?'Recenter':'Use my location'}</Text></Pressable>
       </View>
 
-      <View style={styles.mapCard}>
+      <View style={[styles.mapCard,{height:mapHeight}]}>
         <WebView
           ref={mapRef}
           style={styles.map}
@@ -338,7 +338,22 @@ const styles=StyleSheet.create({
  searchIcon:{fontSize:23,color:colors.text,marginRight:8},searchInput:{flex:1,fontSize:13,color:colors.text,paddingVertical:0},searchKey:{fontSize:20,fontWeight:'800',color:colors.textMuted,paddingHorizontal:3},
  searchResults:{marginTop:7,borderRadius:0,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,overflow:'hidden'},searchResult:{minHeight:52,paddingHorizontal:12,paddingVertical:9,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderBottomColor:colors.border},searchBadge:{minWidth:48,height:30,borderRadius:0,alignItems:'center',justifyContent:'center',paddingHorizontal:6},searchBadgeText:{fontSize:10,fontWeight:'900'},searchStopIcon:{width:30,height:30,borderRadius:0,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},searchStopDot:{fontSize:9,color:colors.accent},searchCopy:{flex:1,marginLeft:9},searchTitle:{fontSize:11,fontWeight:'900',color:colors.text},searchMeta:{fontSize:9,color:colors.textMuted,marginTop:2},searchArrow:{fontSize:21,color:colors.textMuted},searchEmpty:{padding:13,fontSize:10,color:colors.textMuted},searchError:{padding:13,fontSize:10,color:colors.danger},
  sectionLine:{paddingHorizontal:2,paddingTop:13,paddingBottom:7,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionKicker:{fontSize:10,fontWeight:'900',letterSpacing:1.1,color:colors.textMuted},locationLink:{fontSize:11,fontWeight:'900',color:colors.accent},
- mapCard:{height:mapHeight,borderRadius:0,overflow:'hidden',borderWidth:1,borderColor:colors.border,backgroundColor:'#eef2f1'},map:{flex:1},
+ mapCard:{borderRadius:0,overflow:'hidden',borderWidth:1,borderColor:colors.border,backgroundColor:'#eef2f1'},map:{flex:1},
+ legendOverlay:{flex:1,backgroundColor:'rgba(23,49,47,.42)',alignItems:'center',justifyContent:'center',padding:16},
+ legendDialog:{width:'100%',maxWidth:520,maxHeight:'85%',backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,padding:16},
+ legendTitle:{fontSize:17,fontWeight:'900',color:colors.text,marginBottom:12},
+ legendHeader:{flexDirection:'row',justifyContent:'space-between',paddingBottom:7,borderBottomWidth:1,borderBottomColor:colors.border},
+ legendHeaderText:{fontSize:9,fontWeight:'900',letterSpacing:1,color:colors.textMuted},
+ legendRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingVertical:10,borderBottomWidth:1,borderBottomColor:colors.border},
+ legendIcons:{flexDirection:'row',gap:7,flex:1},
+ legendBus:{width:34,height:24,borderRadius:0,alignItems:'center',justifyContent:'center'},
+ legendBusWindow:{position:'absolute',left:6,right:6,top:5,height:6,backgroundColor:'rgba(255,255,255,.22)'},
+ legendBusWindshield:{position:'absolute',left:7,right:7,top:13,height:4,backgroundColor:'rgba(255,255,255,.9)'},
+ legendBusLightRow:{position:'absolute',left:6,right:6,bottom:3,flexDirection:'row',justifyContent:'space-between'},
+ legendBusLight:{width:4,height:3,borderRadius:1,backgroundColor:'#fff'},
+ legendType:{flex:1,fontSize:10,fontWeight:'800',color:colors.text,textAlign:'right'},
+ legendClose:{marginTop:14,minHeight:42,alignItems:'center',justifyContent:'center',backgroundColor:colors.accent,paddingHorizontal:16},
+ legendCloseText:{fontSize:11,fontWeight:'900',color:'#fff'},
  mapTop:{position:'absolute',left:10,top:10,flexDirection:'row',alignItems:'center',backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:9,paddingVertical:6,borderRadius:0},liveDot:{width:7,height:7,borderRadius:0,backgroundColor:colors.success,marginRight:6},mapTopText:{fontSize:10,fontWeight:'900',color:colors.text},mapAttribution:{position:'absolute',right:7,bottom:6,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:5,paddingVertical:2,borderRadius:0},mapAttributionText:{fontSize:7,color:'#52625f'},mapLegend:{position:'absolute',left:7,bottom:7,flexDirection:'row',gap:7,backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:7,paddingVertical:5,borderRadius:0,borderWidth:1,borderColor:colors.border},legendItem:{flexDirection:'row',alignItems:'center',gap:3},legendDot:{width:7,height:7,borderRadius:0},legendText:{fontSize:8,fontWeight:'800',color:colors.text},
  locationNotice:{position:'absolute',left:10,right:10,bottom:10,padding:9,borderRadius:0,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,flexDirection:'row',justifyContent:'space-between'},
  busPreview:{position:'absolute',left:9,right:9,bottom:9,borderRadius:0,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,shadowColor:'#17312F',shadowOpacity:.14,shadowRadius:12,shadowOffset:{width:0,height:4},elevation:6},
