@@ -26,6 +26,8 @@ export type Vehicle={
   toStop?:string|null;
   serviceType?:'dtc'|'cluster'|'electric'|'unknown';
   serviceColor?:string|null;
+  vehicleLabel?:string|null;
+  licensePlate?:string|null;
   latitude:number;
   longitude:number;
   observedAt?:string;
