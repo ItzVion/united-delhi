@@ -8,7 +8,7 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
     const text=await r.text();
     let d:any={};
     try{d=text?JSON.parse(text):{};}catch{d={reason:text.slice(0,160)};}
-    if(!r.ok)throw new Error(d.reason||`Request failed with undefined`);
+    if(!r.ok)throw new Error(d.reason||`Request failed with ${r.status}`);
     return d as T;
   }catch(error){
     if((error as Error)?.name==='AbortError')throw new Error('Request timed out');
