@@ -16,14 +16,12 @@
     "android": {
       "package": "com.uniteddelhi.app",
       "permissions": [
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
       ],
       "backgroundColor": "#F4F7F4",
       "icon": "./assets/icon.png",
-      "predictiveBackGestureEnabled": true,
-      "blockedPermissions": [
-        "android.permission.ACCESS_FINE_LOCATION"
-      ]
+      "predictiveBackGestureEnabled": true
     },
     "web": {
       "bundler": "metro",
