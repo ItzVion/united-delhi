@@ -345,7 +345,7 @@ function BusPreview({bus,go}:{bus:Vehicle;go:(path:string)=>void}){
     <button className="preview-close" onClick={()=>go('/')}>×</button>
     <button className="preview-body" onClick={()=>{if(bus.routeShortName&&bus.routeId)go('/routes/'+encodeURIComponent(bus.routeId));}} disabled={!bus.routeShortName||!bus.routeId}>
       <RouteBadge name={displayVehicleRoute(bus)} color={bus.serviceColor} textColor={'#FFFFFF'}/>
-      <span><small>LIVE BUS</small><b>To {bus.toStop||'Destination'}</b><em>{bus.id} · {ageLabel(bus.observedAt)} · View route</em></span><strong>›</strong>
+      <span><small>LIVE BUS</small><b>To {bus.toStop||'Destination'}</b><em>{bus.vehicleLabel||bus.licensePlate||bus.id} · {ageLabel(bus.observedAt)} · View route</em></span><strong>›</strong>
     </button>
   </div>;
 }
