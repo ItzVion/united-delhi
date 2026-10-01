@@ -20,8 +20,24 @@ try {
   $env:ANDROID_HOME = $sdk
   $env:ANDROID_SDK_ROOT = $sdk
 
-  $jbr = Join-Path $env:ProgramFiles "Android\Android Studio\jbr"
-  if (Test-Path $jbr) { $env:JAVA_HOME = $jbr }
+  # React Native recommends JDK 17; newer JDKs can cause local Android build problems.
+  $jdk17Candidates = @(
+    (Get-ChildItem (Join-Path $env:ProgramFiles "Microsoft") -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "jdk-17|openjdk-17" } | Select-Object -First 1 -ExpandProperty FullName),
+    (Get-ChildItem (Join-Path $env:ProgramFiles "Eclipse Adoptium") -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "jdk-17" } | Select-Object -First 1 -ExpandProperty FullName),
+    (Get-ChildItem (Join-Path $env:ProgramFiles "Java") -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "jdk-17" } | Select-Object -First 1 -ExpandProperty FullName)
+  ) | Where-Object { $_ -and (Test-Path (Join-Path $_ "bin\java.exe")) }
+
+  $jdk17 = $jdk17Candidates | Select-Object -First 1
+  if ($jdk17) {
+    $env:JAVA_HOME = $jdk17
+  }
+
+  if (-not $env:JAVA_HOME -or -not (Test-Path (Join-Path $env:JAVA_HOME "bin\java.exe"))) {
+    throw "JDK 17 was not found. Install Microsoft OpenJDK 17, then rerun this script."
+  }
+
+  Write-Host "JAVA_HOME = $env:JAVA_HOME"
+  & (Join-Path $env:JAVA_HOME "bin\java.exe") -version
 
   Write-Host "[1/7] Root dependency install"
   npm ci
