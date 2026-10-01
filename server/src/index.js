@@ -369,7 +369,7 @@ app.get('/api/search',dbRateLimit,async(req,res)=>{
   }
 });
 
-app.get('/api/plan',dbRateLimit,async(req,res)=>{
+app.get('/api/plan',dbRateLimit,async(req,res)=>{\n  res.setHeader('Cache-Control','no-store');
   if(!pool)return res.status(503).json({status:'UNAVAILABLE',options:[],reason:'Database is not configured'});
   const from=boundedText(req.query.from,80),to=boundedText(req.query.to,80);
   const fromLike=searchPattern(from),toLike=searchPattern(to);
@@ -406,8 +406,6 @@ app.get('/api/plan',dbRateLimit,async(req,res)=>{
       FROM route_stops o
       JOIN route_stops d ON d.route_id=o.route_id AND d.stop_sequence>o.stop_sequence
       JOIN routes r ON r.route_id=o.route_id
-      JOIN stops os ON os.stop_id=o.stop_id
-      JOIN stops ds ON ds.stop_id=d.stop_id
       WHERE o.stop_id=ANY($1::text[]) AND d.stop_id=ANY($2::text[])
       ORDER BY r.route_id,o.stop_id,d.stop_id,(d.stop_sequence-o.stop_sequence)
       LIMIT 20
