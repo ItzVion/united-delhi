@@ -343,6 +343,8 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
       if(!focused.current){focused.current=true;window.setTimeout(()=>map.flyTo([location.lat,location.lon],14,{duration:1.1,easeLinearity:.2}),80);}
     }
   },[location]);
+
+  return <div ref={el} className="dtc-map" aria-label="Live DTC bus map"/>;
 }
 
 function BusPreview({bus,go}:{bus:Vehicle;go:(path:string)=>void}){
