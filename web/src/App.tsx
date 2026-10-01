@@ -244,20 +244,6 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
   const vehiclesRef=useRef<Vehicle[]>([]);
   const animationsRef=useRef<Map<string,number>>(new Map());
   const focused=useRef(false);
-  const locationRef=useRef<Point|null>(location);
-  const legendRef=useRef<()=>void>(onLegend);
-  useEffect(()=>{locationRef.current=location;},[location]);
-  useEffect(()=>{legendRef.current=onLegend;},[onLegend]);
-
-  useEffect(()=>{locationRef.current=location;},[location]);
-  useEffect(()=>{legendRef.current=onLegend;},[onLegend]);
-  const el=useRef<HTMLDivElement|null>(null);
-  const mapRef=useRef<any>(null);
-  const markersRef=useRef<Map<string,any>>(new Map());
-  const userRef=useRef<any>(null);
-  const vehiclesRef=useRef<Vehicle[]>([]);
-  const animationsRef=useRef<Map<string,number>>(new Map());
-  const focused=useRef(false);
 
   useEffect(()=>{
     if(!el.current||mapRef.current)return;
