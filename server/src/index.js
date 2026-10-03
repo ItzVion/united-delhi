@@ -660,7 +660,7 @@ async function ensureStaticData(){
         && Number(counts.routes)>=2000
         && Number(counts.route_stops)>=50000;
       if(complete){
-        console.log('Official OTD GTFS data is already complete and matches its recorded import.');
+        console.log('Pinned GTFS data is already complete and matches its recorded import.');
         staticDataCache.status='OK';
         staticDataCache.completedAt=new Date().toISOString();
         return;
