@@ -13,7 +13,7 @@ const hasManagedDatabase = Boolean(
   managedDbHost && Number.isInteger(managedDbPort) && managedDbPort > 0 &&
   managedDbName && managedDbUser && managedDbPassword
 );
-if (!hasManagedDatabase && !databaseUrl) throw new Error('Wasmer DB_* variables or DATABASE_URL is required');
+if (!hasManagedDatabase && !databaseUrl) throw new Error('DATABASE_URL or managed DB_* variables are required');
 
 const databaseHost = hasManagedDatabase ? managedDbHost : databaseUrl;
 const isLocalDatabase = /(?:localhost|127(?:\.\d+){3}|::1)/i.test(databaseHost);
