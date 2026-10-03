@@ -129,7 +129,7 @@ The current realtime/static route-ID reconciliation also remains unresolved and 
 
 ## Legal and privacy controls
 
-- Added a production 18+ access gate pending a legally appropriate parental-consent implementation.
+- Added an in-app Terms/Privacy consent gate. The current client does not perform age verification; any public age policy and child-specific controls must be finalized before launch.
 - Added an in-app legal center linking the Privacy Policy, Terms of Service, Third-Party Notices, and Security Policy.
 - Added a pre-permission location disclosure explaining nearby-stop processing and reduced-precision location handling.
 - Nearby coordinates are rounded on-device and sent in a POST body rather than query parameters, reducing accidental exposure through URL logs.
