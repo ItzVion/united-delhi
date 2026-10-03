@@ -125,7 +125,7 @@ export default function App(){
       <p>By continuing to United Delhi, you agree to our <button className="text-button inline" onClick={()=>go('/legal/terms')}>Terms of Service</button> and acknowledge our <button className="text-button inline" onClick={()=>go('/legal/privacy')}>Privacy Policy</button>.</p>
       <label className="check-row"><input type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)}/><span>I agree to the Terms of Service and acknowledge the Privacy Policy.</span></label>
       <button className="primary-button" disabled={!checked} onClick={()=>{localStorage.setItem('ud-consent-v1','1');setAccepted(true);}}>Continue to United Delhi</button>
-      <small>No account or phone number is required. Location is requested only when you choose a location-based feature.</small>
+      <small>No account or phone number is required. Location is optional and is requested after consent to support nearby stops and map centering.</small>
     </div></div>;
   }
 
