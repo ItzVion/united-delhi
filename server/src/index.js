@@ -698,8 +698,6 @@ const server=app.listen(port,()=>{
 });
 server.requestTimeout=15000;
 server.headersTimeout=20000;
-server.keepAliveTimeout=5000;
-
 let shuttingDown=false;
 const shutdown=async(signal)=>{
   if(shuttingDown)return;
