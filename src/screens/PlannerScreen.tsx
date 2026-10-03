@@ -31,7 +31,6 @@ export default function PlannerScreen() {
     let active=true;
     const timer=setTimeout(async()=>{try{const r=await api.search(value);if(active)setFromSuggestions((r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label})));}catch{if(active)setFromSuggestions([]);}},180);
     return()=>{active=false;clearTimeout(timer);};
-    return()=>clearTimeout(timer);
   },[from]);
   useEffect(() => {
     const value=to.trim();
