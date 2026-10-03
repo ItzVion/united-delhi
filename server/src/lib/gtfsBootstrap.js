@@ -86,22 +86,30 @@ function buildRouteStops() {
   });
 }
 
-async function insertChunks(client, rows) {
+async function insertRouteStops(client, rows) {
   let inserted = 0;
   for (let i = 0; i < rows.length; i += 200) {
     const chunk = rows.slice(i, i + 200);
+    if (!chunk.length) continue;
     const values = [];
-    const placeholders = chunk.map((row, index) => {
+    const placeholders = [];
+    for (let index = 0; index < chunk.length; index += 1) {
+      const row = chunk[index];
       const base = index * 3;
       values.push(row.routeId, row.stopId, row.stopSequence);
-      return '($' + (base + 1) + ',$' + (base + 2) + ',$' + (base + 3) + ')';
-    }).join(',');
-    await client.query(
-      'INSERT INTO route_stops(route_id,stop_id,stop_sequence) VALUES ' + placeholders +
-      ' ON CONFLICT(route_id,stop_id) DO UPDATE SET stop_sequence=LEAST(route_stops.stop_sequence,EXCLUDED.stop_sequence)',
+      placeholders.push('($' + (base + 1) + ',$' + (base + 2) + ',$' + (base + 3) + ')');
+    }
+
+    const result = await client.query(
+      'INSERT INTO route_stops(route_id,stop_id,stop_sequence) ' +
+      'SELECT v.route_id,v.stop_id,v.stop_sequence ' +
+      'FROM (VALUES ' + placeholders.join(',') + ') AS v(route_id,stop_id,stop_sequence) ' +
+      'WHERE EXISTS (SELECT 1 FROM routes r WHERE r.route_id=v.route_id) ' +
+      'AND EXISTS (SELECT 1 FROM stops s WHERE s.stop_id=v.stop_id) ' +
+      'ON CONFLICT(route_id,stop_id) DO UPDATE SET stop_sequence=LEAST(route_stops.stop_sequence,EXCLUDED.stop_sequence)',
       values
     );
-    inserted += chunk.length;
+    inserted += result.rowCount ?? 0;
   }
   return inserted;
 }
@@ -131,8 +139,6 @@ export async function importGtfs({ pool }) {
       await client.query(fs.readFileSync(path.join(sqlDir, name), 'utf8'));
     }
 
-    // Import parents first, then children. This avoids FK failures when an OTD
-    // stop referenced by stop_times is absent from the pinned stops feed.
     await client.query('TRUNCATE TABLE route_stops, routes, stops RESTART IDENTITY CASCADE');
 
     for (let i = 0; i < routes.length; i += 200) {
@@ -165,47 +171,21 @@ export async function importGtfs({ pool }) {
       );
     }
 
-    // Only keep route-stop pairs for which both FK parents exist.
-    await client.query(
-      'DELETE FROM route_stops rs WHERE NOT EXISTS (SELECT 1 FROM routes r WHERE r.route_id=rs.route_id) OR NOT EXISTS (SELECT 1 FROM stops s WHERE s.stop_id=rs.stop_id)'
-    );
-    await insertChunks(client, routeStops.filter((row) => false));
-
-    for (let i = 0; i < routeStops.length; i += 200) {
-      const chunk = routeStops.slice(i, i + 200);
-      const values = [];
-      const placeholders = [];
-      for (let index = 0; index < chunk.length; index += 1) {
-        const row = chunk[index];
-        const base = index * 3;
-        values.push(row.routeId, row.stopId, row.stopSequence);
-        placeholders.push('($' + (base + 1) + ',$' + (base + 2) + ',$' + (base + 3) + ')');
-      }
-      if (!placeholders.length) continue;
-      await client.query(
-        'INSERT INTO route_stops(route_id,stop_id,stop_sequence) ' +
-        'SELECT v.route_id,v.stop_id,v.stop_sequence FROM (VALUES ' + placeholders.join(',') +
-        ') AS v(route_id,stop_id,stop_sequence) ' +
-        'WHERE EXISTS (SELECT 1 FROM routes r WHERE r.route_id=v.route_id) ' +
-        'AND EXISTS (SELECT 1 FROM stops s WHERE s.stop_id=v.stop_id) ' +
-        'ON CONFLICT(route_id,stop_id) DO UPDATE SET stop_sequence=LEAST(route_stops.stop_sequence,EXCLUDED.stop_sequence)',
-        values
-      );
-    }
-
-    const linked = await client.query('SELECT COUNT(*)::int AS count FROM route_stops');
-    if (Number(linked.rows[0]?.count ?? 0) < 50000) {
-      throw new Error('GTFS import produced too few valid route-stop links: ' + String(linked.rows[0]?.count ?? 0));
+    // stop_times contains a small number of references not present in the
+    // pinned stops feed. Filter those rows at insert time so the FK stays valid.
+    const linked = await insertRouteStops(client, routeStops);
+    if (linked < 50000) {
+      throw new Error('GTFS import produced too few valid route-stop links: ' + linked);
     }
 
     await client.query(
       'INSERT INTO static_feed_meta(id,source_key,source_url,imported_at,imported_route_count,imported_stop_count,imported_route_stop_count) VALUES(TRUE,$1,$2,NOW(),$3,$4,$5) ' +
       'ON CONFLICT(id) DO UPDATE SET source_key=EXCLUDED.source_key,source_url=EXCLUDED.source_url,imported_at=EXCLUDED.imported_at,imported_route_count=EXCLUDED.imported_route_count,imported_stop_count=EXCLUDED.imported_stop_count,imported_route_stop_count=EXCLUDED.imported_route_stop_count',
-      [GTFS_SOURCE_KEY, GTFS_SOURCE_URL, routes.length, stops.length, Number(linked.rows[0]?.count ?? 0)]
+      [GTFS_SOURCE_KEY, GTFS_SOURCE_URL, routes.length, stops.length, linked]
     );
 
     await client.query('COMMIT');
-    console.log('Pinned OTD GTFS import completed: ' + routes.length + ' routes, ' + stops.length + ' stops, ' + Number(linked.rows[0]?.count ?? 0) + ' route-stop links.');
+    console.log('Pinned OTD GTFS import completed: ' + routes.length + ' routes, ' + stops.length + ' stops, ' + linked + ' route-stop links.');
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     throw error;
