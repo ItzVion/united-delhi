@@ -3,12 +3,12 @@
 Deploy this directory as the backend service root.
 
 Current production backend:
-- Provider: Wasmer
+- Provider: Render
 - Service root: `server`
 - Install command: `npm ci`
 - Start command: `npm start`
-- Health endpoint: `https://united-delhi.wasmer.app/health`
-- API base URL: `https://united-delhi.wasmer.app`
+- Health endpoint: `https://united-delhi.onrender.com/health`
+- API base URL: `https://united-delhi.onrender.com`
 
 Required environment variables:
 - PORT (the host supplies this)
