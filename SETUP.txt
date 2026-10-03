@@ -16,17 +16,20 @@ UNITED DELHI SETUP
    Never put either secret in frontend source or the mobile bundle.
 
 4. Current hosted backend
-   The current backend is hosted on Deplexo.
+   The current backend is hosted on Wasmer.
    Service root: ./server
    Install command: npm ci
    Build command: leave empty
    Start command: npm start
    PORT: 3000
    Health endpoint: /health
-   API base URL: https://united-delhi.de.deplexo.com
+   Readiness endpoint: /ready
+   API base URL: https://united-delhi.wasmer.app
 
    Required environment variables:
-   - DTC_API_KEY
+   - DTC_REALTIME_RELAY_URL
+   - DTC_REALTIME_RELAY_SECRET
+   - DTC_API_KEY (private fallback)
    - DATABASE_URL
 
 5. DTC realtime data
@@ -35,5 +38,5 @@ UNITED DELHI SETUP
    The authorised key belongs only on the backend.
 
 6. Static GTFS data
-   The repository uses its pinned GTFS snapshot unless a newer compatible source is
-   verified against the realtime route IDs.
+   The repository currently uses a pinned derived GTFS snapshot; refresh it when
+   current official OTD static data is verified against live route IDs.
