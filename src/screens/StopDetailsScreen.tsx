@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -22,6 +22,7 @@ export default function StopDetailsScreen() {
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [arrivalsReason, setArrivalsReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [stale,setStale]=useState(false);
 
   const load = useCallback(async () => {
     const [stopSettled, arrivalsSettled] = await Promise.allSettled([
@@ -48,6 +49,7 @@ export default function StopDetailsScreen() {
       if (arrivalsResult.status === 'OK') {
         setArrivals(arrivalsResult.arrivals);
         setArrivalsReason(null);
+        setStale(false);
       } else {
         setArrivals([]);
         setArrivalsReason(arrivalsResult.reason || 'Live arrival data is unavailable.');
@@ -55,6 +57,7 @@ export default function StopDetailsScreen() {
     } else {
       setArrivals([]);
       setArrivalsReason((arrivalsSettled.reason as Error)?.message || 'Live arrival data is unavailable.');
+      setStale(true);
     }
 
     if (stopSettled.status === 'rejected' && arrivalsSettled.status === 'rejected') {
@@ -65,10 +68,11 @@ export default function StopDetailsScreen() {
   }, [stopId]);
 
   useEffect(() => {
-    setLoading(true);
-    void load();
-    const interval = setInterval(() => void load(), 30000);
-    return () => clearInterval(interval);
+    const tick=()=>{if(AppState.currentState==='active')void load();};
+    setLoading(true);tick();
+    const interval = setInterval(tick, 30000);
+    const subscription=AppState.addEventListener('change',state=>{if(state==='active')tick();});
+    return () => {clearInterval(interval);subscription.remove();};
   }, [load]);
 
   const title = stop?.name || stopName || 'Bus stop';
@@ -84,19 +88,19 @@ export default function StopDetailsScreen() {
         <View style={styles.hero}>
           <View style={styles.pin}><Text style={styles.pinText}>●</Text></View>
           <View style={styles.heroText}><Text style={styles.heroTitle}>{title}</Text><Text style={styles.heroSub}>{stop ? 'DTC stop' : 'Loading stop details…'}</Text></View>
-          {arrivalsReason ? <StatusPill label="Live unavailable" tone="danger" /> : <StatusPill label="Live" tone="ok" />}
+          {loading ? <StatusPill label="Loading" tone="muted" /> : arrivalsReason ? <StatusPill label={stale?'Stale':'Live unavailable'} tone={stale?'warning':'danger'} /> : arrivals.length ? <StatusPill label="Live" tone="ok" /> : <StatusPill label="No live buses" tone="muted" />}
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Buses at this stop</Text><Text style={styles.refreshText}>Updates every 30s</Text></View>
+          <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Buses at this stop</Text><Pressable accessibilityRole="button" accessibilityLabel="Refresh stop arrivals" onPress={()=>{setLoading(true);void load();}}><Text style={styles.refreshText}>Refresh · 30s</Text></Pressable></View>
           {loading ? <ActivityIndicator color={colors.accent} style={{ marginVertical: 18 }} /> : null}
           {arrivalsReason ? <Text style={styles.muted}>{arrivalsReason}</Text> : null}
           {!loading && !arrivalsReason && arrivals.length === 0 ? <Text style={styles.muted}>No live buses are reporting on these routes right now.</Text> : null}
+          {arrivalsReason ? <Pressable accessibilityRole="button" accessibilityLabel="Retry live arrivals" onPress={()=>{setLoading(true);void load();}}><Text style={[styles.muted,{color:colors.accent,fontWeight:'900',marginTop:8}]}>Retry live arrivals</Text></Pressable> : null}
           {arrivals.map(a => {
             const name=displayRouteName(a.routeShortName) || 'Live bus';
-            if(!a.routeId)return null;
             const rc=a.serviceColor?{background:a.serviceColor,text:a.serviceType==='electric'?'#17313B':'#FFFFFF'}:resolveRouteColor(name,null,null);
-            return <Pressable key={a.vehicleId} style={styles.arrival} onPress={() => {if(a.routeShortName)navigation.navigate('RouteDetails', { routeId:a.routeId!, label:name });}} disabled={!a.routeShortName}>
+            return <Pressable key={a.vehicleId} style={styles.arrival} onPress={() => {if(a.routeId)navigation.navigate('RouteDetails', { routeId:a.routeId, label:name });}} disabled={!a.routeId}>
               <View style={[styles.busIcon,{backgroundColor:rc.background}]}><Text style={{color:rc.text,fontWeight:'900',fontSize:11}}>{name}</Text></View>
               <View style={styles.arrivalMain}>
                 <Text style={styles.route}>{name}</Text>
