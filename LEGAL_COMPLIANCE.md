@@ -11,7 +11,7 @@ This file is an internal engineering/compliance checklist. It is not legal advic
 - No crash-reporting SDK.
 - No external automated model-processing service.
 - Foreground location only.
-- Location is requested only for transit features.
+- Location is requested only for transit features and may be requested after the user enters the main experience to support map centering and nearby-stop discovery.
 - Nearby requests are transient API requests and are not intentionally stored as user location history.
 - Production API traffic uses HTTPS.
 - Database credentials and the OTD realtime key remain server-side.
