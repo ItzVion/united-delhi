@@ -22,12 +22,12 @@ const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||'LIVE';
 const isHex=(v:any)=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 const textFor=(bg:string)=>{const h=bg.replace('#','');const rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.55?'#17313B':'#FFFFFF';};
 const BUS_COLORS:any={evAc:'#2FAFBC',evDeviOrange:'#E57D43',evDeviGreen:'#168F49',cngAcBlue:'#3D82CE',cngAcRed:'#E35F67',cngNonAcPeach:'#E5A16E',cngNonAcGreen:'#24C88B'};
-const SERVICE_COLORS:any={dtc:BUS_COLORS.cngNonAcGreen,cluster:BUS_COLORS.evDeviOrange,electric:BUS_COLORS.evAc,unknown:BUS_COLORS.cngAcBlue};
+const SERVICE_COLORS:any={dtc:BUS_COLORS.cngNonAcGreen,cluster:BUS_COLORS.evDeviOrange,electric:BUS_COLORS.evAc,unknown:'#7A858A'};
 const busColorFor=(v:any)=>isHex(v.serviceColor)?String(v.serviceColor):
   v.serviceType==='electric'?BUS_COLORS.evAc:
   v.serviceType==='cluster'?BUS_COLORS.evDeviOrange:
   v.serviceType==='dtc'?BUS_COLORS.cngNonAcGreen:
-  BUS_COLORS.cngAcBlue;
+  '#7A858A';
 const ageLabel=(value?:string)=>{const t=Date.parse(String(value||''));if(!Number.isFinite(t))return'Live';const s=Math.max(0,Math.round((Date.now()-t)/1000));return s<60?'Just now':Math.floor(s/60)+' min ago';};
 const escapeHtml=(value:any)=>String(value??'').replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]||ch));
 
@@ -90,7 +90,7 @@ export default function App(){
   useEffect(()=>{if(accepted)locate();},[accepted,locate]);
 
   useEffect(()=>{
-    if(!accepted||page.kind!=='home'){setVehicleStatus('loading');return;}
+    if(!accepted||page.kind!=='home')return;
     let active=true;
     const load=async()=>{
       if(document.visibilityState!=='visible')return;
