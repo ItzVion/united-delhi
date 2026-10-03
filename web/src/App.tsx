@@ -134,15 +134,33 @@ export default function App(){
   useEffect(()=>{
     if(!accepted||!['route','stop'].includes(page.kind))return;
     let active=true;
-    setDetail(null);setDetailBusy(true);
-    (async()=>{
+    let firstLoad=true;
+    const load=async()=>{
+      if(document.visibilityState!=='visible'&&!firstLoad)return;
+      if(firstLoad){setDetail(null);setDetailBusy(true);}
       try{
-        if(page.kind==='route'){const r=await api.route(page.id||'');if(active)setDetail({kind:'route',data:r});}
-        else{const pair=await api.stop(page.id||'');if(active)setDetail({kind:'stop',data:{...pair[0],arrivals:(pair[1] as any)?.arrivals||[]}});}
-      }catch(e){if(active)setError((e as Error).message||'Could not load this page.');}
-      finally{if(active)setDetailBusy(false);}
-    })();
-    return()=>{active=false;};
+        if(page.kind==='route'){
+          const r=await api.route(page.id||'');
+          if(active)setDetail({kind:'route',data:r});
+        }else{
+          const pair=await api.stop(page.id||'');
+          if(active)setDetail({kind:'stop',data:{...pair[0],arrivals:(pair[1] as any)?.arrivals||[]}});
+        }
+        if(active)setError('');
+      }catch(e){
+        if(active){
+          setError((e as Error).message||'Could not load this page.');
+          if(firstLoad)setDetail(null);
+        }
+      }finally{
+        if(active){setDetailBusy(false);firstLoad=false;}
+      }
+    };
+    void load();
+    const id=window.setInterval(()=>void load(),30000);
+    const onVisibility=()=>{if(document.visibilityState==='visible')void load();};
+    document.addEventListener('visibilitychange',onVisibility);
+    return()=>{active=false;window.clearInterval(id);document.removeEventListener('visibilitychange',onVisibility);};
   },[page,accepted,detailRetry]);
 
   if(!accepted){
