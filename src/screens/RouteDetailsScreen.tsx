@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -25,24 +25,32 @@ export default function RouteDetailsScreen(){
   const [loading,setLoading]=useState(true);
   const [mapReady,setMapReady]=useState(false);
   const [error,setError]=useState<string|null>(null);
-  const [selectedBus,setSelectedBus]=useState<Vehicle|null>(null);
+  const [selectedBusId,setSelectedBusId]=useState<string|null>(null);
+  const [stale,setStale]=useState(false);
+  const selectedBus=selectedBusId?vehicles.find(v=>v.id===selectedBusId)||null:null;
 
   const load=useCallback(async()=>{
     try{
       const result=await api.route(routeId);
       if(result.status==='OK'){setRoute(result.route);setStops(result.stops);setVehicles(result.vehicles);setError(null);}
       else setError('Route details are unavailable.');
-    }catch(e){setError((e as Error).message||'Route details are unavailable.');}
+    }catch(e){setError((e as Error).message||'Route details are unavailable.');setStale(true);}
     finally{setLoading(false);}
   },[routeId]);
 
-  useEffect(()=>{setLoading(true);void load();const id=setInterval(()=>void load(),15000);return()=>clearInterval(id);},[load]);
+  useEffect(()=>{
+    const tick=()=>{if(AppState.currentState==='active')void load();};
+    setLoading(true);tick();
+    const id=setInterval(tick,15000);
+    const subscription=AppState.addEventListener('change',state=>{if(state==='active')tick();});
+    return()=>{clearInterval(id);subscription.remove();};
+  },[load]);
 
   useEffect(()=>{
     if(!mapReady)return;
     const payload={
       stops:stops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
-      buses:vehicles.flatMap(v=>{const name=displayRouteName(v.routeShortName);if(!name)return [];const c=v.serviceColor?{background:v.serviceColor,text:v.serviceType==='electric'?'#17313B':'#FFFFFF'}:resolveRouteColor(name,null,null);return[{id:v.id,route:name,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];})
+      buses:vehicles.filter(v=>Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)).map(v=>{const name=displayRouteName(v.routeShortName)||'LIVE';const c=v.serviceColor?{background:v.serviceColor,text:v.serviceType==='electric'?'#17313B':'#FFFFFF'}:resolveRouteColor(name,null,null);return{id:v.id,route:name,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude};})
     };
     mapRef.current?.injectJavaScript(`window.updateRouteMap(${JSON.stringify(payload)});true;`);
   },[mapReady,stops,vehicles]);
@@ -56,10 +64,10 @@ export default function RouteDetailsScreen(){
     <View style={styles.topBar}>
       <Pressable onPress={()=>navigation.goBack()} style={styles.backButton}><Text style={styles.back}>‹</Text></Pressable>
       <View style={styles.topCopy}><Text style={styles.eyebrow}>BUS ROUTE</Text><Text style={styles.title}>{routeName}</Text></View>
-      <StatusPill label={error?'Unavailable':vehicles.length?(`${vehicles.length} live`):'No live buses'} tone={error?'danger':vehicles.length?'ok':'muted'}/>
+      <StatusPill label={loading?'Loading':error?(stale?'Stale data':'Unavailable'):vehicles.length?(`${vehicles.length} live`):'No live buses'} tone={loading?'muted':error?(stale?'warning':'danger'):vehicles.length?'ok':'muted'}/>
     </View>
 
-    {error?<View style={styles.error}><Text style={styles.errorText}>{error}</Text></View>:null}
+    {error?<View style={styles.error}><Text style={styles.errorText}>{error}</Text><Pressable accessibilityRole="button" accessibilityLabel="Retry route details" onPress={()=>{setLoading(true);void load();}}><Text style={[styles.errorText,{color:colors.accent,marginTop:6}]}>Retry</Text></Pressable></View>:null}
 
     <View style={styles.hero}>
       <View style={[styles.routeBadge,{backgroundColor:c.background}]}><Text style={[styles.routeBadgeText,{color:c.text}]}>{routeName}</Text></View>
@@ -80,17 +88,17 @@ export default function RouteDetailsScreen(){
     <View style={styles.summary}>
       <Metric value={String(stops.length)} label="stops"/>
       <Metric value={String(vehicles.length)} label="live buses"/>
-      <Metric value={selectedBus?.operator||'BUS'} label="service"/>
+      <Metric value={stale?'STALE':vehicles.length?'LIVE':'—'} label="status"/>
     </View>
 
     {vehicles.length>0?<View style={styles.liveCard}>
       <View style={styles.liveHeader}><View><Text style={styles.liveTitle}>Live buses</Text><Text style={styles.liveSub}>Fresh positions matched to this route</Text></View><Text style={styles.liveCount}>{vehicles.length}</Text></View>
-      {vehicles.slice(0,4).map(v=>{const ageMs=Date.now()-Date.parse(v.observedAt);const age=Number.isFinite(ageMs)?Math.max(0,Math.round(ageMs/1000)):null;return <Pressable key={v.id} style={styles.busRow} onPress={()=>setSelectedBus(v)}><View style={[styles.miniBadge,{backgroundColor:c.background}]}><Text style={[styles.miniBadgeText,{color:c.text}]}>{routeName}</Text></View><View style={styles.busCopy}><Text style={styles.busId}>Live bus · {v.id}</Text><Text style={styles.busMeta}>{v.toStop?'To '+v.toStop:to} · {age===null?'Live position':age<60?'Updated just now':'Updated '+Math.floor(age/60)+' min ago'}</Text></View><Text style={styles.chevron}>›</Text></Pressable>})}
+      {vehicles.slice(0,4).map(v=>{const ageMs=Date.now()-Date.parse(v.observedAt);const age=Number.isFinite(ageMs)?Math.max(0,Math.round(ageMs/1000)):null;return <Pressable key={v.id} style={styles.busRow} onPress={()=>setSelectedBusId(v.id)}><View style={[styles.miniBadge,{backgroundColor:c.background}]}><Text style={[styles.miniBadgeText,{color:c.text}]}>{routeName}</Text></View><View style={styles.busCopy}><Text style={styles.busId}>Live bus · {v.id}</Text><Text style={styles.busMeta}>{v.toStop?'To '+v.toStop:to} · {age===null?'Live position':age<60?'Updated just now':'Updated '+Math.floor(age/60)+' min ago'}</Text></View><Text style={styles.chevron}>›</Text></Pressable>})}
     </View>:null}
 
     <Modal visible={!!selectedBus} transparent animationType="slide" onRequestClose={()=>setSelectedBus(null)}>
       <View style={styles.modalBackdrop}>
-        <Pressable style={styles.modalDismissArea} onPress={()=>setSelectedBus(null)}/>
+        <Pressable style={styles.modalDismissArea} onPress={()=>setSelectedBusId(null)}/>
         {selectedBus ? (() => {
           const busName=displayRouteName(selectedBus.routeShortName)||routeName;
           const busColor=selectedBus.serviceColor?{background:selectedBus.serviceColor,text:selectedBus.serviceType==='electric'?'#17313B':'#FFFFFF'}:resolveRouteColor(busName,null,null);
