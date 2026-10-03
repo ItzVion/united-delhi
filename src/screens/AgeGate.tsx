@@ -27,7 +27,7 @@ export default function AgeGate({ onConfirm }: Props) {
         <Pressable disabled={!checked} style={[styles.button,!checked&&styles.buttonDisabled]} onPress={onConfirm}>
           <Text style={styles.buttonText}>Continue to United Delhi</Text>
         </Pressable>
-        <Text style={styles.small}>No account or phone number is required. Location is requested only when you choose a location-based feature.</Text>
+        <Text style={styles.small}>No account or phone number is required. Location is optional and is requested after consent to support nearby stops and map centering.</Text>
       </View>
       <Modal visible={!!legal} animationType="slide" onRequestClose={()=>setLegal(null)}>
         <SafeAreaView style={styles.safe}>
