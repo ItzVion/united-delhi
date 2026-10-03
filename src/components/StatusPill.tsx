@@ -13,7 +13,7 @@ const toneColor: Record<Tone, string> = {
 
 export function StatusPill({ label, tone = 'muted' }: { label: string; tone?: Tone }) {
   return (
-    <View style={[styles.pill, { borderColor: toneColor[tone] }]}>
+    <View accessible accessibilityRole="text" accessibilityLabel={label} style={[styles.pill, { borderColor: toneColor[tone] }]}>
       <View style={[styles.dot, { backgroundColor: toneColor[tone] }]} />
       <Text style={[styles.text, { color: toneColor[tone] }]}>{label}</Text>
     </View>
@@ -21,7 +21,7 @@ export function StatusPill({ label, tone = 'muted' }: { label: string; tone?: To
 }
 
 const styles = StyleSheet.create({
-  pill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderWidth: 1, borderRadius: 0, paddingVertical: 5, paddingHorizontal: 10, gap: 6 },
-  dot: { width: 7, height: 7, borderRadius: 0 },
+  pill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 10, gap: 6 },
+  dot: { width: 7, height: 7, borderRadius: 999 },
   text: { fontSize: 12, fontWeight: '700' }
 });
