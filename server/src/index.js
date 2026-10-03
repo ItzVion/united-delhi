@@ -62,7 +62,9 @@ app.use((_req,res,next)=>{
 app.use('/api',(_req,res,next)=>{res.setHeader('Cache-Control','no-store');next();});
 const clientIpKey=req=>ipKeyGenerator(req.ip);
 const apiRateLimit=rateLimit({windowMs:60_000,limit:180,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:clientIpKey,message:{status:'RATE_LIMITED',reason:'Too many requests. Please try again shortly.'}});
-const dbRateLimit=rateLimit({windowMs:60_000,limit:45,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:clientIpKey,message:{status:'RATE_LIMITED',reason:'Too many database requests. Please try again shortly.'}});
+const searchRateLimit=rateLimit({windowMs:60_000,limit:120,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:clientIpKey,message:{status:'RATE_LIMITED',reason:'Too many search requests. Please try again shortly.'}});
+const dataRateLimit=rateLimit({windowMs:60_000,limit:90,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:clientIpKey,message:{status:'RATE_LIMITED',reason:'Too many data requests. Please try again shortly.'}});
+const planRateLimit=rateLimit({windowMs:60_000,limit:30,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:clientIpKey,message:{status:'RATE_LIMITED',reason:'Too many planner requests. Please try again shortly.'}});
 const realtimeRateLimit=rateLimit({windowMs:60_000,limit:30,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:clientIpKey,message:{status:'RATE_LIMITED',reason:'Too many realtime-feed requests. Please try again shortly.'}});
 const healthRateLimit=rateLimit({windowMs:60_000,limit:60,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:clientIpKey,message:{status:'RATE_LIMITED',reason:'Too many health checks. Please try again shortly.'}});
 app.use('/api',apiRateLimit);
@@ -118,7 +120,7 @@ function classifyService(vehicleId,agencyId){
   const agency=String(agencyId||'').trim().toUpperCase();
   if(agency==='DIMTS')return{type:'cluster',color:'#E57D43'};                  // EV DEVI / cluster family
   if(agency==='DTC')return{type:'dtc',color:'#24C88B'};                       // CNG Non-AC family
-  return{type:'unknown',color:'#3D82CE'};                                    // CNG AC family fallback
+  return{type:'unknown',color:'#7A858A'};                                    // Unknown service; do not label it as a known bus family
 }
 
 function resolveOperationalRoute(vehicle){
@@ -137,7 +139,7 @@ function observedAtFromTimestamp(value){
   const seconds=numberOrNull(value);
   const milliseconds=seconds===null?NaN:seconds*1000;
   const now=Date.now();
-  if(!Number.isFinite(milliseconds)||milliseconds<0||Math.abs(milliseconds)>8640000000000000)return new Date().toISOString();
+  if(!Number.isFinite(milliseconds)||milliseconds<0||Math.abs(milliseconds)>8640000000000000)return null;
   if(milliseconds>now+300000||milliseconds<now-5*60*1000)return null;
   return new Date(milliseconds).toISOString();
 }
@@ -153,9 +155,10 @@ function entityToVehicle(entity){
   const tripId=ok(trip.tripId)?boundedText(trip.tripId,120):null;
   const stopId=ok(vehicle.stopId)?boundedText(vehicle.stopId,120):null;
   const timestamp=Number(vehicle.timestamp||0);
-  const observedAt=timestamp>0?observedAtFromTimestamp(timestamp):new Date().toISOString();
+  if(!(timestamp>0))return null;
+  const observedAt=observedAtFromTimestamp(timestamp);
   if(!observedAt)return null;
-  return{id,routeId,routeShortName:null,routeColor:null,routeTextColor:null,tripId,stopId,vehicleLabel:ok(descriptor.label)?boundedText(descriptor.label,120):null,licensePlate:ok(descriptor.licensePlate)?boundedText(descriptor.licensePlate,120):null,operator:null,serviceType:'unknown',serviceColor:'#3D82CE',latitude:lat,longitude:lon,bearing:normalizeBearing(position.bearing),observedAt};
+  return{id,routeId,routeShortName:null,routeColor:null,routeTextColor:null,tripId,stopId,vehicleLabel:ok(descriptor.label)?boundedText(descriptor.label,120):null,licensePlate:ok(descriptor.licensePlate)?boundedText(descriptor.licensePlate,120):null,operator:null,serviceType:'unknown',serviceColor:'#7A858A',latitude:lat,longitude:lon,bearing:normalizeBearing(position.bearing),observedAt};
 }
 async function getRealtimeVehicles(){
   const relayUrl = String(process.env.DTC_REALTIME_RELAY_URL || '').trim();
@@ -265,19 +268,70 @@ async function getRealtimeVehicles(){
     clearTimeout(timer);
   }
 }
-const realtimeCache={vehicles:[],status:'INIT',reason:null,fetchedAt:null};const staticDataCache={status:'INIT',reason:null,completedAt:null};let realtimeRefreshInFlight=null;let vehicleSaveInFlight=false;
+const realtimeCache={vehicles:[],status:'INIT',reason:null,fetchedAt:null};
+const staticDataCache={status:'INIT',reason:null,completedAt:null};
+let realtimeRefreshInFlight=null;
+let vehicleSaveInFlight=false;
+let realtimePollingTimer=null;
 async function persistVehiclesIfIdle(vehicles){if(!pool||vehicleSaveInFlight)return;vehicleSaveInFlight=true;try{await saveVehicles(vehicles);}catch(error){console.error('Failed to save realtime vehicles:',error.message);}finally{vehicleSaveInFlight=false;}}
 async function refreshRealtimeCache(){if(realtimeRefreshInFlight)return realtimeRefreshInFlight;realtimeRefreshInFlight=(async()=>{try{const vehicles=await getRealtimeVehicles();realtimeCache.vehicles=vehicles;realtimeCache.status='OK';realtimeCache.reason=null;realtimeCache.fetchedAt=new Date().toISOString();if(pool)void persistVehiclesIfIdle(vehicles);}catch(error){if(!realtimeCache.fetchedAt)realtimeCache.status='UNAVAILABLE';realtimeCache.reason=error instanceof Error?error.message:'Realtime request failed';console.error('Realtime poll failed:',realtimeCache.reason);}})().finally(()=>{realtimeRefreshInFlight=null;});return realtimeRefreshInFlight;}
-function startRealtimePolling(){if(!process.env.DTC_REALTIME_RELAY_URL&&!process.env.DTC_API_KEY){realtimeCache.status='UNAVAILABLE';realtimeCache.reason='No realtime source is configured';return;}void refreshRealtimeCache();setInterval(()=>void refreshRealtimeCache(),12000);}
-async function saveVehicles(vehicles){if(!pool)return;const client=await pool.connect();try{await client.query('BEGIN');await client.query("SET LOCAL statement_timeout='15000'");const chunkSize=200;for(let i=0;i<vehicles.length;i+=chunkSize){const chunk=vehicles.slice(i,i+chunkSize),values=[];const placeholders=chunk.map((v,index)=>{const base=index*7;values.push(v.id,v.routeId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);return '($'+(base+1)+',$'+(base+2)+',$'+(base+3)+',$'+(base+4)+',$'+(base+5)+',$'+(base+6)+',$'+(base+7)+',NOW())';}).join(',');await client.query('INSERT INTO vehicle_positions(vehicle_id,route_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+placeholders+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values);}await client.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '10 minutes'");await client.query('COMMIT');}catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}}
+async function warmRealtimeCacheFromDatabase(){
+  if(!pool||realtimeCache.vehicles.length)return;
+  try{
+    const result=await pool.query("SELECT vehicle_id,route_id,stop_id,latitude,longitude,bearing,observed_at,updated_at FROM vehicle_positions WHERE observed_at >= NOW() - INTERVAL '5 minutes' ORDER BY observed_at DESC LIMIT 5000");
+    if(!result.rows.length)return;
+    const vehicles=result.rows.map(row=>({
+      id:String(row.vehicle_id),
+      routeId:row.route_id?String(row.route_id):null,
+      routeShortName:null,
+      routeColor:null,
+      routeTextColor:null,
+      tripId:null,
+      stopId:row.stop_id?String(row.stop_id):null,
+      vehicleLabel:null,
+      licensePlate:null,
+      operator:null,
+      serviceType:'unknown',
+      serviceColor:'#7A858A',
+      latitude:Number(row.latitude),
+      longitude:Number(row.longitude),
+      bearing:row.bearing===null?null:Number(row.bearing),
+      observedAt:new Date(row.observed_at).toISOString()
+    })).filter(v=>Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)&&Number.isFinite(Date.parse(v.observedAt)));
+    if(!vehicles.length)return;
+    const newest=result.rows.reduce((latest,row)=>{
+      const t=Date.parse(row.updated_at||row.observed_at);
+      return Number.isFinite(t)&&t>latest?t:latest;
+    },0);
+    realtimeCache.vehicles=vehicles;
+    realtimeCache.status='STALE';
+    realtimeCache.reason='Using the last cached vehicle positions while live data reconnects';
+    realtimeCache.fetchedAt=newest?new Date(newest).toISOString():null;
+    console.log('Warmed realtime cache from vehicle_positions: '+vehicles.length+' vehicles.');
+  }catch(error){
+    console.error('Realtime warm cache failed:',error instanceof Error?error.message:String(error));
+  }
+}
+function startRealtimePolling(){
+  if(!process.env.DTC_REALTIME_RELAY_URL&&!process.env.DTC_API_KEY){
+    realtimeCache.status='UNAVAILABLE';
+    realtimeCache.reason='No realtime source is configured';
+    return;
+  }
+  if(realtimePollingTimer)return;
+  realtimePollingTimer=setInterval(()=>void refreshRealtimeCache(),12000);
+  void warmRealtimeCacheFromDatabase().finally(()=>void refreshRealtimeCache());
+  console.log('Realtime polling started independently of static GTFS bootstrap.');
+}
+async function saveVehicles(vehicles){if(!pool)return;const client=await pool.connect();try{await client.query('BEGIN');await client.query("SET LOCAL statement_timeout='15000'");const chunkSize=200;for(let i=0;i<vehicles.length;i+=chunkSize){const chunk=vehicles.slice(i,i+chunkSize),values=[];const placeholders=chunk.map((v,index)=>{const base=index*7;values.push(v.id,v.routeId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);return '($'+(base+1)+',$'+(base+2)+',$'+(base+3)+',$'+(base+4)+',$'+(base+5)+',$'+(base+6)+',$'+(base+7)+',NOW())';}).join(',');await client.query('INSERT INTO vehicle_positions(vehicle_id,route_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+placeholders+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values);}await client.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '5 minutes'");await client.query('COMMIT');}catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}}
 app.get('/',(_req,res)=>res.status(200).json({service:'united-delhi-api',status:'ok'}));
 app.get('/health',healthRateLimit,async(_req,res)=>{res.setHeader('Cache-Control','no-store');let database='not_configured';if(pool){try{await pool.query('SELECT 1');database='ok';}catch{database='error';}}res.status(database==='ok'?200:503).json({ok:database!=='error',service:'united-delhi-api',database,staticData:staticDataCache.status,staticDataCompletedAt:staticDataCache.completedAt,staticDataSource:GTFS_SOURCE_KEY,staticDataUrl:GTFS_SOURCE_URL,realtime:realtimeCache.status,lastRealtimeFetch:realtimeCache.fetchedAt,time:new Date().toISOString()});});
 app.get('/api/status',(_req,res)=>res.json({realtime:(process.env.DTC_REALTIME_RELAY_URL||process.env.DTC_API_KEY)?'configured':'unavailable',database:pool?'configured':'unavailable',realtimeCache:realtimeCache.status,lastRealtimeFetch:realtimeCache.fetchedAt}));
 app.get('/api/realtime/vehicles',realtimeRateLimit,(_req,res)=>{res.setHeader('Cache-Control','no-store');const fetchedAt=realtimeCache.fetchedAt,age=fetchedAt?Math.max(0,Date.now()-Date.parse(fetchedAt)):Infinity,stale=age>180000;if(realtimeCache.status==='UNAVAILABLE'&&!realtimeCache.vehicles.length)return res.status(503).json({status:'UNAVAILABLE',count:0,vehicles:[],reason:'Realtime data is currently unavailable'});res.json({status:stale?'STALE':'OK',count:realtimeCache.vehicles.length,vehicles:realtimeCache.vehicles,fetchedAt,stale});});
-app.post('/api/stops/nearby',dbRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',stops:[],reason:'Database is not configured'});const lat=parseCoordinate(req.body?.lat,-90,90),lon=parseCoordinate(req.body?.lon,-180,180),ln=Number(req.body?.limit),limit=Number.isFinite(ln)?Math.min(Math.max(Math.trunc(ln),1),50):10;if(lat===null||lon===null)return res.status(400).json({status:'ERROR',stops:[],reason:'Valid lat and lon are required'});res.setHeader('Cache-Control','no-store');try{const result=await pool.query(`SELECT stop_id,name,latitude,longitude,distance_m FROM (SELECT stop_id,name,latitude,longitude,(6371000*acos(LEAST(1,GREATEST(-1,sin(radians($1))*sin(radians(latitude))+cos(radians($1))*cos(radians(latitude))*cos(radians(longitude)-radians($2)))))) distance_m FROM stops) calculated ORDER BY distance_m,stop_id LIMIT $3`,[lat,lon,limit]);res.json({status:'OK',stops:result.rows});}catch(error){console.error('Failed to load nearby stops:',error.message);res.status(500).json({status:'ERROR',stops:[],reason:'Failed to load nearby stops'});}});
+app.post('/api/stops/nearby',dataRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',stops:[],reason:'Database is not configured'});const lat=parseCoordinate(req.body?.lat,-90,90),lon=parseCoordinate(req.body?.lon,-180,180),ln=Number(req.body?.limit),limit=Number.isFinite(ln)?Math.min(Math.max(Math.trunc(ln),1),50):10,rad=Number(req.body?.radius_m),radiusM=Number.isFinite(rad)?Math.min(Math.max(Math.trunc(rad),500),15000):10000;if(lat===null||lon===null)return res.status(400).json({status:'ERROR',stops:[],reason:'Valid lat and lon are required'});res.setHeader('Cache-Control','no-store');try{const result=await pool.query(`SELECT stop_id,name,latitude,longitude,distance_m FROM (SELECT stop_id,name,latitude,longitude,(6371000*acos(LEAST(1,GREATEST(-1,sin(radians($1))*sin(radians(latitude))+cos(radians($1))*cos(radians(latitude))*cos(radians(longitude)-radians($2)))))) distance_m FROM stops WHERE latitude BETWEEN $1-$4/111320.0 AND $1+$4/111320.0 AND longitude BETWEEN $2-($4/(111320.0*GREATEST(0.1,cos(radians($1))))) AND $2+($4/(111320.0*GREATEST(0.1,cos(radians($1))))) ) calculated WHERE distance_m <= $4 ORDER BY distance_m,stop_id LIMIT $3`,[lat,lon,limit,radiusM]);res.json({status:'OK',stops:result.rows});}catch(error){console.error('Failed to load nearby stops:',error.message);res.status(500).json({status:'ERROR',stops:[],reason:'Failed to load nearby stops'});}});
 function haversineMeters(lat1,lon1,lat2,lon2){const R=6371000,toRad=v=>v*Math.PI/180,dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1),a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(a));}
-app.get('/api/stops/:id/arrivals',dbRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',arrivals:[],reason:'Database is not configured'});const stopId=requestId(req.params.id);if(!stopId)return res.status(400).json({status:'ERROR',arrivals:[],reason:'Invalid stop id'});try{const result=await pool.query('SELECT rs.route_id,r.short_name,r.route_color,r.route_text_color,start_stop.name AS from_stop,end_stop.name AS to_stop FROM route_stops rs LEFT JOIN routes r ON r.route_id=rs.route_id LEFT JOIN LATERAL (SELECT s.name FROM route_stops rsi JOIN stops s ON s.stop_id=rsi.stop_id WHERE rsi.route_id=rs.route_id ORDER BY rsi.stop_sequence ASC,s.name,s.stop_id LIMIT 1) start_stop ON TRUE LEFT JOIN LATERAL (SELECT s.name FROM route_stops rse JOIN stops s ON s.stop_id=rse.stop_id WHERE rse.route_id=rs.route_id ORDER BY rse.stop_sequence DESC,s.name,s.stop_id LIMIT 1) end_stop ON TRUE WHERE rs.stop_id=$1',[stopId]);const routeMap=new Map(result.rows.map(row=>[String(row.route_id),row]));const stop=await pool.query('SELECT latitude,longitude FROM stops WHERE stop_id=$1',[stopId]);if(!stop.rows.length)return res.status(404).json({status:'NOT_FOUND',arrivals:[],reason:'Stop not found'});const stopLat=Number(stop.rows[0].latitude),stopLon=Number(stop.rows[0].longitude),now=Date.now(),routeIds=new Set(routeMap.keys()),cacheAge=realtimeCache.fetchedAt?Math.max(0,now-Date.parse(realtimeCache.fetchedAt)):Infinity;const liveVehicles=cacheAge<=180000?realtimeCache.vehicles:[];const output=liveVehicles.filter(v=>{const operational=resolveOperationalRoute(v);const candidateRouteId=operational?.routeId||v.routeId;return candidateRouteId&&routeIds.has(String(candidateRouteId));}).map(v=>{const d=haversineMeters(v.latitude,v.longitude,stopLat,stopLon),observed=Date.parse(v.observedAt),age=Number.isFinite(observed)?Math.max(0,Math.round((now-observed)/1000)):0,row=routeMap.get(String(v.routeId));if(!row?.short_name)return null;const operational=resolveOperationalRoute(v);const publicName=operational?.shortName||String(row.short_name||'').trim()||null;if(!publicName)return null;return{vehicleId:v.id,routeId:v.routeId,routeShortName:publicName,routeColor:operational?.routeColor?'#'+String(operational.routeColor).replace(/^#/,''):row.route_color?'#'+String(row.route_color).replace(/^#/,''):null,routeTextColor:null,serviceType:v.serviceType||'unknown',serviceColor:v.serviceColor||'#3D82CE',distanceMeters:Math.max(0,Math.round(d)),observedAgeSeconds:age,fromStop:row?.from_stop?String(row.from_stop).trim():null,toStop:row?.to_stop?String(row.to_stop).trim():null};}).filter(Boolean).sort((a,b)=>a.distanceMeters-b.distanceMeters).slice(0,20);res.json({status:'OK',arrivals:output});}catch(error){console.error('Failed to load stop arrivals:',error.message);res.status(500).json({status:'ERROR',arrivals:[],reason:'Failed to load arrivals'});}});
-app.get('/api/stops/:id',dbRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',reason:'Database is not configured'});const stopId=requestId(req.params.id);if(!stopId)return res.status(400).json({status:'ERROR',reason:'Invalid stop id'});try{const stopResult=await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[stopId]);if(!stopResult.rows.length)return res.status(404).json({status:'NOT_FOUND',reason:'Stop not found'});const routesResult=await pool.query(`
+app.get('/api/stops/:id/arrivals',dataRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',arrivals:[],reason:'Database is not configured'});const stopId=requestId(req.params.id);if(!stopId)return res.status(400).json({status:'ERROR',arrivals:[],reason:'Invalid stop id'});try{const result=await pool.query('SELECT rs.route_id,r.short_name,r.route_color,r.route_text_color,start_stop.name AS from_stop,end_stop.name AS to_stop FROM route_stops rs LEFT JOIN routes r ON r.route_id=rs.route_id LEFT JOIN LATERAL (SELECT s.name FROM route_stops rsi JOIN stops s ON s.stop_id=rsi.stop_id WHERE rsi.route_id=rs.route_id ORDER BY rsi.stop_sequence ASC,s.name,s.stop_id LIMIT 1) start_stop ON TRUE LEFT JOIN LATERAL (SELECT s.name FROM route_stops rse JOIN stops s ON s.stop_id=rse.stop_id WHERE rse.route_id=rs.route_id ORDER BY rse.stop_sequence DESC,s.name,s.stop_id LIMIT 1) end_stop ON TRUE WHERE rs.stop_id=$1',[stopId]);const routeMap=new Map(result.rows.map(row=>[String(row.route_id),row]));const stop=await pool.query('SELECT latitude,longitude FROM stops WHERE stop_id=$1',[stopId]);if(!stop.rows.length)return res.status(404).json({status:'NOT_FOUND',arrivals:[],reason:'Stop not found'});const stopLat=Number(stop.rows[0].latitude),stopLon=Number(stop.rows[0].longitude),now=Date.now(),routeIds=new Set(routeMap.keys()),cacheAge=realtimeCache.fetchedAt?Math.max(0,now-Date.parse(realtimeCache.fetchedAt)):Infinity;const liveVehicles=cacheAge<=180000?realtimeCache.vehicles:[];const output=liveVehicles.filter(v=>{const operational=resolveOperationalRoute(v);const candidateRouteId=operational?.routeId||v.routeId;return candidateRouteId&&routeIds.has(String(candidateRouteId));}).map(v=>{const d=haversineMeters(v.latitude,v.longitude,stopLat,stopLon),observed=Date.parse(v.observedAt),age=Number.isFinite(observed)?Math.max(0,Math.round((now-observed)/1000)):0,row=routeMap.get(String(v.routeId));if(!row?.short_name)return null;const operational=resolveOperationalRoute(v);const publicName=operational?.shortName||String(row.short_name||'').trim()||null;if(!publicName)return null;return{vehicleId:v.id,routeId:v.routeId,routeShortName:publicName,routeColor:operational?.routeColor?'#'+String(operational.routeColor).replace(/^#/,''):row.route_color?'#'+String(row.route_color).replace(/^#/,''):null,routeTextColor:null,serviceType:v.serviceType||'unknown',serviceColor:v.serviceColor||'#3D82CE',distanceMeters:Math.max(0,Math.round(d)),observedAgeSeconds:age,fromStop:row?.from_stop?String(row.from_stop).trim():null,toStop:row?.to_stop?String(row.to_stop).trim():null};}).filter(Boolean).sort((a,b)=>a.distanceMeters-b.distanceMeters).slice(0,20);res.json({status:'OK',arrivals:output});}catch(error){console.error('Failed to load stop arrivals:',error.message);res.status(500).json({status:'ERROR',arrivals:[],reason:'Failed to load arrivals'});}});
+app.get('/api/stops/:id',dataRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',reason:'Database is not configured'});const stopId=requestId(req.params.id);if(!stopId)return res.status(400).json({status:'ERROR',reason:'Invalid stop id'});try{const stopResult=await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[stopId]);if(!stopResult.rows.length)return res.status(404).json({status:'NOT_FOUND',reason:'Stop not found'});const routesResult=await pool.query(`
 WITH route_base AS (
   SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,
     CASE WHEN r.short_name IS NULL OR BTRIM(r.short_name)='' THEN BTRIM(COALESCE(r.long_name,'')) ELSE REGEXP_REPLACE(REGEXP_REPLACE(BTRIM(r.short_name),'(?:UP|DOWN|DWN)$','','i'),'^AIR-0+','AIR-','i') END public_route_name,
@@ -302,7 +356,7 @@ SELECT route_id,public_route_name AS "publicRouteName",short_name,long_name,rout
 FROM representative
 ORDER BY public_route_name,"fromStop","toStop",route_id
 `,[stopId]);res.json({status:'OK',stop:stopResult.rows[0],routes:routesResult.rows});}catch(error){console.error('Failed to load stop:',error.message);res.status(500).json({status:'ERROR',reason:'Failed to load stop'});}});
-app.get('/api/routes/:id',dbRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',reason:'Database is not configured'});const routeId=requestId(req.params.id);if(!routeId)return res.status(400).json({status:'ERROR',reason:'Invalid route id'});try{const routeResult=await pool.query(`
+app.get('/api/routes/:id',dataRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',reason:'Database is not configured'});const routeId=requestId(req.params.id);if(!routeId)return res.status(400).json({status:'ERROR',reason:'Invalid route id'});try{const routeResult=await pool.query(`
 WITH route_meta AS (
   SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,
     CASE WHEN r.short_name IS NULL OR BTRIM(r.short_name)='' THEN BTRIM(COALESCE(r.long_name,'')) ELSE REGEXP_REPLACE(REGEXP_REPLACE(BTRIM(r.short_name),'(?:UP|DOWN|DWN)$','','i'),'^AIR-0+','AIR-','i') END public_route_name,
@@ -315,7 +369,7 @@ WITH route_meta AS (
 SELECT route_id,short_name,long_name,route_color,route_text_color,public_route_name AS "publicRouteName",from_stop AS "fromStop",to_stop AS "toStop"
 FROM route_meta
 `,[routeId]);if(!routeResult.rows.length)return res.status(404).json({status:'NOT_FOUND',reason:'Route not found'});const stopsResult=await pool.query('SELECT s.stop_id,s.name,s.latitude,s.longitude,rs.stop_sequence FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=$1 ORDER BY rs.stop_sequence,s.name,s.stop_id',[routeId]);const routeStops=stopsResult.rows;const cacheAge=realtimeCache.fetchedAt?Math.max(0,Date.now()-Date.parse(realtimeCache.fetchedAt)):Infinity;const candidates=cacheAge<=180000?realtimeCache.vehicles.filter(v=>{const operational=resolveOperationalRoute(v);return String(operational?.routeId||v.routeId||'')===routeId;}):[];const vehicles=candidates.filter(v=>v.routeId&&routeStops.some(s=>haversineMeters(v.latitude,v.longitude,Number(s.latitude),Number(s.longitude))<=3000));res.json({status:'OK',route:routeResult.rows[0],stops:routeStops,vehicles});}catch(error){console.error('Failed to load route:',error.message);res.status(500).json({status:'ERROR',reason:'Failed to load route'});}});
-app.get('/api/search',dbRateLimit,async(req,res)=>{
+app.get('/api/search',searchRateLimit,async(req,res)=>{
   if(!pool)return res.status(503).json({status:'UNAVAILABLE',results:[],reason:'Database is not configured'});
   const raw=String(req.query.q||'').trim();
   const like=searchPattern(raw);
@@ -346,7 +400,7 @@ app.get('/api/search',dbRateLimit,async(req,res)=>{
       ),
       stop_matches AS (
         SELECT 'stop' type,stop_id id,name label,NULL::TEXT "fromStop",NULL::TEXT "toStop",NULL::TEXT "routeColor",NULL::TEXT "routeTextColor"
-        FROM stops WHERE name ILIKE $1 ORDER BY name,stop_id LIMIT 30
+        FROM stops WHERE name ILIKE $1 ORDER BY CASE WHEN UPPER(BTRIM(name))=UPPER($2) THEN 0 WHEN UPPER(BTRIM(name)) LIKE UPPER($2)||'%' THEN 1 ELSE 2 END, name,stop_id LIMIT 30
       ),
       route_results AS (
         SELECT 'route' type,r.route_id id,r.public_label label,r.public_from_stop "fromStop",r.public_to_stop "toStop",r.route_color "routeColor",r.route_text_color "routeTextColor"
@@ -369,7 +423,7 @@ app.get('/api/search',dbRateLimit,async(req,res)=>{
   }
 });
 
-app.get('/api/plan',dbRateLimit,async(req,res)=>{\n  res.setHeader('Cache-Control','no-store');
+app.get('/api/plan',planRateLimit,async(req,res)=>{\n  res.setHeader('Cache-Control','no-store');
   if(!pool)return res.status(503).json({status:'UNAVAILABLE',options:[],reason:'Database is not configured'});
   const from=boundedText(req.query.from,80),to=boundedText(req.query.to,80);
   const fromLike=searchPattern(from),toLike=searchPattern(to);
@@ -456,6 +510,8 @@ app.get('/api/plan',dbRateLimit,async(req,res)=>{\n  res.setHeader('Cache-Contro
         type:'direct',
         durationMinutes:Math.max(3,Math.ceil(hops*2.5)),
         walkingMinutes:0,
+        durationIsEstimate:true,
+        walkingIsEstimated:true,
         legs:[{routeId:String(row.route_id),routeName:row.short_name||row.long_name||'Bus',routeColor:row.route_color,routeTextColor:row.route_text_color,fromStop:row.from_stop,toStop:row.to_stop,fromStopId:row.from_stop_id,toStopId:row.to_stop_id}]
       });
     }
@@ -466,6 +522,8 @@ app.get('/api/plan',dbRateLimit,async(req,res)=>{\n  res.setHeader('Cache-Contro
         type:'one-transfer',
         durationMinutes:Math.max(8,Math.ceil((firstHops+secondHops)*2.5+5)),
         walkingMinutes:0,
+        durationIsEstimate:true,
+        walkingIsEstimated:true,
         legs:[
           {routeId:String(row.route1_id),routeName:row.route1_name||'Bus',routeColor:row.route1_color,routeTextColor:row.route1_text_color,fromStop:row.from_stop,toStop:row.transfer_stop,fromStopId:row.from_stop_id,toStopId:row.transfer_stop_id},
           {routeId:String(row.route2_id),routeName:row.route2_name||'Bus',routeColor:row.route2_color,routeTextColor:row.route2_text_color,fromStop:row.transfer_stop,toStop:row.to_stop,fromStopId:row.transfer_stop_id,toStopId:row.to_stop_id}
@@ -523,9 +581,9 @@ async function ensureStaticData(){
         && Number(meta?.imported_stop_count||0)===Number(counts.stops)
         && Number(meta?.imported_route_count||0)===Number(counts.routes)
         && Number(meta?.imported_route_stop_count||0)===Number(counts.route_stops)
-        && Number(counts.stops)>=1000
-        && Number(counts.routes)>=500
-        && Number(counts.route_stops)>=10000;
+        && Number(counts.stops)>=9000
+        && Number(counts.routes)>=2000
+        && Number(counts.route_stops)>=50000;
       if(complete){
         console.log('Official OTD GTFS data is already complete and matches its recorded import.');
         staticDataCache.status='OK';
@@ -548,20 +606,33 @@ app.use((_req,res)=>res.status(404).json({status:'NOT_FOUND',reason:'Endpoint no
 app.use((error,_req,res,_next)=>{
   console.error('Unhandled request error:',error instanceof Error?error.message:String(error));
   if(res.headersSent)return;
-  res.status(500).json({status:'ERROR',reason:'Internal server error'});
+  const status=Number(error?.status);
+  res.status(Number.isInteger(status)&&status>=400&&status<500?status:500).json({status:'ERROR',reason:status===400?'Invalid request':'Internal server error'});
 });
 loadOperationalMappings();
 
 const server=app.listen(port,()=>{
   console.log('United Delhi API listening on :'+port);
-  void ensureStaticData().then(()=>startRealtimePolling()).catch(error=>{
+  startRealtimePolling();
+  void ensureStaticData().catch(error=>{
     staticDataCache.status='ERROR';
     staticDataCache.reason=error instanceof Error?error.message:'Static GTFS bootstrap failed';
     console.error('Static GTFS bootstrap failed:',staticDataCache.reason);
-    startRealtimePolling();
   });
 });
 server.requestTimeout=15000;
 server.headersTimeout=20000;
 server.keepAliveTimeout=5000;
+
+let shuttingDown=false;
+const shutdown=async(signal)=>{
+  if(shuttingDown)return;
+  shuttingDown=true;
+  console.log('Received '+signal+', shutting down United Delhi API...');
+  if(realtimePollingTimer){clearInterval(realtimePollingTimer);realtimePollingTimer=null;}
+  server.close(()=>{});
+  await pool?.end().catch(error=>console.error('PostgreSQL pool shutdown failed:',error.message));
+};
+process.once('SIGTERM',()=>void shutdown('SIGTERM'));
+process.once('SIGINT',()=>void shutdown('SIGINT'));server.keepAliveTimeout=5000;
 
