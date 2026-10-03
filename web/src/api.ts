@@ -21,5 +21,5 @@ export const api={
   route:(id:string)=>request<any>(`/api/routes/${encodeURIComponent(id)}`),
   stop:async(id:string)=>{const stopResult=await request<any>(`/api/stops/${encodeURIComponent(id)}`);let arrivals:any={status:'UNAVAILABLE',arrivals:[],reason:'Live arrival data is unavailable.'};try{arrivals=await request<any>(`/api/stops/${encodeURIComponent(id)}/arrivals`);}catch(error){arrivals={status:'UNAVAILABLE',arrivals:[],reason:error instanceof Error?error.message:'Live arrival data is unavailable.'};}return [stopResult,arrivals] as const;},
   nearby:(lat:number,lon:number)=>request<any>('/api/stops/nearby',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat,lon,limit:30})}),
-  plan:(from:string,to:string,fromStopId?:string,toStopId?:string)=>{const params=new URLSearchParams({from,to});if(fromStopId)params.set('fromStopId',fromStopId);if(toStopId)params.set('toStopId',toStopId);return request<any>('/api/plan?'+params.toString());}
+  plan:(from:string,to:string,fromStopId?:string,toStopId?:string)=>{const params=new URLSearchParams({from,to});if(fromStopId)params.set('fromStopId',fromStopId);if(toStopId)params.set('toStopId',toStopId);return request<any>('/api/plan?'+params.toString(),{method:'GET'});}
 };
