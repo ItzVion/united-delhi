@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -75,13 +76,17 @@ export default function PlannerScreen() {
   };
 
   const plan = async () => {
-    if (from.trim().length < 2 || to.trim().length < 2) {
-      setError('Select a starting bus stop and destination.');
+    if (!fromStop || !toStop) {
+      setError('Choose both stops from the suggestions so the planner uses the exact bus stops.');
+      return;
+    }
+    if (fromStop.id===toStop.id) {
+      setError('Choose two different bus stops.');
       return;
     }
     setLoading(true); setError(null); setOptions([]); setFromFocus(false); setToFocus(false);
     try {
-      const result = await api.plan(from.trim(), to.trim());
+      const result = await api.plan(fromStop.label,toStop.label,fromStop.id,toStop.id);
       if (result.status === 'OK') setOptions(result.options);
       else setError(result.reason || 'No journey could be planned.');
     } catch (e) {
@@ -95,7 +100,7 @@ export default function PlannerScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Pressable style={styles.back} onPress={() => navigation.goBack()}><Text style={styles.backText}>‹</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Back to home" style={styles.back} onPress={() => navigation.goBack()}><Text style={styles.backText}>‹</Text></Pressable>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>JOURNEY PLANNER</Text>
             <Text style={styles.title}>Plan your ride</Text>
