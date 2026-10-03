@@ -26,7 +26,7 @@ const pool = hasManagedDatabase
       password: managedDbPassword,
       max: 2,
       connectionTimeoutMillis: 5000,
-      ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: false } })
+      ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: true } })
     })
   : new Pool({
       connectionString: databaseUrl,
