@@ -429,20 +429,99 @@ function RouteBadge({name,color,textColor}:{name:string;color?:string|null;textC
 }
 
 function Planner({go}:{go:(path:string)=>void}){
-  const[from,setFrom]=useState('');const[to,setTo]=useState('');const[busy,setBusy]=useState(false);const[error,setError]=useState('');
+  const[from,setFrom]=useState('');const[to,setTo]=useState('');
+  const[fromStop,setFromStop]=useState<{id:string;label:string}|null>(null);
+  const[toStop,setToStop]=useState<{id:string;label:string}|null>(null);
+  const[busy,setBusy]=useState(false);const[error,setError]=useState('');
   const[fromSuggestions,setFromSuggestions]=useState<any[]>([]);const[toSuggestions,setToSuggestions]=useState<any[]>([]);
   const[fromFocus,setFromFocus]=useState(false);const[toFocus,setToFocus]=useState(false);const[options,setOptions]=useState<any[]>([]);
-  const loadSuggestions=async(value:string,setter:(v:any[])=>void)=>{
-    const term=value.trim();if(term.length<2){setter([]);return;}
-    try{const r=await api.search(term);setter((r.results||[]).filter((x:any)=>x.type==='stop').slice(0,8));}catch{setter([]);}
-  };
-  useEffect(()=>{const id=window.setTimeout(()=>void loadSuggestions(from,setFromSuggestions),180);return()=>window.clearTimeout(id);},[from]);
-  useEffect(()=>{const id=window.setTimeout(()=>void loadSuggestions(to,setToSuggestions),180);return()=>window.clearTimeout(id);},[to]);
-  const plan=async()=>{if(from.trim().length<2||to.trim().length<2){setError('Select a starting stop and destination.');return;}setBusy(true);setError('');setOptions([]);setFromFocus(false);setToFocus(false);try{const r=await api.plan(from.trim(),to.trim());if(r.status==='OK')setOptions(r.options||[]);else setError(r.reason||'No journey could be planned.');}catch(e){setError((e as Error).message||'Journey planner is unavailable.');}finally{setBusy(false);}};
-  const suggestions=(items:any[],active:boolean,setter:(v:string)=>void)=><>{active&&items.length?<div className="planner-suggestions">{items.map((x:any)=><button type="button" className="planner-suggestion" key={x.id} onMouseDown={e=>e.preventDefault()} onClick={()=>{setter(x.label);setFromFocus(false);setToFocus(false);}}><span className="stop-square">●</span><span><b>{x.label}</b><small>Bus stop · {x.id}</small></span><span>›</span></button>)}</div>:null}</>;
-  return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">JOURNEY PLANNER</span><h1>Plan your ride</h1><p>Bus journeys across Delhi</p></div></div><div className="flat-card planner-form"><div className="planner-row"><div className="route-rail"><i/><b/><i/></div><div className="planner-fields"><label>FROM<div className="planner-input-wrap"><input value={from} onFocus={()=>setFromFocus(true)} onChange={e=>{setFrom(e.target.value);setFromFocus(true);}} placeholder="Starting stop or place"/>{suggestions(fromSuggestions,fromFocus,setFrom)}</div></label><label>TO<div className="planner-input-wrap"><input value={to} onFocus={()=>setToFocus(true)} onChange={e=>{setTo(e.target.value);setToFocus(true);}} placeholder="Where do you want to go?"/>{suggestions(toSuggestions,toFocus,setTo)}</div></label></div><button className="swap-button" onClick={()=>{const v=from;setFrom(to);setTo(v);}}>↕</button></div><button className="primary-button" onClick={plan} disabled={busy}>{busy?'Finding buses…':'Find buses'}</button></div>{error?<div className="error-box"><b>Couldn't plan this trip</b><span>{error}</span></div>:null}{options.map((o:any,i:number)=><div className="flat-card journey" key={i}><div className="journey-top"><div><span className="eyebrow">{o.type==='direct'?'DIRECT BUS':'ONE CHANGE'}</span><strong>{o.durationMinutes} min</strong></div><span className="walk-tag">Walk {o.walkingMinutes} min</span></div>{(o.legs||[]).map((l:any,j:number)=><div className="journey-leg" key={String(l.routeId)+j}><RouteBadge name={routeName(l.routeName)} color={l.routeColor} textColor={l.routeTextColor}/><div><b>Bus {routeName(l.routeName)}</b><small>{l.fromStop} → {l.toStop}</small></div></div>)}</div>)}{!busy&&!error&&!options.length?<div className="empty-panel"><span className="empty-icon">↗</span><b>Where are you going?</b><p>Start typing a Delhi bus stop in either field to choose it from the list.</p></div>:null}</section>;
-}
 
+  useEffect(()=>{
+    const term=from.trim();if(term.length<2){setFromSuggestions([]);return;}
+    let cancelled=false;
+    const id=window.setTimeout(async()=>{
+      try{
+        const r=await api.search(term);
+        if(!cancelled)setFromSuggestions((r.results||[]).filter((x:any)=>x.type==='stop').slice(0,8));
+      }catch{if(!cancelled)setFromSuggestions([]);}
+    },220);
+    return()=>{cancelled=true;window.clearTimeout(id);};
+  },[from]);
+
+  useEffect(()=>{
+    const term=to.trim();if(term.length<2){setToSuggestions([]);return;}
+    let cancelled=false;
+    const id=window.setTimeout(async()=>{
+      try{
+        const r=await api.search(term);
+        if(!cancelled)setToSuggestions((r.results||[]).filter((x:any)=>x.type==='stop').slice(0,8));
+      }catch{if(!cancelled)setToSuggestions([]);}
+    },220);
+    return()=>{cancelled=true;window.clearTimeout(id);};
+  },[to]);
+
+  const chooseFrom=(x:any)=>{const choice={id:String(x.id),label:String(x.label||'')};setFrom(choice.label);setFromStop(choice);setFromSuggestions([]);setFromFocus(false);};
+  const chooseTo=(x:any)=>{const choice={id:String(x.id),label:String(x.label||'')};setTo(choice.label);setToStop(choice);setToSuggestions([]);setToFocus(false);};
+  const changeFrom=(value:string)=>{setFrom(value);if(!fromStop||fromStop.label!==value)setFromStop(null);setFromFocus(true);};
+  const changeTo=(value:string)=>{setTo(value);if(!toStop||toStop.label!==value)setToStop(null);setToFocus(true);};
+
+  const swap=()=>{const v=from,s=fromStop;setFrom(to);setFromStop(toStop);setTo(v);setToStop(s);setFromFocus(false);setToFocus(false);};
+
+  const plan=async()=>{
+    if(!fromStop||!toStop){setError('Choose both stops from the suggestions so the planner uses the exact bus stops.');return;}
+    if(fromStop.id===toStop.id){setError('Choose two different bus stops.');return;}
+    setBusy(true);setError('');setOptions([]);setFromFocus(false);setToFocus(false);
+    try{
+      const r=await api.plan(fromStop.label,toStop.label,fromStop.id,toStop.id);
+      if(r.status==='OK')setOptions(r.options||[]);
+      else setError(r.reason||'No journey could be planned.');
+    }catch(e){setError((e as Error).message||'Journey planner is unavailable.');}
+    finally{setBusy(false);}
+  };
+
+  const suggestions=(items:any[],active:boolean,choose:(x:any)=>void,side:string)=>
+    active&&items.length?<div className="planner-suggestions">{items.map((x:any)=>
+      <button type="button" className="planner-suggestion" key={String(x.id)} aria-label={`Select ${side} stop ${x.label}`} onMouseDown={e=>e.preventDefault()} onClick={()=>choose(x)}>
+        <span className="stop-square">●</span><span><b>{x.label}</b><small>Bus stop · {x.id}</small></span><span>›</span>
+      </button>
+    )}</div>:null;
+
+  return <section className="screen">
+    <div className="page-top">
+      <button aria-label="Back to home" className="back-button" onClick={()=>go('/')}>‹</button>
+      <div><span className="eyebrow">JOURNEY PLANNER</span><h1>Plan your ride</h1><p>Bus journeys across Delhi</p></div>
+    </div>
+    <div className="flat-card planner-form">
+      <div className="planner-row">
+        <div className="route-rail"><i/><b/><i/></div>
+        <div className="planner-fields">
+          <label>FROM<div className="planner-input-wrap"><input aria-label="Starting bus stop" value={from} onFocus={()=>setFromFocus(true)} onChange={e=>changeFrom(e.target.value)} placeholder="Choose a starting bus stop"/>{suggestions(fromSuggestions,fromFocus,chooseFrom,'starting')}</div></label>
+          <label>TO<div className="planner-input-wrap"><input aria-label="Destination bus stop" value={to} onFocus={()=>setToFocus(true)} onChange={e=>changeTo(e.target.value)} placeholder="Choose a destination bus stop"/>{suggestions(toSuggestions,toFocus,chooseTo,'destination')}</div></label>
+        </div>
+        <button aria-label="Swap starting and destination stops" className="swap-button" onClick={swap}>↕</button>
+      </div>
+      <button aria-label="Find bus journeys" className="primary-button" onClick={plan} disabled={busy}>{busy?'Finding buses…':'Find buses'}</button>
+    </div>
+    {error?<div className="error-box"><b>Couldn't plan this trip</b><span>{error}</span></div>:null}
+    {options.map((o:any,i:number)=>
+      <div className="flat-card journey" key={i}>
+        <div className="journey-top">
+          <div><span className="eyebrow">{o.type==='direct'?'DIRECT BUS':'ONE CHANGE'}</span><strong>~{o.durationMinutes} min</strong><small className="estimate-note">Estimated travel time</small></div>
+          <span className="walk-tag">Walking not estimated</span>
+        </div>
+        {(o.legs||[]).map((l:any,j:number)=>
+          <button type="button" className="journey-leg journey-leg-button" key={String(l.routeId)+j} aria-label={`View route ${routeName(l.routeName)||'Bus'}`} onClick={()=>go('/routes/'+encodeURIComponent(l.routeId))}>
+            <RouteBadge name={routeName(l.routeName)||'Bus'} color={l.routeColor} textColor={l.routeTextColor}/>
+            <div><b>Bus {routeName(l.routeName)||'Bus'}</b><small>{l.fromStop} → {l.toStop}</small></div>
+            <span className="chevron">›</span>
+          </button>
+        )}
+        {o.transferStop?<div className="transfer">Change at {o.transferStop}</div>:null}
+      </div>
+    )}
+    {!busy&&!error&&!options.length?<div className="empty-panel"><span className="empty-icon">↗</span><b>Where are you going?</b><p>Choose two Delhi bus stops from the suggestions to find direct and one-change journeys.</p></div>:null}
+  </section>;
+}
 
 function Legal({go}:{go:(path:string)=>void}){
   return <section className="screen">
