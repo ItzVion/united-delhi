@@ -80,7 +80,7 @@ export default function RouteDetailsScreen(){
 
     <View style={styles.mapWrap}>
       <WebView ref={mapRef} style={styles.map} originWhitelist={['*']} javaScriptEnabled domStorageEnabled cacheEnabled userAgent="UnitedDelhi/1.0 (+https://github.com/ItzVion/united-delhi)" source={{html:buildRouteMapHtml()}} onLoadEnd={()=>setMapReady(true)}
-        onMessage={event=>{try{const m=JSON.parse(event.nativeEvent.data);if(m.type==='stop'){const stop=stops.find(s=>s.stop_id===m.stopId);if(stop)navigation.navigate('StopDetails',{stopId:stop.stop_id,stopName:stop.name});}else if(m.type==='bus'){const bus=vehicles.find(v=>v.id===m.busId);if(bus)setSelectedBus(bus);}}catch{}}}/>
+        onMessage={event=>{try{const m=JSON.parse(event.nativeEvent.data);if(m.type==='stop'){const stop=stops.find(s=>s.stop_id===m.stopId);if(stop)navigation.navigate('StopDetails',{stopId:stop.stop_id,stopName:stop.name});}else if(m.type==='bus'){const bus=vehicles.find(v=>v.id===m.busId);if(bus)setSelectedBusId(bus.id);}}catch{}}}/>
       <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View>
       <View pointerEvents="none" style={styles.mapPill}><View style={styles.liveDot}/><Text style={styles.mapPillText}>{vehicles.length?(`${vehicles.length} live on route`):'No live position on route'}</Text></View>
     </View>
@@ -93,10 +93,10 @@ export default function RouteDetailsScreen(){
 
     {vehicles.length>0?<View style={styles.liveCard}>
       <View style={styles.liveHeader}><View><Text style={styles.liveTitle}>Live buses</Text><Text style={styles.liveSub}>Fresh positions matched to this route</Text></View><Text style={styles.liveCount}>{vehicles.length}</Text></View>
-      {vehicles.slice(0,4).map(v=>{const ageMs=Date.now()-Date.parse(v.observedAt);const age=Number.isFinite(ageMs)?Math.max(0,Math.round(ageMs/1000)):null;return <Pressable key={v.id} style={styles.busRow} onPress={()=>setSelectedBusId(v.id)}><View style={[styles.miniBadge,{backgroundColor:c.background}]}><Text style={[styles.miniBadgeText,{color:c.text}]}>{routeName}</Text></View><View style={styles.busCopy}><Text style={styles.busId}>Live bus · {v.id}</Text><Text style={styles.busMeta}>{v.toStop?'To '+v.toStop:to} · {age===null?'Live position':age<60?'Updated just now':'Updated '+Math.floor(age/60)+' min ago'}</Text></View><Text style={styles.chevron}>›</Text></Pressable>})}
+      {vehicles.slice(0,4).map(v=>{const ageMs=Date.now()-Date.parse(v.observedAt);const age=Number.isFinite(ageMs)?Math.max(0,Math.round(ageMs/1000)):null;return <Pressable key={v.id} accessibilityRole="button" accessibilityLabel={`View live bus ${v.id}`} style={styles.busRow} onPress={()=>setSelectedBusId(v.id)}><View style={[styles.miniBadge,{backgroundColor:c.background}]}><Text style={[styles.miniBadgeText,{color:c.text}]}>{routeName}</Text></View><View style={styles.busCopy}><Text style={styles.busId}>Live bus · {v.id}</Text><Text style={styles.busMeta}>{v.toStop?'To '+v.toStop:to} · {age===null?'Live position':age<60?'Updated just now':'Updated '+Math.floor(age/60)+' min ago'}</Text></View><Text style={styles.chevron}>›</Text></Pressable>})}
     </View>:null}
 
-    <Modal visible={!!selectedBus} transparent animationType="slide" onRequestClose={()=>setSelectedBus(null)}>
+    <Modal visible={!!selectedBus} transparent animationType="slide" onRequestClose={()=>setSelectedBusId(null)}>
       <View style={styles.modalBackdrop}>
         <Pressable style={styles.modalDismissArea} onPress={()=>setSelectedBusId(null)}/>
         {selectedBus ? (() => {
@@ -110,7 +110,7 @@ export default function RouteDetailsScreen(){
               <View style={[styles.sheetRouteBadge,{backgroundColor:busColor.background}]}>
                 <Text style={[styles.sheetRouteText,{color:busColor.text}]}>{busName}</Text>
               </View>
-              <Pressable onPress={()=>setSelectedBus(null)} style={styles.sheetClose}><Text style={styles.sheetCloseText}>×</Text></Pressable>
+              <Pressable onPress={()=>setSelectedBusId(null)} style={styles.sheetClose}><Text style={styles.sheetCloseText}>×</Text></Pressable>
             </View>
             <Text style={styles.sheetEyebrow}>LIVE BUS</Text>
             <Text style={styles.sheetTitle}>Vehicle {selectedBus.id}</Text>
@@ -119,7 +119,7 @@ export default function RouteDetailsScreen(){
               <View><Text style={styles.sheetMetaLabel}>STATUS</Text><Text style={styles.sheetMetaValue}>Live position</Text></View>
               <View><Text style={styles.sheetMetaLabel}>UPDATED</Text><Text style={styles.sheetMetaValue}>{age===null?'Live':age<60?'Just now':Math.floor(age/60)+' min ago'}</Text></View>
             </View>
-            <Pressable style={styles.sheetAction} onPress={()=>setSelectedBus(null)}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close bus details" style={styles.sheetAction} onPress={()=>setSelectedBusId(null)}>
               <Text style={styles.sheetActionText}>Close</Text>
             </Pressable>
           </View>;
