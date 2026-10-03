@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, AppState, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
@@ -134,7 +134,7 @@ export default function HomeScreen(){
 
   const realtimeAge=lastRealtimeAt?Math.max(0,Math.round((Date.now()-Date.parse(lastRealtimeAt))/1000)):null;
   const realtimeAgeLabel=realtimeAge===null?'':realtimeAge<60?'just now':`${Math.floor(realtimeAge/60)} min ago`;
-  const liveLabel=fresh==='ok'?(`${vehicles.length} live buses`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='loading'?'Checking live buses':vehicles.length?(`${vehicles.length} buses · connection lost`):'Live data unavailable';
+  const liveLabel=fresh==='ok'?(`${vehicles.length} live buses`):fresh==='stale'?(`${vehicles.length} buses · stale ${realtimeAgeLabel||'earlier'}`):fresh==='loading'?'Checking live buses':vehicles.length?(`${vehicles.length} cached buses · live unavailable`):'Live data unavailable';
 
   return <SafeAreaView style={styles.safe}>
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
