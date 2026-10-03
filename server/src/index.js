@@ -121,7 +121,7 @@ function classifyService(vehicleId,agencyId){
   const agency=String(agencyId||'').trim().toUpperCase();
   if(agency==='DIMTS')return{type:'cluster',color:'#E57D43'};                  // EV DEVI / cluster family
   if(agency==='DTC')return{type:'dtc',color:'#24C88B'};                       // CNG Non-AC family
-  return{type:'unknown',color:'#7A858A'};                                    // Unknown service; do not label it as a known bus family
+  return{type:'unknown',color:null};                                      // Unknown service; frontend uses the locked palette fallback
 }
 
 function resolveOperationalRoute(vehicle){
@@ -159,7 +159,7 @@ function entityToVehicle(entity){
   if(!(timestamp>0))return null;
   const observedAt=observedAtFromTimestamp(timestamp);
   if(!observedAt)return null;
-  return{id,routeId,routeShortName:null,routeColor:null,routeTextColor:null,tripId,stopId,vehicleLabel:ok(descriptor.label)?boundedText(descriptor.label,120):null,licensePlate:ok(descriptor.licensePlate)?boundedText(descriptor.licensePlate,120):null,operator:null,serviceType:'unknown',serviceColor:'#7A858A',latitude:lat,longitude:lon,bearing:normalizeBearing(position.bearing),observedAt};
+  return{id,routeId,routeShortName:null,routeColor:null,routeTextColor:null,tripId,stopId,vehicleLabel:ok(descriptor.label)?boundedText(descriptor.label,120):null,licensePlate:ok(descriptor.licensePlate)?boundedText(descriptor.licensePlate,120):null,operator:null,serviceType:'unknown',serviceColor:null,latitude:lat,longitude:lon,bearing:normalizeBearing(position.bearing),observedAt};
 }
 async function getRealtimeVehicles(){
   const relayUrl = String(process.env.DTC_REALTIME_RELAY_URL || '').trim();
