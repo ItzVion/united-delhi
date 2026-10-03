@@ -7,7 +7,10 @@ type Page={kind:'home'|'plan'|'legal'|'privacy'|'terms'|'route'|'stop';id?:strin
 type Point={lat:number;lon:number};
 
 const CENTER:[number,number]=[28.6139,77.209];
-const BOUNDS:any=[[28.40,76.84],[28.88,77.35]];
+const BOUNDS:any=[[28.20,76.55],[29.30,77.65]];
+const storageGet=(key:string)=>{try{return localStorage.getItem(key);}catch{return null;}};
+const storageSet=(key:string,value:string)=>{try{localStorage.setItem(key,value);}catch{}};
+
 
 type DtcMarker = (L.Marker | L.CircleMarker) & {
   _udBg?: string;
@@ -42,9 +45,11 @@ function parsePath(path:string=window.location.pathname):Page{
 
 export default function App(){
   const[page,setPage]=useState<Page>(parsePath());
-  const[accepted,setAccepted]=useState(localStorage.getItem('ud-consent-v1')==='1');
+  const[accepted,setAccepted]=useState(storageGet('ud-consent-v1')==='1');
   const[checked,setChecked]=useState(false);
   const[vehicles,setVehicles]=useState<Vehicle[]>([]);
+  const[vehicleStatus,setVehicleStatus]=useState<'loading'|'ok'|'stale'|'unavailable'>('loading');
+  const[lastRealtimeAt,setLastRealtimeAt]=useState<string|null>(null);
   const vehicleCountRef=useRef(0);
   const[q,setQ]=useState('');
   const[searchOpen,setSearchOpen]=useState(false);
@@ -84,13 +89,33 @@ export default function App(){
   useEffect(()=>{if(accepted)locate();},[accepted,locate]);
 
   useEffect(()=>{
-    if(!accepted)return;
+    if(!accepted||page.kind!=='home'){setVehicleStatus('loading');return;}
     let active=true;
-    const load=async()=>{try{const r=await api.vehicles();if(active){const next=Array.isArray(r.vehicles)?r.vehicles:[];vehicleCountRef.current=next.length;setVehicles(next);setError('');}}catch(e){if(active&&vehicleCountRef.current===0)setError((e as Error).message||'Live data is unavailable.');}};
+    const load=async()=>{
+      if(document.visibilityState!=='visible')return;
+      try{
+        const r=await api.vehicles();
+        if(active){
+          const next=Array.isArray(r.vehicles)?r.vehicles:[];
+          vehicleCountRef.current=next.length;
+          setVehicles(next);
+          setLastRealtimeAt(r.fetchedAt||null);
+          setVehicleStatus(r.status==='STALE'?'stale':'ok');
+          setError('');
+        }
+      }catch(e){
+        if(active){
+          setVehicleStatus(vehicleCountRef.current?'unavailable':'unavailable');
+          if(vehicleCountRef.current===0)setError((e as Error).message||'Live data is unavailable.');
+        }
+      }
+    };
     void load();
     const id=window.setInterval(()=>void load(),15000);
-    return()=>{active=false;window.clearInterval(id);};
-  },[accepted]);
+    const onVisibility=()=>{if(document.visibilityState==='visible')void load();};
+    document.addEventListener('visibilitychange',onVisibility);
+    return()=>{active=false;window.clearInterval(id);document.removeEventListener('visibilitychange',onVisibility);};
+  },[accepted,page.kind]);
 
   useEffect(()=>{
     const term=q.trim();
@@ -129,32 +154,32 @@ export default function App(){
       <h1>Delhi transit,<br/>made simple.</h1>
       <p>By continuing to United Delhi, you agree to our <button className="text-button inline" onClick={()=>go('/legal/terms')}>Terms of Service</button> and acknowledge our <button className="text-button inline" onClick={()=>go('/legal/privacy')}>Privacy Policy</button>.</p>
       <label className="check-row"><input type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)}/><span>I agree to the Terms of Service and acknowledge the Privacy Policy.</span></label>
-      <button className="primary-button" disabled={!checked} onClick={()=>{localStorage.setItem('ud-consent-v1','1');setAccepted(true);}}>Continue to United Delhi</button>
+      <button className="primary-button" disabled={!checked} onClick={()=>{storageSet('ud-consent-v1','1');setAccepted(true);}}>Continue to United Delhi</button>
       <small>No account or phone number is required. Location is requested only when you choose a location-based feature.</small>
     </div></div>;
   }
 
   return <div className="app-shell">
     <header className="mobile-header">
-      <button className="brand brand-button" onClick={()=>go('/')}>
+      <button aria-label="Go to United Delhi home" className="brand brand-button" onClick={()=>go('/')}>
         <img className="brand-mark" src="/united-delhi-logo.png" alt="United Delhi logo"/>
         <span className="brand-copy"><b>UNITED DELHI</b><small>Delhi transit, made simple</small></span>
       </button>
-      <span className={'status '+(vehicles.length?'ok':'muted')}><i/>{vehicles.length?vehicles.length+' live buses':'Live data unavailable'}</span>
+      <span className={'status '+(vehicleStatus==='ok'?'ok':vehicleStatus==='stale'?'muted':'muted')}><i/>{vehicleStatus==='loading'?'Checking live buses':vehicleStatus==='stale'?(vehicles.length+' buses · stale '+(lastRealtimeAt?ageLabel(lastRealtimeAt):'earlier')):vehicleStatus==='ok'?(vehicles.length+' live buses'):'Live data unavailable'}</span>
     </header>
 
     <main className="app-main">
       <div className="search-box">
         <span className="search-icon">⌕</span>
-        <input value={q} onChange={e=>{setQ(e.target.value);setSearchOpen(true);}} onFocus={()=>setSearchOpen(true)} placeholder="Search routes, stops or places"/>
+        <input aria-label="Search routes, stops or places" value={q} onChange={e=>{setQ(e.target.value);setSearchOpen(true);}} onFocus={()=>setSearchOpen(true)} placeholder="Search routes, stops or places"/>
         {searchBusy?<span className="spinner"/>:null}
-        {q?<button className="clear" onClick={()=>{setQ('');setSearchOpen(false);}}>×</button>:null}
+        {q?<button aria-label="Clear search" className="clear" onClick={()=>{setQ('');setSearchOpen(false);}}>×</button>:null}
       </div>
 
       {searchOpen&&q.trim().length>=2?<SearchResults loading={searchBusy} error={searchError} results={searchResults} go={go}/>:null}
       {error?<div className="error-box"><b>Live data issue</b><span>{error}</span></div>:null}
 
-      {page.kind==='home'?<Home vehicles={vehicles} location={location} locationStatus={locationStatus} locate={locate} go={go} onLegend={()=>setLegendOpen(true)}/>
+      {page.kind==='home'?<Home vehicles={vehicles} vehicleStatus={vehicleStatus} lastRealtimeAt={lastRealtimeAt} location={location} locationStatus={locationStatus} locate={locate} go={go} onLegend={()=>setLegendOpen(true)}/>
        :page.kind==='plan'?<Planner go={go}/>
        :page.kind==='legal'?<Legal go={go}/>
        :page.kind==='privacy'?<Privacy go={go}/>
@@ -186,7 +211,7 @@ function SearchResults({loading,error,results,go}:{loading:boolean;error:string;
   </section>;
 }
 
-function Home({vehicles,location,locationStatus,locate,go,onLegend}:{vehicles:Vehicle[];location:Point|null;locationStatus:string;locate:()=>void;go:(path:string)=>void;onLegend:()=>void}){
+function Home({vehicles,vehicleStatus,lastRealtimeAt,location,locationStatus,locate,go,onLegend}:{vehicles:Vehicle[];vehicleStatus:'loading'|'ok'|'stale'|'unavailable';lastRealtimeAt:string|null;location:Point|null;locationStatus:string;locate:()=>void;go:(path:string)=>void;onLegend:()=>void}){
   const[stops,setStops]=useState<any[]>([]);
   const[selected,setSelected]=useState<Vehicle|null>(null);
 
@@ -201,7 +226,7 @@ function Home({vehicles,location,locationStatus,locate,go,onLegend}:{vehicles:Ve
     <section className="section-line live-section"><span className="eyebrow">LIVE TRANSIT</span><button className="text-button" onClick={locate}>{location?'Recenter':'Use my location'}</button></section>
     <div className="map-card">
       <DtcMap vehicles={vehicles} location={location} onSelect={setSelected} onLegend={onLegend}/>
-      <div className="map-topbar"><i/><b>{vehicles.length?vehicles.length+' buses live':'Checking live buses'}</b></div>
+      <div className="map-topbar"><i/><b>{vehicleStatus==='ok'?vehicles.length+' buses live':vehicleStatus==='stale'?vehicles.length+' buses · stale '+(lastRealtimeAt?ageLabel(lastRealtimeAt):'earlier'):vehicleStatus==='unavailable'?'Live data unavailable':'Checking live buses'}</b></div>
       <div className="map-attribution">© OpenStreetMap contributors</div><div className="map-legend"><span><i style={{background:BUS_COLORS.cngNonAcGreen}}/>DTC</span><span><i style={{background:BUS_COLORS.evDeviOrange}}/>Cluster</span><span><i style={{background:BUS_COLORS.evAc}}/>Electric</span></div>
       {selected?<BusPreview bus={selected} go={go}/>:null}
     </div>
@@ -260,7 +285,7 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
     let initial:[number,number]=[CENTER[0],CENTER[1]];
     let initialZoom=10.5;
     try{
-      const saved=localStorage.getItem('ud-map-center');
+      let saved=null;try{saved=localStorage.getItem('ud-map-center');}catch{}
       if(saved){
         const p=JSON.parse(saved);
         if(Number.isFinite(p.lat)&&Number.isFinite(p.lon)){initial=[p.lat,p.lon];initialZoom=14;}
@@ -281,9 +306,12 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
         const lat=Number(v.latitude),lon=Number(v.longitude);
         if(Number.isFinite(lat)&&Number.isFinite(lon)&&bounds.contains([lat,lon]))visible.set(v.id,v);
       }
+      const center=map.getCenter();
+      const capped=[...visible.values()].map(v=>({v,score:(Number(v.latitude)-center.lat)**2+((Number(v.longitude)-center.lng)*Math.cos(center.lat*Math.PI/180))**2})).sort((a,b)=>a.score-b.score).slice(0,250);
+      const wanted=new Map(capped.map(item=>[item.v.id,item.v]));
       const markers=markersRef.current;
-      for(const [id,marker] of markers){if(!visible.has(id)){const frame=animationsRef.current.get(id);if(frame)cancelAnimationFrame(frame);animationsRef.current.delete(id);marker.remove();markers.delete(id);}}
-      for(const [id,v] of visible){
+      for(const [id,marker] of markers){if(!wanted.has(id)){const frame=animationsRef.current.get(id);if(frame)cancelAnimationFrame(frame);animationsRef.current.delete(id);marker.remove();markers.delete(id);}}
+      for(const [id,v] of wanted){
         const lat=Number(v.latitude),lon=Number(v.longitude);
         const bg=busColorFor(v);
         const name=displayVehicleRoute(v);
@@ -354,10 +382,10 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
 
 function BusPreview({bus,go}:{bus:Vehicle;go:(path:string)=>void}){
   return <div className="bus-preview">
-    <button className="preview-close" onClick={()=>go('/')}>×</button>
-    <button className="preview-body" onClick={()=>{if(bus.routeShortName&&bus.routeId)go('/routes/'+encodeURIComponent(bus.routeId));}} disabled={!bus.routeShortName||!bus.routeId}>
+    <button aria-label="Close selected bus" className="preview-close" onClick={()=>go('/')}>×</button>
+    <button aria-label={bus.routeId?'View bus route':'Selected live bus'} className="preview-body" onClick={()=>{if(bus.routeId)go('/routes/'+encodeURIComponent(bus.routeId));}} disabled={!bus.routeId}>
       <RouteBadge name={displayVehicleRoute(bus)} color={bus.serviceColor} textColor={'#FFFFFF'}/>
-      <span><small>LIVE BUS</small><b>To {bus.toStop||'Destination'}</b><em>{bus.vehicleLabel||bus.licensePlate||bus.id} · {ageLabel(bus.observedAt)} · View route</em></span><strong>›</strong>
+      <span><small>LIVE BUS</small><b>To {bus.toStop||'Destination'}</b><em>{bus.vehicleLabel||bus.licensePlate||bus.id} · {ageLabel(bus.observedAt)} · {bus.routeId?'View route':'Route information unavailable'}</em></span><strong>{bus.routeId?'›':'·'}</strong>
     </button>
   </div>;
 }
