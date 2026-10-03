@@ -43,18 +43,18 @@ export default function HomeScreen(){
   const [searchLoading,setSearchLoading]=useState(false);
   const [searchError,setSearchError]=useState<string|null>(null);
   const [legendOpen,setLegendOpen]=useState(false);
-  const locationPromptedRef=useRef(false);
 
   const requestLocation=useCallback(async()=>{
-    if(!locationPromptedRef.current){locationPromptedRef.current=true;if(!(await confirmLocationUse())){setLocationStatus('Showing Delhi without your location.');return;}}
     try{
-      const permission=await Location.getForegroundPermissionsAsync();
+      let permission=await Location.getForegroundPermissionsAsync();
       if(permission.status!=='granted'){
+        if(!(await confirmLocationUse())){setLocationStatus('Showing Delhi without your location.');return;}
         const requested=await Promise.race([
           Location.requestForegroundPermissionsAsync(),
           new Promise<never>((_,reject)=>setTimeout(()=>reject(new Error('timeout')),10000))
         ]);
-        if(requested.status!=='granted'){setLocationStatus('Location is off. Showing Delhi.');return;}
+        permission=requested;
+        if(permission.status!=='granted'){setLocationStatus('Location is off. Showing Delhi.');return;}
       }
       const last=await Location.getLastKnownPositionAsync({maxAge:5*60*1000,requiredAccuracy:2000});
       if(last)setLocation(last);
