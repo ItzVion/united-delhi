@@ -48,7 +48,7 @@ Before release:
 
 ## Children's data
 
-The production service currently takes an 18+ approach. Do not advertise the app as child-directed.
+The current client does not perform age verification. Before public release, the operator must choose and document the intended age audience and align the app, policy, and store disclosures with that decision.
 
 If the service is later opened to users under 18, do not rely on a simple checkbox saying "my parent agrees". Implement a legally appropriate parental-consent mechanism and review the DPDP Act/Rules and app-store child-safety requirements before collecting children's personal data.
 
