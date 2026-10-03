@@ -23,9 +23,9 @@ const hasManagedDatabase = Boolean(managedDbHost && Number.isInteger(managedDbPo
 const databaseHost = hasManagedDatabase ? managedDbHost : databaseUrl;
 const isLocalDatabase = /(?:localhost|127(?:\.\d+){3}|::1)/i.test(databaseHost);
 const pool = hasManagedDatabase
-  ? new Pool({ host: managedDbHost, port: managedDbPort, database: managedDbName, user: managedDbUser, password: managedDbPassword, max: 5, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000, statement_timeout: 10000, ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: false } }) })
+  ? new Pool({ host: managedDbHost, port: managedDbPort, database: managedDbName, user: managedDbUser, password: managedDbPassword, max: 5, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000, statement_timeout: 10000, ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: true } }) })
   : databaseUrl
-    ? new Pool({ connectionString: databaseUrl, max: 10, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000, statement_timeout: 10000, ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: false } }) })
+    ? new Pool({ connectionString: databaseUrl, max: 10, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000, statement_timeout: 10000, ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: true } }) })
     : null;
 if (pool) pool.on('error', error => console.error('PostgreSQL pool error:', error.message));
 app.disable('x-powered-by');
@@ -330,7 +330,57 @@ app.get('/api/status',(_req,res)=>res.json({realtime:(process.env.DTC_REALTIME_R
 app.get('/api/realtime/vehicles',realtimeRateLimit,(_req,res)=>{res.setHeader('Cache-Control','no-store');const fetchedAt=realtimeCache.fetchedAt,age=fetchedAt?Math.max(0,Date.now()-Date.parse(fetchedAt)):Infinity,stale=age>180000;if(realtimeCache.status==='UNAVAILABLE'&&!realtimeCache.vehicles.length)return res.status(503).json({status:'UNAVAILABLE',count:0,vehicles:[],reason:'Realtime data is currently unavailable'});res.json({status:stale?'STALE':'OK',count:realtimeCache.vehicles.length,vehicles:realtimeCache.vehicles,fetchedAt,stale});});
 app.post('/api/stops/nearby',dataRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',stops:[],reason:'Database is not configured'});const lat=parseCoordinate(req.body?.lat,-90,90),lon=parseCoordinate(req.body?.lon,-180,180),ln=Number(req.body?.limit),limit=Number.isFinite(ln)?Math.min(Math.max(Math.trunc(ln),1),50):10,rad=Number(req.body?.radius_m),radiusM=Number.isFinite(rad)?Math.min(Math.max(Math.trunc(rad),500),15000):10000;if(lat===null||lon===null)return res.status(400).json({status:'ERROR',stops:[],reason:'Valid lat and lon are required'});res.setHeader('Cache-Control','no-store');try{const result=await pool.query(`SELECT stop_id,name,latitude,longitude,distance_m FROM (SELECT stop_id,name,latitude,longitude,(6371000*acos(LEAST(1,GREATEST(-1,sin(radians($1))*sin(radians(latitude))+cos(radians($1))*cos(radians(latitude))*cos(radians(longitude)-radians($2)))))) distance_m FROM stops WHERE latitude BETWEEN $1-$4/111320.0 AND $1+$4/111320.0 AND longitude BETWEEN $2-($4/(111320.0*GREATEST(0.1,cos(radians($1))))) AND $2+($4/(111320.0*GREATEST(0.1,cos(radians($1))))) ) calculated WHERE distance_m <= $4 ORDER BY distance_m,stop_id LIMIT $3`,[lat,lon,limit,radiusM]);res.json({status:'OK',stops:result.rows});}catch(error){console.error('Failed to load nearby stops:',error.message);res.status(500).json({status:'ERROR',stops:[],reason:'Failed to load nearby stops'});}});
 function haversineMeters(lat1,lon1,lat2,lon2){const R=6371000,toRad=v=>v*Math.PI/180,dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1),a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(a));}
-app.get('/api/stops/:id/arrivals',dataRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',arrivals:[],reason:'Database is not configured'});const stopId=requestId(req.params.id);if(!stopId)return res.status(400).json({status:'ERROR',arrivals:[],reason:'Invalid stop id'});try{const result=await pool.query('SELECT rs.route_id,r.short_name,r.route_color,r.route_text_color,start_stop.name AS from_stop,end_stop.name AS to_stop FROM route_stops rs LEFT JOIN routes r ON r.route_id=rs.route_id LEFT JOIN LATERAL (SELECT s.name FROM route_stops rsi JOIN stops s ON s.stop_id=rsi.stop_id WHERE rsi.route_id=rs.route_id ORDER BY rsi.stop_sequence ASC,s.name,s.stop_id LIMIT 1) start_stop ON TRUE LEFT JOIN LATERAL (SELECT s.name FROM route_stops rse JOIN stops s ON s.stop_id=rse.stop_id WHERE rse.route_id=rs.route_id ORDER BY rse.stop_sequence DESC,s.name,s.stop_id LIMIT 1) end_stop ON TRUE WHERE rs.stop_id=$1',[stopId]);const routeMap=new Map(result.rows.map(row=>[String(row.route_id),row]));const stop=await pool.query('SELECT latitude,longitude FROM stops WHERE stop_id=$1',[stopId]);if(!stop.rows.length)return res.status(404).json({status:'NOT_FOUND',arrivals:[],reason:'Stop not found'});const stopLat=Number(stop.rows[0].latitude),stopLon=Number(stop.rows[0].longitude),now=Date.now(),routeIds=new Set(routeMap.keys()),cacheAge=realtimeCache.fetchedAt?Math.max(0,now-Date.parse(realtimeCache.fetchedAt)):Infinity;const liveVehicles=cacheAge<=180000?realtimeCache.vehicles:[];const output=liveVehicles.filter(v=>{const operational=resolveOperationalRoute(v);const candidateRouteId=operational?.routeId||v.routeId;return candidateRouteId&&routeIds.has(String(candidateRouteId));}).map(v=>{const d=haversineMeters(v.latitude,v.longitude,stopLat,stopLon),observed=Date.parse(v.observedAt),age=Number.isFinite(observed)?Math.max(0,Math.round((now-observed)/1000)):0,row=routeMap.get(String(v.routeId));if(!row?.short_name)return null;const operational=resolveOperationalRoute(v);const publicName=operational?.shortName||String(row.short_name||'').trim()||null;if(!publicName)return null;return{vehicleId:v.id,routeId:v.routeId,routeShortName:publicName,routeColor:operational?.routeColor?'#'+String(operational.routeColor).replace(/^#/,''):row.route_color?'#'+String(row.route_color).replace(/^#/,''):null,routeTextColor:null,serviceType:v.serviceType||'unknown',serviceColor:v.serviceColor||'#3D82CE',distanceMeters:Math.max(0,Math.round(d)),observedAgeSeconds:age,fromStop:row?.from_stop?String(row.from_stop).trim():null,toStop:row?.to_stop?String(row.to_stop).trim():null};}).filter(Boolean).sort((a,b)=>a.distanceMeters-b.distanceMeters).slice(0,20);res.json({status:'OK',arrivals:output});}catch(error){console.error('Failed to load stop arrivals:',error.message);res.status(500).json({status:'ERROR',arrivals:[],reason:'Failed to load arrivals'});}});
+app.get('/api/stops/:id/arrivals',dataRateLimit,async(req,res)=>{
+  if(!pool)return res.status(503).json({status:'UNAVAILABLE',arrivals:[],reason:'Database is not configured'});
+  const stopId=requestId(req.params.id);
+  if(!stopId)return res.status(400).json({status:'ERROR',arrivals:[],reason:'Invalid stop id'});
+  try{
+    const result=await pool.query('SELECT rs.route_id,r.short_name,r.route_color,r.route_text_color,start_stop.name AS from_stop,end_stop.name AS to_stop FROM route_stops rs LEFT JOIN routes r ON r.route_id=rs.route_id LEFT JOIN LATERAL (SELECT s.name FROM route_stops rsi JOIN stops s ON s.stop_id=rsi.stop_id WHERE rsi.route_id=rs.route_id ORDER BY rsi.stop_sequence ASC,s.name,s.stop_id LIMIT 1) start_stop ON TRUE LEFT JOIN LATERAL (SELECT s.name FROM route_stops rse JOIN stops s ON s.stop_id=rse.stop_id WHERE rse.route_id=rs.route_id ORDER BY rse.stop_sequence DESC,s.name,s.stop_id LIMIT 1) end_stop ON TRUE WHERE rs.stop_id=$1',[stopId]);
+    const routeMap=new Map(result.rows.map(row=>[String(row.route_id),row]));
+    const stop=await pool.query('SELECT latitude,longitude FROM stops WHERE stop_id=$1',[stopId]);
+    if(!stop.rows.length)return res.status(404).json({status:'NOT_FOUND',arrivals:[],reason:'Stop not found'});
+    const stopLat=Number(stop.rows[0].latitude),stopLon=Number(stop.rows[0].longitude),now=Date.now();
+    const routeIds=new Set(routeMap.keys());
+    const cacheAge=realtimeCache.fetchedAt?Math.max(0,now-Date.parse(realtimeCache.fetchedAt)):Infinity;
+    const liveVehicles=cacheAge<=180000?realtimeCache.vehicles:[];
+    const output=liveVehicles
+      .filter(v=>{
+        const operational=resolveOperationalRoute(v);
+        const candidateRouteId=operational?.routeId||v.routeId;
+        return candidateRouteId&&routeIds.has(String(candidateRouteId));
+      })
+      .map(v=>{
+        const operational=resolveOperationalRoute(v);
+        const candidateRouteId=operational?.routeId||v.routeId;
+        const d=haversineMeters(v.latitude,v.longitude,stopLat,stopLon);
+        if(d>15000)return null;
+        const observed=Date.parse(v.observedAt);
+        const age=Number.isFinite(observed)?Math.max(0,Math.round((now-observed)/1000)):0;
+        const row=routeMap.get(String(candidateRouteId));
+        const publicName=operational?.shortName||String(row?.short_name||'').trim()||null;
+        return{
+          vehicleId:v.id,
+          routeId:candidateRouteId?String(candidateRouteId):null,
+          routeShortName:publicName,
+          routeColor:operational?.routeColor?'#'+String(operational.routeColor).replace(/^#/,''):row?.route_color?'#'+String(row.route_color).replace(/^#/,''):null,
+          routeTextColor:row?.route_text_color||null,
+          serviceType:v.serviceType||'unknown',
+          serviceColor:v.serviceColor||'#7A858A',
+          distanceMeters:Math.max(0,Math.round(d)),
+          observedAgeSeconds:age,
+          fromStop:row?.from_stop?String(row.from_stop).trim():null,
+          toStop:row?.to_stop?String(row.to_stop).trim():null
+        };
+      })
+      .filter(Boolean)
+      .sort((a,b)=>a.distanceMeters-b.distanceMeters)
+      .slice(0,20);
+    res.json({status:'OK',arrivals:output});
+  }catch(error){
+    console.error('Failed to load stop arrivals:',error.message);
+    res.status(500).json({status:'ERROR',arrivals:[],reason:'Failed to load arrivals'});
+  }
+});
 app.get('/api/stops/:id',dataRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',reason:'Database is not configured'});const stopId=requestId(req.params.id);if(!stopId)return res.status(400).json({status:'ERROR',reason:'Invalid stop id'});try{const stopResult=await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[stopId]);if(!stopResult.rows.length)return res.status(404).json({status:'NOT_FOUND',reason:'Stop not found'});const routesResult=await pool.query(`
 WITH route_base AS (
   SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,
@@ -423,28 +473,46 @@ app.get('/api/search',searchRateLimit,async(req,res)=>{
   }
 });
 
-app.get('/api/plan',planRateLimit,async(req,res)=>{\n  res.setHeader('Cache-Control','no-store');
+app.get('/api/plan',planRateLimit,async(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
   if(!pool)return res.status(503).json({status:'UNAVAILABLE',options:[],reason:'Database is not configured'});
   const from=boundedText(req.query.from,80),to=boundedText(req.query.to,80);
+  const fromId=requestId(req.query.fromStopId),toId=requestId(req.query.toStopId);
   const fromLike=searchPattern(from),toLike=searchPattern(to);
-  if(!fromLike||!toLike)return res.status(400).json({status:'ERROR',options:[],reason:'Valid origin and destination are required'});
-  if(fromLike.toLowerCase()===toLike.toLowerCase())return res.status(400).json({status:'ERROR',options:[],reason:'Choose two different stops or places'});
+  if((!fromId&&!fromLike)||(!toId&&!toLike))return res.status(400).json({status:'ERROR',options:[],reason:'Valid origin and destination are required'});
+  if(fromId&&toId&&fromId===toId)return res.status(400).json({status:'ERROR',options:[],reason:'Choose two different stops'});
   try{
     const candidates=await pool.query(`
       WITH origin AS (
-        SELECT stop_id,name,latitude,longitude,
-               ROW_NUMBER() OVER (ORDER BY CASE WHEN LOWER(BTRIM(name))=LOWER($1) THEN 0 ELSE 1 END, name, stop_id) rn
-        FROM stops WHERE name ILIKE $2 LIMIT 12
+        SELECT stop_id,name,latitude,longitude
+        FROM stops
+        WHERE ($1::text IS NOT NULL AND stop_id=$1)
+           OR ($1::text IS NULL AND name ILIKE $2)
+        ORDER BY CASE
+          WHEN $1::text IS NOT NULL THEN 0
+          WHEN LOWER(BTRIM(name))=LOWER($3) THEN 0
+          WHEN LOWER(BTRIM(name)) LIKE LOWER($3)||'%' THEN 1
+          ELSE 2
+        END,name,stop_id
+        LIMIT 12
       ),
       destination AS (
-        SELECT stop_id,name,latitude,longitude,
-               ROW_NUMBER() OVER (ORDER BY CASE WHEN LOWER(BTRIM(name))=LOWER($3) THEN 0 ELSE 1 END, name, stop_id) rn
-        FROM stops WHERE name ILIKE $4 LIMIT 12
+        SELECT stop_id,name,latitude,longitude
+        FROM stops
+        WHERE ($4::text IS NOT NULL AND stop_id=$4)
+           OR ($4::text IS NULL AND name ILIKE $5)
+        ORDER BY CASE
+          WHEN $4::text IS NOT NULL THEN 0
+          WHEN LOWER(BTRIM(name))=LOWER($6) THEN 0
+          WHEN LOWER(BTRIM(name)) LIKE LOWER($6)||'%' THEN 1
+          ELSE 2
+        END,name,stop_id
+        LIMIT 12
       )
       SELECT 'origin' side,stop_id,name,latitude,longitude FROM origin
       UNION ALL
       SELECT 'destination' side,stop_id,name,latitude,longitude FROM destination
-    `,[from,fromLike,to,toLike]);
+    `,[fromId,fromLike,from,toId,toLike,to]);
     const origins=candidates.rows.filter(r=>r.side==='origin');
     const destinations=candidates.rows.filter(r=>r.side==='destination');
     if(!origins.length||!destinations.length)return res.status(404).json({status:'NOT_FOUND',origin:origins[0]||null,destination:destinations[0]||null,options:[],reason:'Could not find matching bus stops'});
@@ -531,13 +599,20 @@ app.get('/api/plan',planRateLimit,async(req,res)=>{\n  res.setHeader('Cache-Cont
         transferStop:row.transfer_stop
       });
     }
+
     const seen=new Set();
     const unique=options.filter(option=>{
       const key=option.type+'|'+option.legs.map(l=>l.routeId+':'+l.fromStopId+'>'+l.toStopId).join('|');
       if(seen.has(key))return false;
       seen.add(key);return true;
     }).sort((a,b)=>a.durationMinutes-b.durationMinutes).slice(0,5);
-    const response={status:'OK',origin:{stop_id:origins[0].stop_id,name:origins[0].name,latitude:Number(origins[0].latitude),longitude:Number(origins[0].longitude)},destination:{stop_id:destinations[0].stop_id,name:destinations[0].name,latitude:Number(destinations[0].latitude),longitude:Number(destinations[0].longitude)},options:unique};
+
+    const response={
+      status:'OK',
+      origin:{stop_id:origins[0].stop_id,name:origins[0].name,latitude:Number(origins[0].latitude),longitude:Number(origins[0].longitude)},
+      destination:{stop_id:destinations[0].stop_id,name:destinations[0].name,latitude:Number(destinations[0].latitude),longitude:Number(destinations[0].longitude)},
+      options:unique
+    };
     if(!unique.length)response.reason='No direct or one-change bus journey was found';
     res.json(response);
   }catch(error){
