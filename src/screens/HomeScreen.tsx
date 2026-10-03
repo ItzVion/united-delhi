@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, AppState, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
@@ -21,7 +21,7 @@ const BUS_COLORS={
   evAc:'#2FAFBC', evDeviOrange:'#E57D43', evDeviGreen:'#168F49',
   cngAcBlue:'#3D82CE', cngAcRed:'#E35F67', cngNonAcPeach:'#E5A16E', cngNonAcGreen:'#24C88B'
 } as const;
-const SERVICE_COLORS={dtc:BUS_COLORS.cngNonAcGreen,cluster:BUS_COLORS.evDeviOrange,electric:BUS_COLORS.evAc,unknown:BUS_COLORS.cngAcBlue} as const;
+const SERVICE_COLORS={dtc:BUS_COLORS.cngNonAcGreen,cluster:BUS_COLORS.evDeviOrange,electric:BUS_COLORS.evAc,unknown:'#7A858A'} as const;
 
 export default function HomeScreen(){
   const navigation=useNavigation<Nav>();
@@ -37,7 +37,10 @@ export default function HomeScreen(){
   const [lastRealtimeAt,setLastRealtimeAt]=useState<string|null>(null);
   const [mapReady,setMapReady]=useState(false);
   const [bounds,setBounds]=useState<MapBounds|null>(null);
-  const [selectedBus,setSelectedBus]=useState<Vehicle|null>(null);
+  const [selectedBusId,setSelectedBusId]=useState<string|null>(null);
+  const [mapError,setMapError]=useState(false);
+  const [mapReloadKey,setMapReloadKey]=useState(0);
+  const selectedBus=selectedBusId?vehicles.find(v=>v.id===selectedBusId)||null:null;
   const [searchQuery,setSearchQuery]=useState('');
   const [searchResults,setSearchResults]=useState<SearchResult[]>([]);
   const [searchLoading,setSearchLoading]=useState(false);
@@ -83,9 +86,14 @@ export default function HomeScreen(){
     }
   },[]);
 
-  useEffect(()=>{void requestLocation();},[requestLocation]);
   useEffect(()=>{if(location)void loadNearby(location.coords.latitude,location.coords.longitude);},[location,loadNearby]);
-  useEffect(()=>{void loadVehicles();const id=setInterval(()=>void loadVehicles(),15000);return()=>clearInterval(id);},[loadVehicles]);
+  useEffect(()=>{
+    const tick=()=>{if(AppState.currentState==='active')void loadVehicles();};
+    tick();
+    const id=setInterval(tick,15000);
+    const subscription=AppState.addEventListener('change',state=>{if(state==='active')tick();});
+    return()=>{clearInterval(id);subscription.remove();};
+  },[loadVehicles]);
 
   useEffect(()=>{const value=searchQuery.trim();if(value.length<2){setSearchResults([]);setSearchError(null);setSearchLoading(false);return;}let cancelled=false;setSearchLoading(true);setSearchError(null);const timer=setTimeout(async()=>{try{const result=await api.search(value);if(!cancelled){const seen=new Set<string>();const cleaned=(result.status==='OK'?result.results:[]).filter(item=>{const key=item.type+'|'+item.id+'|'+item.label.toLowerCase();if(seen.has(key))return false;seen.add(key);return true}).slice(0,12);setSearchResults(cleaned);}}catch(e){if(!cancelled){setSearchResults([]);setSearchError((e as Error).message||'Search is temporarily unavailable.');}}finally{if(!cancelled)setSearchLoading(false);}},220);return()=>{cancelled=true;clearTimeout(timer);};},[searchQuery]);
 
@@ -97,11 +105,19 @@ export default function HomeScreen(){
     // Fetch/cache the full realtime fleet, but only send buses inside the
     // current map viewport to the WebView. This prevents thousands of DOM
     // markers from being created outside the visible area.
-    const visible= bounds
+    const candidates=bounds
       ? vehicles.filter(v=>Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)&&
           v.latitude>=bounds.south && v.latitude<=bounds.north &&
           v.longitude>=bounds.west && v.longitude<=bounds.east)
       : [];
+    const nearestCenter=bounds
+      ? {lat:(bounds.south+bounds.north)/2,lon:(bounds.west+bounds.east)/2}
+      : {lat:location?.coords.latitude??DELHI.latitude,lon:location?.coords.longitude??DELHI.longitude};
+    const visible=candidates
+      .map(v=>({v,score:(v.latitude-nearestCenter.lat)**2+((v.longitude-nearestCenter.lon)*Math.cos(nearestCenter.lat*Math.PI/180))**2}))
+      .sort((a,b)=>a.score-b.score)
+      .slice(0,250)
+      .map(item=>item.v);
     const payload={
       center,
       stops:nearbyStops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
@@ -129,9 +145,9 @@ export default function HomeScreen(){
 
       <View style={styles.search}>
         <Text style={styles.searchIcon}>⌕</Text>
-        <TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="Search routes, stops or places" placeholderTextColor={colors.textMuted} style={styles.searchInput} autoCorrect={false} returnKeyType="search"/>
+        <TextInput accessibilityLabel="Search routes, stops or places" value={searchQuery} onChangeText={setSearchQuery} placeholder="Search routes, stops or places" placeholderTextColor={colors.textMuted} style={styles.searchInput} autoCorrect={false} returnKeyType="search"/>
         {searchLoading?<ActivityIndicator size="small" color={colors.accent}/>:null}
-        {searchQuery?<Pressable onPress={()=>setSearchQuery('')}><Text style={styles.searchKey}>×</Text></Pressable>:null}
+        {searchQuery?<Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={()=>setSearchQuery('')}><Text style={styles.searchKey}>×</Text></Pressable>:null}
       </View>
       {searchQuery.trim().length>=2?<View style={styles.searchResults}>
         {searchError?<Text style={styles.searchError}>{searchError}</Text>:searchResults.length?searchResults.map((item,index)=>{const name=item.type==='route'?(displayRouteName(item.label)||item.label):item.label;const rc=item.type==='route'?resolveRouteColor(name,item.routeColor,item.routeTextColor):null;return <Pressable key={item.type+'-'+item.id+'-'+index} style={styles.searchResult} onPress={()=>item.type==='stop'?navigation.navigate('StopDetails',{stopId:item.id,stopName:item.label}):navigation.navigate('RouteDetails',{routeId:item.id,label:item.label})}>
@@ -155,7 +171,9 @@ export default function HomeScreen(){
           cacheEnabled
           userAgent="UnitedDelhi/1.0 (+https://github.com/ItzVion/united-delhi)"
           source={{html:buildMapHtml()}}
-          onLoadEnd={()=>setMapReady(true)}
+          key={mapReloadKey}
+          onLoadEnd={()=>{setMapReady(true);setMapError(false);}}
+          onError={()=>setMapError(true)}
           onMessage={event=>{
             try{
               const m=JSON.parse(event.nativeEvent.data);
@@ -164,7 +182,7 @@ export default function HomeScreen(){
                 if(stop)navigation.navigate('StopDetails',{stopId:stop.stop_id,stopName:stop.name});
               }else if(m.type==='bus'){
                 const bus=vehicles.find(v=>v.id===m.busId);
-                if(bus)setSelectedBus(bus);
+                if(bus)setSelectedBusId(bus.id);
               }else if(m.type==='bounds'&&m.bounds)setBounds(m.bounds);
               else if(m.type==='legend')setLegendOpen(true);
               else if(m.type==='locate')void requestLocation();
@@ -173,9 +191,17 @@ export default function HomeScreen(){
         />
         <View pointerEvents="none" style={styles.mapTop}>
           <View style={styles.liveDot}/>
-          <Text style={styles.mapTopText}>{fresh==='ok'?(`${vehicles.length} buses live`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='unavailable'?'Live data unavailable':'Checking live buses'}</Text>
+          <Text style={styles.mapTopText}>{fresh==='ok'?(`${vehicles.length} buses live`):fresh==='stale'?(`${vehicles.length} buses · stale ${realtimeAgeLabel||'earlier'}`):fresh==='unavailable'?(vehicles.length?`${vehicles.length} cached buses · live unavailable`:'Live data unavailable'):'Checking live buses'}</Text>
         </View>
-        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.dtc}]}/><Text style={styles.legendText}>DTC</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.cluster}]}/><Text style={styles.legendText}>Cluster</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.electric}]}/><Text style={styles.legendText}>Electric</Text></View></View>
+        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View>
+        {mapError ? <View style={styles.mapErrorOverlay}>
+          <Text style={styles.mapErrorTitle}>Map couldn't load</Text>
+          <Text style={styles.mapErrorText}>Check your connection and try again.</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Retry map" style={styles.mapErrorButton} onPress={()=>{setMapError(false);setMapReady(false);setMapReloadKey(v=>v+1);}}>
+            <Text style={styles.mapErrorButtonText}>Retry map</Text>
+          </Pressable>
+        </View> : null}
+        <View pointerEvents="none" style={styles.mapLegend}><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.dtc}]}/><Text style={styles.legendText}>DTC</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.cluster}]}/><Text style={styles.legendText}>Cluster</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.electric}]}/><Text style={styles.legendText}>Electric</Text></View></View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
           const name=displayRouteName(selectedBus.routeShortName) || 'Live bus';
@@ -244,7 +270,7 @@ export default function HomeScreen(){
 }
 
 function QuickAction({icon,title,sub,onPress,accent=colors.accent}:{icon:string;title:string;sub:string;onPress:()=>void;accent?:string}){
-  return <Pressable style={styles.quick} onPress={onPress}><Text style={[styles.quickIcon,{color:accent}]}>{icon}</Text><Text style={styles.quickTitle}>{title}</Text><Text style={styles.quickSub}>{sub}</Text></Pressable>;
+  return <Pressable accessibilityRole="button" style={styles.quick} onPress={onPress}><Text style={[styles.quickIcon,{color:accent}]}>{icon}</Text><Text style={styles.quickTitle}>{title}</Text><Text style={styles.quickSub}>{sub}</Text></Pressable>;
 }
 function BottomItem({icon,label,onPress,active=false}:{icon:string;label:string;onPress:()=>void;active?:boolean}){
   return <Pressable style={styles.bottomItem} onPress={onPress}><Text style={[styles.bottomIcon,{color:active?colors.accent:colors.textMuted}]}>{icon}</Text><Text style={[styles.bottomLabel,{color:active?colors.accent:colors.textMuted}]}>{label}</Text></Pressable>;
@@ -257,10 +283,11 @@ html,body,#map{margin:0;width:100%;height:100%;background:#eef2f1}.leaflet-contr
 .stop-label{width:10px;height:10px;border-radius:0;background:#0b746b;border:2px solid #fff;box-shadow:0 2px 6px rgba(23,49,47,.28)}.bus-pin{width:34px;height:34px;border-radius:0;background:#3D82CE;color:#fff;border:3px solid #fff;box-shadow:0 3px 10px rgba(23,49,47,.30);display:flex;align-items:center;justify-content:center;font:900 8px system-ui,sans-serif;line-height:1;text-align:center}.bus-pin span{max-width:27px;overflow:hidden;text-overflow:clip}
 </style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script>
 let currentLocation=null;let autoFocused=false;let lastBusData=[];
-const saved=localStorage.getItem('ud-map-center');
+let saved=null;
 let initialCenter=[28.6139,77.209],initialZoom=10.5;
+try{saved=localStorage.getItem('ud-map-center');}catch{}
 try{if(saved){const p=JSON.parse(saved);if(Number.isFinite(p.lat)&&Number.isFinite(p.lon)){initialCenter=[p.lat,p.lon];initialZoom=14;}}}catch{}
-const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5,minZoom:9,maxBounds:[[28.40,76.84],[28.88,77.35]],maxBoundsViscosity:.18,inertia:true,inertiaDeceleration:1800,inertiaMaxSpeed:1800,bounceAtZoomLimits:false}).setView(initialCenter,initialZoom);
+const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5,minZoom:9,maxBounds:[[28.20,76.55],[29.30,77.65]],maxBoundsViscosity:.18,inertia:true,inertiaDeceleration:1800,inertiaMaxSpeed:1800,bounceAtZoomLimits:false}).setView(initialCenter,initialZoom);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
 const stopLayer=L.layerGroup().addTo(map),busLayer=L.layerGroup().addTo(map),userLayer=L.layerGroup().addTo(map),busMarkers=new Map(),busAnimations=new Map();
 const legendControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-legend'),button=L.DomUtil.create('button','');button.type='button';button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';button.title='Bus color legend';button.setAttribute('aria-label','Bus color legend');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'legend'})));wrap.appendChild(button);return wrap;}});map.addControl(new legendControl());
