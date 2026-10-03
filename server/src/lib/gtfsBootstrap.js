@@ -71,13 +71,13 @@ function buildRouteStops() {
     const sequence = Number(row.stop_sequence);
     if (!routeId || !stopId || !Number.isFinite(sequence)) continue;
 
-    const key = routeId + '\\0' + stopId;
+    const key = routeId + '\0' + stopId;
     const existing = unique.get(key);
     if (existing === undefined || sequence < existing) unique.set(key, sequence);
   }
 
   return [...unique.entries()].map(([key, stopSequence]) => {
-    const separator = key.indexOf('\\0');
+    const separator = key.indexOf('\0');
     return {
       routeId: key.slice(0, separator),
       stopId: key.slice(separator + 1),
@@ -138,7 +138,6 @@ export async function importGtfs({ pool }) {
       const values = [];
       const placeholders = chunk.map((row, index) => {
         const base = index * 4;
-        // CommuteLive generated route_color by hash; it is not a real bus-livery colour.
         values.push(row.routeId, row.shortName, row.longName, null);
         return '($' + (base + 1) + ',$' + (base + 2) + ',$' + (base + 3) + ',$' + (base + 4) + ')';
       }).join(',');
@@ -164,16 +163,23 @@ export async function importGtfs({ pool }) {
       );
     }
 
-    await insertChunks(client, routeStops);
+    // stop_times can contain stale/orphan references in historical feeds. Only insert
+    // route-stop links that point at rows loaded above so the FK can never abort the import.
+    const knownRoutes = new Set(routes.map(row => row.routeId));
+    const knownStops = new Set(stops.map(row => row.stopId));
+    const validRouteStops = routeStops.filter(row => knownRoutes.has(row.routeId) && knownStops.has(row.stopId));
+    const skipped = routeStops.length - validRouteStops.length;
+    if (skipped > 0) console.log('Skipped ' + skipped + ' orphan route-stop links during GTFS import.');
+    await insertChunks(client, validRouteStops);
 
     await client.query(
       'INSERT INTO static_feed_meta(id,source_key,source_url,imported_at,imported_route_count,imported_stop_count,imported_route_stop_count) VALUES(TRUE,$1,$2,NOW(),$3,$4,$5) ' +
       'ON CONFLICT(id) DO UPDATE SET source_key=EXCLUDED.source_key,source_url=EXCLUDED.source_url,imported_at=EXCLUDED.imported_at,imported_route_count=EXCLUDED.imported_route_count,imported_stop_count=EXCLUDED.imported_stop_count,imported_route_stop_count=EXCLUDED.imported_route_stop_count',
-      [GTFS_SOURCE_KEY, GTFS_SOURCE_URL, routes.length, stops.length, routeStops.length]
+      [GTFS_SOURCE_KEY, GTFS_SOURCE_URL, routes.length, stops.length, validRouteStops.length]
     );
 
     await client.query('COMMIT');
-    console.log('Pinned OTD GTFS import completed: ' + routes.length + ' routes, ' + stops.length + ' stops, ' + routeStops.length + ' route-stop links.');
+    console.log('Pinned OTD GTFS import completed: ' + routes.length + ' routes, ' + stops.length + ' stops, ' + validRouteStops.length + ' route-stop links.');
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     throw error;
