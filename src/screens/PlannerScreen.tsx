@@ -15,6 +15,8 @@ export default function PlannerScreen() {
   const navigation = useNavigation<Nav>();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [fromStopId, setFromStopId] = useState<string | null>(null);
+  const [toStopId, setToStopId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState<TripPlanOption[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -26,16 +28,20 @@ export default function PlannerScreen() {
   useEffect(() => {
     const value=from.trim();
     if(value.length<2){setFromSuggestions([]);return;}
-    const timer=setTimeout(async()=>{try{const r=await api.search(value);setFromSuggestions((r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label})));}catch{setFromSuggestions([]);}},180);
+    let active=true;
+    const timer=setTimeout(async()=>{try{const r=await api.search(value);if(active)setFromSuggestions((r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label})));}catch{if(active)setFromSuggestions([]);}},180);
+    return()=>{active=false;clearTimeout(timer);};
     return()=>clearTimeout(timer);
   },[from]);
   useEffect(() => {
     const value=to.trim();
     if(value.length<2){setToSuggestions([]);return;}
-    const timer=setTimeout(async()=>{try{const r=await api.search(value);setToSuggestions((r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label})));}catch{setToSuggestions([]);}},180);
+    let active=true;
+    const timer=setTimeout(async()=>{try{const r=await api.search(value);if(active)setToSuggestions((r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label})));}catch{if(active)setToSuggestions([]);}},180);
+    return()=>{active=false;clearTimeout(timer);};
     return()=>clearTimeout(timer);
   },[to]);
-  const swap = () => { const value = from; setFrom(to); setTo(value); };
+  const swap = () => { const value = from; const valueId = fromStopId; setFrom(to); setTo(value); setFromStopId(toStopId); setToStopId(valueId); };
 
   const plan = async () => {
     if (from.trim().length < 2 || to.trim().length < 2) {
@@ -44,7 +50,7 @@ export default function PlannerScreen() {
     }
     setLoading(true); setError(null); setOptions([]); setFromFocus(false); setToFocus(false);
     try {
-      const result = await api.plan(from.trim(), to.trim());
+      const result = await api.plan(from.trim(), to.trim(), fromStopId ?? undefined, toStopId ?? undefined);
       if (result.status === 'OK') setOptions(result.options);
       else setError(result.reason || 'No journey could be planned.');
     } catch (e) {
@@ -72,14 +78,14 @@ export default function PlannerScreen() {
             <View style={styles.fields}>
               <Text style={styles.fieldLabel}>FROM</Text>
               <View style={styles.inputWrap}>
-                <TextInput value={from} onFocus={()=>setFromFocus(true)} onChangeText={value=>{setFrom(value);setFromFocus(true);}} placeholder="Starting stop or place" placeholderTextColor={colors.textMuted} style={styles.input}/>
-                {fromFocus && fromSuggestions.length>0 ? <View style={styles.suggestions}>{fromSuggestions.map(s=><Pressable key={s.id} style={styles.suggestion} onPress={()=>{setFrom(s.label);setFromSuggestions([]);setFromFocus(false);}}><View style={styles.suggestionIcon}><Text style={styles.suggestionDot}>●</Text></View><View style={styles.suggestionCopy}><Text style={styles.suggestionTitle} numberOfLines={1}>{s.label}</Text><Text style={styles.suggestionMeta}>Bus stop · {s.id}</Text></View><Text style={styles.suggestionArrow}>›</Text></Pressable>)}</View> : null}
+                <TextInput value={from} onFocus={()=>setFromFocus(true)} onChangeText={value=>{setFrom(value);setFromStopId(null);setFromFocus(true);}} placeholder="Starting stop or place" placeholderTextColor={colors.textMuted} style={styles.input}/>
+                {fromFocus && fromSuggestions.length>0 ? <View style={styles.suggestions}>{fromSuggestions.map(s=><Pressable key={s.id} style={styles.suggestion} onPress={()=>{setFrom(s.label);setFromStopId(s.id);setFromSuggestions([]);setFromFocus(false);}}><View style={styles.suggestionIcon}><Text style={styles.suggestionDot}>●</Text></View><View style={styles.suggestionCopy}><Text style={styles.suggestionTitle} numberOfLines={1}>{s.label}</Text><Text style={styles.suggestionMeta}>Bus stop · {s.id}</Text></View><Text style={styles.suggestionArrow}>›</Text></Pressable>)}</View> : null}
               </View>
               <View style={styles.divider}/>
               <Text style={styles.fieldLabel}>TO</Text>
               <View style={styles.inputWrap}>
-                <TextInput value={to} onFocus={()=>setToFocus(true)} onChangeText={value=>{setTo(value);setToFocus(true);}} placeholder="Where do you want to go?" placeholderTextColor={colors.textMuted} style={styles.input}/>
-                {toFocus && toSuggestions.length>0 ? <View style={styles.suggestions}>{toSuggestions.map(s=><Pressable key={s.id} style={styles.suggestion} onPress={()=>{setTo(s.label);setToSuggestions([]);setToFocus(false);}}><View style={styles.suggestionIcon}><Text style={styles.suggestionDot}>●</Text></View><View style={styles.suggestionCopy}><Text style={styles.suggestionTitle} numberOfLines={1}>{s.label}</Text><Text style={styles.suggestionMeta}>Bus stop · {s.id}</Text></View><Text style={styles.suggestionArrow}>›</Text></Pressable>)}</View> : null}
+                <TextInput value={to} onFocus={()=>setToFocus(true)} onChangeText={value=>{setTo(value);setToStopId(null);setToFocus(true);}} placeholder="Where do you want to go?" placeholderTextColor={colors.textMuted} style={styles.input}/>
+                {toFocus && toSuggestions.length>0 ? <View style={styles.suggestions}>{toSuggestions.map(s=><Pressable key={s.id} style={styles.suggestion} onPress={()=>{setTo(s.label);setToStopId(s.id);setToSuggestions([]);setToFocus(false);}}><View style={styles.suggestionIcon}><Text style={styles.suggestionDot}>●</Text></View><View style={styles.suggestionCopy}><Text style={styles.suggestionTitle} numberOfLines={1}>{s.label}</Text><Text style={styles.suggestionMeta}>Bus stop · {s.id}</Text></View><Text style={styles.suggestionArrow}>›</Text></Pressable>)}</View> : null}
               </View>
             </View>
             <Pressable onPress={swap} style={styles.swap}><Text style={styles.swapText}>↕</Text></Pressable>
