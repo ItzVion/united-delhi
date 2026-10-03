@@ -240,7 +240,8 @@ function BusLegend({open,onClose}:{open:boolean;onClose:()=>void}){
 function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];location:Point|null;onSelect:(v:Vehicle)=>void;onLegend:()=>void}){
   const el=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<any>(null);
-  const markersRef=useRef<Map<string,any>>(new Map());
+  type BusMarker=(L.Marker|L.CircleMarker)&{_udBg?:string;_udKind?:'label'|'dot'};
+  const markersRef=useRef<Map<string,BusMarker>>(new Map());
   const userRef=useRef<any>(null);
   const vehiclesRef=useRef<Vehicle[]>([]);
   const animationsRef=useRef<Map<string,number>>(new Map());
