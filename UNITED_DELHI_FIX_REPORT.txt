@@ -1,0 +1,96 @@
+UNITED DELHI V1 — COMPREHENSIVE FIX PASS
+========================================
+
+Source audit:
+- UNITED_DELHI_COMPLETE_AUDIT.txt (54 findings; audit marked partial)
+- fix.sql from the audit (DB-05 safe search indexes)
+- current GitHub main / United Delhi source
+
+Working branch:
+fix/v1-comprehensive-audit
+
+No Android device deployment was performed.
+No EAS build or GitHub Actions run was triggered.
+No production database mutation was performed.
+No secrets were added.
+
+Implemented code fixes in this pass
+------------------------------------
+1. Android location permissions now request coarse + fine; fine permission is no longer blocked.
+2. Native in-app United Delhi mark now uses the existing official logo asset.
+3. Planner suggestions retain exact stop IDs and pass those IDs to /api/plan.
+4. Planner suggestion requests ignore stale/out-of-order responses.
+5. Planner copy now correctly says bus stops rather than promising generic places.
+6. Planner results clearly label duration as an estimate and walking as not estimated.
+7. Web planner uses exact selected stop IDs and route-result links.
+8. Search/typeahead rate limiting is separated from data and planner limits.
+9. Realtime polling starts independently of the static GTFS bootstrap.
+10. A short-lived database warm cache can display recently stored positions as STALE during reconnects/restarts.
+11. Realtime polling pauses when the web page or native app is backgrounded where applicable.
+12. Live vehicle retention is aligned to a 5-minute freshness window in vehicle_positions cleanup.
+13. Vehicles without a valid realtime timestamp are not given a synthetic "now" timestamp.
+14. Unknown vehicle service types use a neutral color rather than being presented as a known CNG family.
+15. Home/native map vehicle rendering is capped to the nearest 250 visible vehicles.
+16. Web map vehicle rendering is capped to the nearest 250 visible vehicles.
+17. Native map has a visible retry/error state.
+18. Map bounds were widened to avoid excluding outer Delhi vehicle positions.
+19. Selected bus state uses the vehicle ID and resolves against the newest vehicle list.
+20. Bus selection now still shows useful information when route metadata is unavailable.
+21. Route details stale/error state now has retry behavior and background polling protection.
+22. Stop details stale/live/empty states are explicit and include refresh/retry.
+23. Web detail pages refresh while visible and preserve loaded content instead of blanking unnecessarily.
+24. Web detail pages have retry UI when the first load fails.
+25. Web stop-arrival rows can navigate to a route when a route ID exists.
+26. Web API base URL can be overridden with VITE_API_BASE_URL, with HTTPS required outside localhost.
+27. API request errors and stale states are presented more honestly.
+28. Several focus/accessibility labels were added to important controls.
+29. Web planner/result controls received usability/focus styling.
+30. Root web package scripts were corrected to use the actual web package scripts.
+31. Production database TLS verification was changed to certificate verification instead of accepting any certificate.
+32. Backend graceful shutdown clears realtime polling and closes the DB pool.
+33. Backend readiness is exposed separately from basic health.
+34. Static-data completeness checks were aligned with the stronger import thresholds.
+35. Static GTFS import no longer truncates vehicle_positions.
+36. The GTFS importer no longer disables PostgreSQL certificate verification.
+37. Static GTFS provenance wording was corrected away from claiming the pinned derived snapshot is official.
+38. Nearby-stop queries now use a bounding-box prefilter and bounded radius.
+39. Stop-arrival matching uses resolved operational route IDs and ignores very distant vehicles.
+40. Backend search ranking now prefers exact/prefix stop-name matches before applying the limit.
+41. Planner SQL removed unnecessary direct-query joins.
+42. Planner duration/walking semantics are explicitly marked as estimates.
+
+Safe database SQL
+-----------------
+fix.sql contains only the audit-confirmed DB-05 changes:
+- pg_trgm extension
+- trigram index on stops.name
+- trigram index on routes.short_name expression
+- trigram index on routes.long_name expression
+
+It has NOT been executed against the production database.
+
+Known items that still require external verification/manual work
+---------------------------------------------------------------
+- DB-01: live row counts for routes/stops/route_stops/static_feed_meta must be checked.
+- DB-02: the pinned static feed does not cover many live route IDs; current official OTD static data needs verification/refresh.
+- DB-03/04: redundant vehicle/index/schema drift needs a deliberate database decision.
+- DB-06: the Adminer export should not be treated as a production restore backup; re-export with pg_dump.
+- DB-09/10: route patterns, schedules and shapes require a better source/model before replacing the planner heuristic.
+- DB-11: RLS/check constraints should be verified in the live DB.
+- DB-12: duplicate stop names are real; API/UI disambiguation is improved by exact stop IDs, but full geographic labels may still be useful.
+- DB-13: duplicate operational CSV/static route metadata should eventually be consolidated.
+- MOB-01: Leaflet assets still load at runtime inside WebView; a compliant tile/CDN strategy still needs product/deployment review.
+- CI/build findings were not converted into a cloud build because no cloud build was requested.
+- Runtime behavior against the live database/realtime service still needs real-device/web testing.
+
+Validation status
+-----------------
+Static source review was performed after the edits. A complete local Android build was not run from this environment, and no Android APK was pushed/installed.
+
+Web preview/build:
+- Intended next verification target is the Vercel preview for branch fix/v1-comprehensive-audit.
+- The web preview should be used to check Home, map, search, planner, route details and stop details.
+
+Important:
+- This report does not claim the entire 54-item audit is resolved.
+- External data freshness and live database state remain the largest unresolved dependencies.
