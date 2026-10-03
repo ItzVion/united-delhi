@@ -30,7 +30,7 @@ export default function HomeScreen(){
   const mapHeight=Math.min(380,Math.max(275,contentWidth*0.36));
   const mapRef=useRef<WebView|null>(null);
   const [location,setLocation]=useState<Location.LocationObject|null>(null);
-  const [locationStatus,setLocationStatus]=useState('Finding your location…');
+  const [locationStatus,setLocationStatus]=useState('');
   const [nearbyStops,setNearbyStops]=useState<Stop[]>([]);
   const [vehicles,setVehicles]=useState<Vehicle[]>([]);
   const [fresh,setFresh]=useState<'loading'|'ok'|'stale'|'unavailable'>('loading');
