@@ -62,6 +62,7 @@ export default function App(){
   const[locationRequesting,setLocationRequesting]=useState(false);
   const[detail,setDetail]=useState<any>(null);
   const[detailBusy,setDetailBusy]=useState(false);
+  const[detailRetry,setDetailRetry]=useState(0);
   const[legendOpen,setLegendOpen]=useState(false);
 
   const go=useCallback((path:string)=>{window.history.pushState({},'',path);setPage(parsePath(path));setSearchOpen(false);setError('');window.scrollTo(0,0);},[]);
@@ -142,7 +143,7 @@ export default function App(){
       finally{if(active)setDetailBusy(false);}
     })();
     return()=>{active=false;};
-  },[page,accepted]);
+  },[page,accepted,detailRetry]);
 
   if(!accepted){
     if(page.kind==='privacy')return <Privacy go={go}/>;
@@ -185,7 +186,8 @@ export default function App(){
        :page.kind==='privacy'?<Privacy go={go}/>
        :page.kind==='terms'?<Terms go={go}/>
        :detailBusy?<div className="flat-card loading-card">Loading…</div>
-       :detail?<Details detail={detail} go={go}/>:null}
+       :detail?<Details detail={detail} go={go}/>
+       :<div className="flat-card loading-card"><b>Couldn't load this page</b><span>Transit details are temporarily unavailable.</span><button className="secondary-button retry-button" onClick={()=>{setError('');setDetailRetry(v=>v+1);}}>Try again</button></div>}
     </main>
 
     <BusLegend open={legendOpen} onClose={()=>setLegendOpen(false)}/>
@@ -525,7 +527,7 @@ function Planner({go}:{go:(path:string)=>void}){
 
 function Legal({go}:{go:(path:string)=>void}){
   return <section className="screen">
-    <div className="page-top"><button className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">UNITED DELHI</span><h1>Legal & privacy</h1><p>How United Delhi handles transit information and privacy.</p></div></div>
+    <div className="page-top"><button aria-label="Back to home" className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">UNITED DELHI</span><h1>Legal & privacy</h1><p>How United Delhi handles transit information and privacy.</p></div></div>
     <div className="flat-card detail-section"><button className="legal-row" onClick={()=>go('/legal/privacy')}><span><b>Privacy Policy</b><small>Data, location and privacy information</small></span><span className="chevron">›</span></button><button className="legal-row" onClick={()=>go('/legal/terms')}><span><b>Terms of Service</b><small>Rules for using United Delhi</small></span><span className="chevron">›</span></button></div>
   </section>;
 }
@@ -568,7 +570,7 @@ function Details({detail,go}:{detail:any;go:(path:string)=>void}){
   const title=stop.name||'Bus stop';
   return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">BUS STOP</span><h1>{title}</h1><p>{stop.stop_id||'Stop details'}</p></div></div>
     <div className="flat-card stop-hero"><span className="square-icon">●</span><div><h2>{title}</h2><p>Bus stop</p></div></div>
-    <div className="flat-card detail-section"><div className="section-head-inline"><h2>Buses at this stop</h2><small>Live positions</small></div>{arrivals.length?arrivals.map((a:any)=><button className="arrival-row" key={a.vehicleId}><strong style={{background:a.serviceColor||BUS_COLORS.cngAcBlue,color:'#fff',padding:'6px 8px'}}>{routeName(a.routeShortName)||'Bus'}</strong><span className="row-copy"><b>To {a.toStop||'Destination'}</b><small>{a.observedAgeSeconds<60?'Updated just now':'Updated '+Math.floor(a.observedAgeSeconds/60)+' min ago'}</small></span><span className="chevron">›</span></button>):<p className="muted">No live buses are reporting at this stop right now.</p>}</div>
+    <div className="flat-card detail-section"><div className="section-head-inline"><h2>Buses at this stop</h2><small>Live positions</small></div>{arrivals.length?arrivals.map((a:any)=><button aria-label={a.routeId?`View route ${routeName(a.routeShortName)||'Bus'}`:'Live bus with unavailable route'} disabled={!a.routeId} className="arrival-row" key={a.vehicleId} onClick={()=>{if(a.routeId)go('/routes/'+encodeURIComponent(a.routeId));}}><strong style={{background:a.serviceColor||BUS_COLORS.cngAcBlue,color:'#fff',padding:'6px 8px'}}>{routeName(a.routeShortName)||'Bus'}</strong><span className="row-copy"><b>To {a.toStop||'Destination'}</b><small>{a.observedAgeSeconds<60?'Updated just now':'Updated '+Math.floor(a.observedAgeSeconds/60)+' min ago'}</small></span><span className="chevron">{a.routeId?'›':'·'}</span></button>):<p className="muted">No live buses are reporting at this stop right now.</p>}</div>
     <div className="flat-card detail-section"><div className="section-head-inline"><h2>Routes at this stop</h2><span className="count-box">{routes.length}</span></div>{routes.map((r:any)=><button className="route-row" key={r.route_id} onClick={()=>go('/routes/'+encodeURIComponent(r.route_id))}><RouteBadge name={routeName(r.publicRouteName||r.short_name)||'Bus'} color={r.route_color} textColor={r.route_text_color}/><span className="row-copy"><b>{r.fromStop||'Starting stop'}</b><small>to {r.toStop||'Ending stop'}</small></span><span className="chevron">›</span></button>)}</div>
   </section>;
 }
