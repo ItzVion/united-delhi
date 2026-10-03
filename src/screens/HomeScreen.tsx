@@ -158,7 +158,7 @@ export default function HomeScreen(){
 
       <View style={styles.sectionLine}>
         <Text style={styles.sectionKicker}>LIVE TRANSIT</Text>
-        <Pressable onPress={requestLocation}><Text style={styles.locationLink}>{location?'Recenter':'Use my location'}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={location?'Recenter map on your location':'Use my location'} onPress={requestLocation}><Text style={styles.locationLink}>{location?'Recenter':'Use my location'}</Text></Pressable>
       </View>
 
       <View style={[styles.mapCard,{height:mapHeight}]}>
@@ -202,29 +202,33 @@ export default function HomeScreen(){
           </Pressable>
         </View> : null}
         <View pointerEvents="none" style={styles.mapLegend}><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.dtc}]}/><Text style={styles.legendText}>DTC</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.cluster}]}/><Text style={styles.legendText}>Cluster</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.electric}]}/><Text style={styles.legendText}>Electric</Text></View></View>
-        {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
+        {locationStatus?<Pressable accessibilityRole="button" accessibilityLabel="Retry location" style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
           const name=displayRouteName(selectedBus.routeShortName) || 'Live bus';
-          if(!selectedBus.routeId) return null;
           const c={background:selectedBus.serviceColor||SERVICE_COLORS[selectedBus.serviceType||'unknown'],text:selectedBus.serviceType==='electric'?'#17313B':'#FFFFFF'};
-          const ageSeconds=Math.max(0,Math.round((Date.now()-Date.parse(selectedBus.observedAt))/1000));
-          const freshness=Number.isFinite(ageSeconds)?(ageSeconds<60?'Updated just now':`Updated ${Math.floor(ageSeconds/60)} min ago`):'Live position';
+          const parsed=Date.parse(selectedBus.observedAt);
+          const ageSeconds=Number.isFinite(parsed)?Math.max(0,Math.round((Date.now()-parsed)/1000)):null;
+          const freshness=ageSeconds===null?'Timestamp unavailable':ageSeconds<60?'Updated just now':`Updated ${Math.floor(ageSeconds/60)} min ago`;
+          const routeAvailable=Boolean(selectedBus.routeId);
           return <View style={styles.busPreview}>
-            <Pressable style={styles.busPreviewClose} onPress={()=>setSelectedBus(null)}><Text style={styles.busPreviewCloseText}>×</Text></Pressable>
-            <Pressable style={styles.busPreviewBody} onPress={()=>{
-              if(selectedBus.routeShortName) navigation.navigate('RouteDetails',{routeId:selectedBus.routeId!,label:name});
-            }}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close selected bus" style={styles.busPreviewClose} onPress={()=>setSelectedBusId(null)}><Text style={styles.busPreviewCloseText}>×</Text></Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={routeAvailable?`View route for ${name}`:'Selected live bus'}
+              style={[styles.busPreviewBody,!routeAvailable&&{opacity:.86}]}
+              onPress={()=>{if(routeAvailable)navigation.navigate('RouteDetails',{routeId:selectedBus.routeId!,label:name});}}
+              disabled={!routeAvailable}
+            >
               <View style={[styles.busPreviewBadge,{backgroundColor:c.background}]}><Text style={[styles.busPreviewBadgeText,{color:c.text}]}>{name}</Text></View>
               <View style={styles.busPreviewCopy}>
                 <Text style={styles.busPreviewEyebrow}>LIVE BUS</Text>
                 <Text style={styles.busPreviewTitle} numberOfLines={1}>To {selectedBus.toStop || 'Destination'}</Text>
-                <Text style={styles.busPreviewMeta} numberOfLines={1}>{selectedBus.vehicleLabel || selectedBus.licensePlate || selectedBus.id} · {freshness} · View route</Text>
+                <Text style={styles.busPreviewMeta} numberOfLines={2}>{selectedBus.vehicleLabel || selectedBus.licensePlate || selectedBus.id} · {freshness} · {routeAvailable?'View route':'Route information unavailable'}</Text>
               </View>
-              <Text style={styles.busPreviewArrow}>›</Text>
+              <Text style={styles.busPreviewArrow}>{routeAvailable?'›':'·'}</Text>
             </Pressable>
           </View>;
         })() : null}
-      </View>
         <Modal visible={legendOpen} transparent animationType="fade" onRequestClose={()=>setLegendOpen(false)}>
           <Pressable style={styles.legendOverlay} onPress={()=>setLegendOpen(false)}>
             <Pressable style={styles.legendDialog} onPress={event=>event.stopPropagation()}>
@@ -258,7 +262,6 @@ export default function HomeScreen(){
       </Pressable>)}
       {!nearbyStops.length?<View style={styles.emptyCard}><Text style={styles.emptyTitle}>No nearby stops yet</Text><Text style={styles.emptyText}>Location is optional; use the map or enable location to find nearby stops.</Text></View>:null}
 
-      <Pressable style={styles.legal} onPress={()=>navigation.navigate('Legal')}><Text style={styles.legalText}>Legal & privacy</Text></Pressable>
     </ScrollView>
 
     <View style={styles.bottomNav}>
