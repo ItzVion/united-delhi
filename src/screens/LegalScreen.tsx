@@ -40,7 +40,7 @@ export default function LegalScreen() {
           times or vehicle availability.
         </Text>
         <Text style={styles.section}>App version</Text>
-        <Text style={styles.body}>United Delhi {APP_VERSION}. Android build numbers are managed by EAS for production releases.</Text>
+        <Text style={styles.body}>United Delhi {APP_VERSION}. Android and iOS release builds can be generated locally; no EAS build is required.</Text>
         <Text style={styles.section}>Contact</Text>
         <Text style={styles.body}>
           Privacy and legal inquiries can be submitted using the developer contact email shown on the United Delhi Google Play listing.

@@ -16,13 +16,13 @@ UNITED DELHI SETUP
    Never put either secret in frontend source or the mobile bundle.
 
 4. Current hosted backend
-   Provider: Render
-   Service: https://united-delhi.onrender.com
+   Provider: Wasmer
+   Service: https://united-delhi.wasmer.app
    Service root: ./server
    Build command: npm ci
    Start command: npm start
-   Health endpoint: https://united-delhi.onrender.com/health
-   API base URL: https://united-delhi.onrender.com
+   Health endpoint: https://united-delhi.wasmer.app/health
+   API base URL: https://united-delhi.wasmer.app
 
    Required environment variables:
    - DTC_API_KEY

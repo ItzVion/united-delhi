@@ -5,7 +5,7 @@ import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 
 type Props = { onConfirm: () => void };
 
-export default function AgeGate({ onConfirm }: Props) {
+export default function ConsentGate({ onConfirm }: Props) {
   const [checked,setChecked]=useState(false);
   const [legal,setLegal]=useState<'terms'|'privacy'|null>(null);
   return (

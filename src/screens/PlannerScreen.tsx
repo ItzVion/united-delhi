@@ -104,7 +104,7 @@ export default function PlannerScreen() {
                 <Text style={styles.optionType}>{option.type === 'direct' ? 'DIRECT BUS' : 'ONE CHANGE'}</Text>
                 <Text style={styles.duration}>{option.durationMinutes} min</Text>
               </View>
-              <View style={styles.walkPill}><Text style={styles.walkText}>Walk {option.walkingMinutes} min</Text></View>
+              <View style={styles.walkPill}><Text style={styles.walkText}>Walking time not estimated</Text></View>
             </View>
             {option.legs.map((leg, legIndex) => (
               <View key={`${leg.routeId}-${legIndex}`} style={styles.leg}>

@@ -1,14 +1,14 @@
 {
   "cli": {
     "version": ">= 13.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://united-delhi.onrender.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://united-delhi.wasmer.app"
       }
     },
     "preview": {
@@ -17,13 +17,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://united-delhi.onrender.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://united-delhi.wasmer.app"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://united-delhi.onrender.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://united-delhi.wasmer.app"
       }
     }
   },

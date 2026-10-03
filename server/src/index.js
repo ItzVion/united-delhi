@@ -578,7 +578,7 @@ app.get('/api/plan',planRateLimit,async(req,res)=>{
       options.push({
         type:'direct',
         durationMinutes:Math.max(3,Math.ceil(hops*2.5)),
-        walkingMinutes:0,
+        walkingMinutes:null,
         durationIsEstimate:true,
         walkingIsEstimated:true,
         legs:[{routeId:String(row.route_id),routeName:row.short_name||row.long_name||'Bus',routeColor:row.route_color,routeTextColor:row.route_text_color,fromStop:row.from_stop,toStop:row.to_stop,fromStopId:row.from_stop_id,toStopId:row.to_stop_id}]
@@ -590,7 +590,7 @@ app.get('/api/plan',planRateLimit,async(req,res)=>{
       options.push({
         type:'one-transfer',
         durationMinutes:Math.max(8,Math.ceil((firstHops+secondHops)*2.5+5)),
-        walkingMinutes:0,
+        walkingMinutes:null,
         durationIsEstimate:true,
         walkingIsEstimated:true,
         legs:[
