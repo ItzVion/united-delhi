@@ -131,7 +131,7 @@ export async function importGtfs({ pool }) {
       await client.query(fs.readFileSync(path.join(sqlDir, name), 'utf8'));
     }
 
-    await client.query('TRUNCATE TABLE route_stops, vehicle_positions, routes, stops RESTART IDENTITY CASCADE');
+    await client.query('TRUNCATE TABLE route_stops, routes, stops RESTART IDENTITY CASCADE');
 
     for (let i = 0; i < routes.length; i += 200) {
       const chunk = routes.slice(i, i + 200);
