@@ -18,6 +18,6 @@ export const api={
  stop:(id:string)=>request<{status:string;stop:Stop;routes:Route[]}>(`/api/stops/${encodeURIComponent(id)}`),
  route:(id:string)=>request<{status:string;route:Route;stops:Stop[];vehicles:Vehicle[]}>(`/api/routes/${encodeURIComponent(id)}`),
  arrivals:(stopId:string)=>request<{status:string;arrivals:Arrival[];reason?:string}>(`/api/stops/${encodeURIComponent(stopId)}/arrivals`),
- plan:(from:string,to:string)=>request<TripPlanResponse>(`/api/plan?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+ plan:(from:string,to:string,fromStopId?:string,toStopId?:string)=>{const params=new URLSearchParams({from,to});if(fromStopId)params.set('fromStopId',fromStopId);if(toStopId)params.set('toStopId',toStopId);return request<TripPlanResponse>('/api/plan?'+params.toString());}
 };
 export { ApiError };
