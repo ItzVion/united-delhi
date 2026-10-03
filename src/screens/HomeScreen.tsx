@@ -43,9 +43,10 @@ export default function HomeScreen(){
   const [searchLoading,setSearchLoading]=useState(false);
   const [searchError,setSearchError]=useState<string|null>(null);
   const [legendOpen,setLegendOpen]=useState(false);
+  const locationPromptedRef=useRef(false);
 
   const requestLocation=useCallback(async()=>{
-    if(!(await confirmLocationUse())){setLocationStatus('Showing Delhi without your location.');return;}
+    if(!locationPromptedRef.current){locationPromptedRef.current=true;if(!(await confirmLocationUse())){setLocationStatus('Showing Delhi without your location.');return;}}
     try{
       const permission=await Location.getForegroundPermissionsAsync();
       if(permission.status!=='granted'){
