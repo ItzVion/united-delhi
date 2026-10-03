@@ -15,7 +15,7 @@ United Delhi is designed to work without a user account. We do not currently ask
 
 Location is optional.
 
-If you choose the **Nearby** feature, the mobile app requests foreground location permission and sends a reduced-precision latitude/longitude to the United Delhi API so the server can calculate nearby DTC stops. The web client may store the last successful map/location coordinates in your browser's local storage so it can restore the previous map area; this local browser storage is not the United Delhi database.
+After the Terms/Privacy consent screen, the client may request foreground location permission to support map centering and nearby DTC stop discovery. When location is allowed, the mobile client sends a reduced-precision latitude/longitude to the United Delhi API so the server can calculate nearby DTC stops. The web client may store the last successful map/location coordinates in your browser's local storage so it can restore the previous map area; this local browser storage is not the United Delhi database.
 
 Core route and stop search does not require location permission.
 
