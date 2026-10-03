@@ -1,17 +1,17 @@
 {
   "name": "united-delhi",
-  "version": "1.0.1",
+  "version": "1.0.6",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "node web/serve.mjs",
+    "web": "npm --prefix web run dev",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test \"src/lib/__tests__/*.test.ts\"",
     "build:apk": "eas build -p android --profile preview",
-    "web:check": "node web/check.mjs",
+    "web:check": "npm --prefix web run typecheck",
     "build": "npm --prefix web run build",
     "build:web": "npm --prefix web run build"
   },
