@@ -1,4 +1,4 @@
-export const API=String(import.meta.env.VITE_API_BASE_URL || 'https://united-delhi.onrender.com').trim().replace(/\/+$/,'');
+export const API=String(import.meta.env.VITE_API_BASE_URL || 'https://united-delhi.wasmer.app').trim().replace(/\/+$/,'');
 async function request<T>(path:string,init:RequestInit={},timeoutMs=10000):Promise<T>{
   const controller=new AbortController();
   const timer=window.setTimeout(()=>controller.abort(),timeoutMs);

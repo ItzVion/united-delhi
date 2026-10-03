@@ -276,29 +276,21 @@ let vehicleSaveInFlight=false;
 let realtimePollingTimer=null;
 async function persistVehiclesIfIdle(vehicles){if(!pool||vehicleSaveInFlight)return;vehicleSaveInFlight=true;try{await saveVehicles(vehicles);}catch(error){console.error('Failed to save realtime vehicles:',error.message);}finally{vehicleSaveInFlight=false;}}
 async function refreshRealtimeCache(){if(realtimeRefreshInFlight)return realtimeRefreshInFlight;realtimeRefreshInFlight=(async()=>{try{const vehicles=await getRealtimeVehicles();realtimeCache.vehicles=vehicles;realtimeCache.status='OK';realtimeCache.reason=null;realtimeCache.fetchedAt=new Date().toISOString();if(pool)void persistVehiclesIfIdle(vehicles);}catch(error){if(!realtimeCache.fetchedAt)realtimeCache.status='UNAVAILABLE';realtimeCache.reason=error instanceof Error?error.message:'Realtime request failed';console.error('Realtime poll failed:',realtimeCache.reason);}})().finally(()=>{realtimeRefreshInFlight=null;});return realtimeRefreshInFlight;}
+async function ensureFreshRealtimeCache(maxAgeMs=30000){
+  const age=realtimeCache.fetchedAt?Math.max(0,Date.now()-Date.parse(realtimeCache.fetchedAt)):Infinity;
+  if(age>maxAgeMs&&(process.env.DTC_REALTIME_RELAY_URL||process.env.DTC_API_KEY))await refreshRealtimeCache();
+}
 async function warmRealtimeCacheFromDatabase(){
   if(!pool||realtimeCache.vehicles.length)return;
   try{
     const result=await pool.query("SELECT vehicle_id,route_id,stop_id,latitude,longitude,bearing,observed_at,updated_at FROM vehicle_positions WHERE observed_at >= NOW() - INTERVAL '5 minutes' ORDER BY observed_at DESC LIMIT 5000");
     if(!result.rows.length)return;
-    const vehicles=result.rows.map(row=>({
-      id:String(row.vehicle_id),
-      routeId:row.route_id?String(row.route_id):null,
-      routeShortName:null,
-      routeColor:null,
-      routeTextColor:null,
-      tripId:null,
-      stopId:row.stop_id?String(row.stop_id):null,
-      vehicleLabel:null,
-      licensePlate:null,
-      operator:null,
-      serviceType:'unknown',
-      serviceColor:'#7A858A',
-      latitude:Number(row.latitude),
-      longitude:Number(row.longitude),
-      bearing:row.bearing===null?null:Number(row.bearing),
-      observedAt:new Date(row.observed_at).toISOString()
-    })).filter(v=>Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)&&Number.isFinite(Date.parse(v.observedAt)));
+    const vehicles=result.rows.map(row=>{
+      const base={id:String(row.vehicle_id),routeId:row.route_id?String(row.route_id):null,routeShortName:null,routeColor:null,routeTextColor:null,tripId:null,stopId:row.stop_id?String(row.stop_id):null,vehicleLabel:null,licensePlate:null,operator:null,serviceType:'unknown',serviceColor:null,latitude:Number(row.latitude),longitude:Number(row.longitude),bearing:row.bearing===null?null:Number(row.bearing),observedAt:new Date(row.observed_at).toISOString()};
+      const operational=resolveOperationalRoute(base);const service=classifyService(base.id,operational?.agencyId);
+      base.routeShortName=operational?.shortName||null;base.operator=operational?.agencyId||null;base.serviceType=service.type;base.serviceColor=service.color;
+      return base;
+    }).filter(v=>Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)&&Number.isFinite(Date.parse(v.observedAt)));
     if(!vehicles.length)return;
     const newest=result.rows.reduce((latest,row)=>{
       const t=Date.parse(row.updated_at||row.observed_at);
@@ -326,9 +318,9 @@ function startRealtimePolling(){
 }
 async function saveVehicles(vehicles){if(!pool)return;const client=await pool.connect();try{await client.query('BEGIN');await client.query("SET LOCAL statement_timeout='15000'");const chunkSize=200;for(let i=0;i<vehicles.length;i+=chunkSize){const chunk=vehicles.slice(i,i+chunkSize),values=[];const placeholders=chunk.map((v,index)=>{const base=index*7;values.push(v.id,v.routeId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);return '($'+(base+1)+',$'+(base+2)+',$'+(base+3)+',$'+(base+4)+',$'+(base+5)+',$'+(base+6)+',$'+(base+7)+',NOW())';}).join(',');await client.query('INSERT INTO vehicle_positions(vehicle_id,route_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+placeholders+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values);}await client.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '5 minutes'");await client.query('COMMIT');}catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}}
 app.get('/',(_req,res)=>res.status(200).json({service:'united-delhi-api',status:'ok'}));
-app.get('/health',healthRateLimit,async(_req,res)=>{res.setHeader('Cache-Control','no-store');let database='not_configured';if(pool){try{await pool.query('SELECT 1');database='ok';}catch{database='error';}}res.status(database==='ok'?200:503).json({ok:database!=='error',service:'united-delhi-api',database,staticData:staticDataCache.status,staticDataCompletedAt:staticDataCache.completedAt,staticDataSource:GTFS_SOURCE_KEY,staticDataUrl:GTFS_SOURCE_URL,realtime:realtimeCache.status,lastRealtimeFetch:realtimeCache.fetchedAt,time:new Date().toISOString()});});
+app.get('/health',healthRateLimit,async(_req,res)=>{res.setHeader('Cache-Control','no-store');let database='not_configured';if(pool){try{await pool.query('SELECT 1');database='ok';}catch{database='error';}}res.status(database==='ok'?200:503).json({ok:database==='ok',service:'united-delhi-api',database,staticData:staticDataCache.status,staticDataCompletedAt:staticDataCache.completedAt,staticDataSource:GTFS_SOURCE_KEY,staticDataUrl:GTFS_SOURCE_URL,realtime:realtimeCache.status,lastRealtimeFetch:realtimeCache.fetchedAt,time:new Date().toISOString()});});
 app.get('/api/status',(_req,res)=>res.json({realtime:(process.env.DTC_REALTIME_RELAY_URL||process.env.DTC_API_KEY)?'configured':'unavailable',database:pool?'configured':'unavailable',realtimeCache:realtimeCache.status,lastRealtimeFetch:realtimeCache.fetchedAt}));
-app.get('/api/realtime/vehicles',realtimeRateLimit,(_req,res)=>{res.setHeader('Cache-Control','no-store');const fetchedAt=realtimeCache.fetchedAt,age=fetchedAt?Math.max(0,Date.now()-Date.parse(fetchedAt)):Infinity,stale=age>180000;if(realtimeCache.status==='UNAVAILABLE'&&!realtimeCache.vehicles.length)return res.status(503).json({status:'UNAVAILABLE',count:0,vehicles:[],reason:'Realtime data is currently unavailable'});res.json({status:stale?'STALE':'OK',count:realtimeCache.vehicles.length,vehicles:realtimeCache.vehicles,fetchedAt,stale});});
+app.get('/api/realtime/vehicles',realtimeRateLimit,async(_req,res)=>{res.setHeader('Cache-Control','no-store');await ensureFreshRealtimeCache();const fetchedAt=realtimeCache.fetchedAt,age=fetchedAt?Math.max(0,Date.now()-Date.parse(fetchedAt)):Infinity,stale=age>180000;if(realtimeCache.status==='UNAVAILABLE'&&!realtimeCache.vehicles.length)return res.status(503).json({status:'UNAVAILABLE',count:0,vehicles:[],reason:'Realtime data is currently unavailable'});res.json({status:stale?'STALE':'OK',count:realtimeCache.vehicles.length,vehicles:realtimeCache.vehicles,fetchedAt,stale});});
 app.post('/api/stops/nearby',dataRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',stops:[],reason:'Database is not configured'});const lat=parseCoordinate(req.body?.lat,-90,90),lon=parseCoordinate(req.body?.lon,-180,180),ln=Number(req.body?.limit),limit=Number.isFinite(ln)?Math.min(Math.max(Math.trunc(ln),1),50):10,rad=Number(req.body?.radius_m),radiusM=Number.isFinite(rad)?Math.min(Math.max(Math.trunc(rad),500),15000):10000;if(lat===null||lon===null)return res.status(400).json({status:'ERROR',stops:[],reason:'Valid lat and lon are required'});res.setHeader('Cache-Control','no-store');try{const result=await pool.query(`SELECT stop_id,name,latitude,longitude,distance_m FROM (SELECT stop_id,name,latitude,longitude,(6371000*acos(LEAST(1,GREATEST(-1,sin(radians($1))*sin(radians(latitude))+cos(radians($1))*cos(radians(latitude))*cos(radians(longitude)-radians($2)))))) distance_m FROM stops WHERE latitude BETWEEN $1-$4/111320.0 AND $1+$4/111320.0 AND longitude BETWEEN $2-($4/(111320.0*GREATEST(0.1,cos(radians($1))))) AND $2+($4/(111320.0*GREATEST(0.1,cos(radians($1))))) ) calculated WHERE distance_m <= $4 ORDER BY distance_m,stop_id LIMIT $3`,[lat,lon,limit,radiusM]);res.json({status:'OK',stops:result.rows});}catch(error){console.error('Failed to load nearby stops:',error.message);res.status(500).json({status:'ERROR',stops:[],reason:'Failed to load nearby stops'});}});
 function haversineMeters(lat1,lon1,lat2,lon2){const R=6371000,toRad=v=>v*Math.PI/180,dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1),a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(a));}
 app.get('/api/stops/:id/arrivals',dataRateLimit,async(req,res)=>{
@@ -340,7 +332,7 @@ app.get('/api/stops/:id/arrivals',dataRateLimit,async(req,res)=>{
     const routeMap=new Map(result.rows.map(row=>[String(row.route_id),row]));
     const stop=await pool.query('SELECT latitude,longitude FROM stops WHERE stop_id=$1',[stopId]);
     if(!stop.rows.length)return res.status(404).json({status:'NOT_FOUND',arrivals:[],reason:'Stop not found'});
-    const stopLat=Number(stop.rows[0].latitude),stopLon=Number(stop.rows[0].longitude),now=Date.now();
+    await ensureFreshRealtimeCache();const stopLat=Number(stop.rows[0].latitude),stopLon=Number(stop.rows[0].longitude),now=Date.now();
     const routeIds=new Set(routeMap.keys());
     const cacheAge=realtimeCache.fetchedAt?Math.max(0,now-Date.parse(realtimeCache.fetchedAt)):Infinity;
     const liveVehicles=cacheAge<=180000?realtimeCache.vehicles:[];
@@ -366,7 +358,7 @@ app.get('/api/stops/:id/arrivals',dataRateLimit,async(req,res)=>{
           routeColor:operational?.routeColor?'#'+String(operational.routeColor).replace(/^#/,''):row?.route_color?'#'+String(row.route_color).replace(/^#/,''):null,
           routeTextColor:row?.route_text_color||null,
           serviceType:v.serviceType||'unknown',
-          serviceColor:v.serviceColor||'#7A858A',
+          serviceColor:v.serviceColor||null,
           distanceMeters:Math.max(0,Math.round(d)),
           observedAgeSeconds:age,
           fromStop:row?.from_stop?String(row.from_stop).trim():null,
@@ -419,7 +411,7 @@ WITH route_meta AS (
 )
 SELECT route_id,short_name,long_name,route_color,route_text_color,public_route_name AS "publicRouteName",from_stop AS "fromStop",to_stop AS "toStop"
 FROM route_meta
-`,[routeId]);if(!routeResult.rows.length)return res.status(404).json({status:'NOT_FOUND',reason:'Route not found'});const stopsResult=await pool.query('SELECT s.stop_id,s.name,s.latitude,s.longitude,rs.stop_sequence FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=$1 ORDER BY rs.stop_sequence,s.name,s.stop_id',[routeId]);const routeStops=stopsResult.rows;const cacheAge=realtimeCache.fetchedAt?Math.max(0,Date.now()-Date.parse(realtimeCache.fetchedAt)):Infinity;const candidates=cacheAge<=180000?realtimeCache.vehicles.filter(v=>{const operational=resolveOperationalRoute(v);return String(operational?.routeId||v.routeId||'')===routeId;}):[];const vehicles=candidates.filter(v=>v.routeId&&routeStops.some(s=>haversineMeters(v.latitude,v.longitude,Number(s.latitude),Number(s.longitude))<=3000));res.json({status:'OK',route:routeResult.rows[0],stops:routeStops,vehicles});}catch(error){console.error('Failed to load route:',error.message);res.status(500).json({status:'ERROR',reason:'Failed to load route'});}});
+`,[routeId]);if(!routeResult.rows.length)return res.status(404).json({status:'NOT_FOUND',reason:'Route not found'});const stopsResult=await pool.query('SELECT s.stop_id,s.name,s.latitude,s.longitude,rs.stop_sequence FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=$1 ORDER BY rs.stop_sequence,s.name,s.stop_id',[routeId]);const routeStops=stopsResult.rows;await ensureFreshRealtimeCache();const cacheAge=realtimeCache.fetchedAt?Math.max(0,Date.now()-Date.parse(realtimeCache.fetchedAt)):Infinity;const candidates=cacheAge<=180000?realtimeCache.vehicles.filter(v=>{const operational=resolveOperationalRoute(v);return String(operational?.routeId||v.routeId||'')===routeId;}):[];const vehicles=candidates.filter(v=>v.routeId&&routeStops.some(s=>haversineMeters(v.latitude,v.longitude,Number(s.latitude),Number(s.longitude))<=3000));res.json({status:'OK',route:routeResult.rows[0],stops:routeStops,vehicles});}catch(error){console.error('Failed to load route:',error.message);res.status(500).json({status:'ERROR',reason:'Failed to load route'});}});
 app.get('/api/search',searchRateLimit,async(req,res)=>{
   if(!pool)return res.status(503).json({status:'UNAVAILABLE',results:[],reason:'Database is not configured'});
   const raw=String(req.query.q||'').trim();
