@@ -37,6 +37,6 @@ npm run web
 
 Then open `http://localhost:8080`.
 
-The browser client uses the same Wasmer-hosted backend as the mobile app and does not contain private DTC or Neon credentials. It can be hosted as a static website; see `web/README.md`.
+The browser client uses the same Render-hosted backend as the mobile app and does not contain private DTC or Neon credentials. It can be hosted as a static website; see `web/README.md`.
 
 Expo SDK 57 supports Android, iOS and web targets, while the dedicated `web/` client is used here so desktop browsers do not depend on native-only WebView components.
