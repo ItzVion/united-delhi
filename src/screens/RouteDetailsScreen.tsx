@@ -62,7 +62,7 @@ export default function RouteDetailsScreen(){
 
   return <SafeAreaView style={styles.safe}>
     <View style={styles.topBar}>
-      <Pressable onPress={()=>navigation.goBack()} style={styles.backButton}><Text style={styles.back}>‹</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={()=>navigation.goBack()} style={styles.backButton}><Text style={styles.back}>‹</Text></Pressable>
       <View style={styles.topCopy}><Text style={styles.eyebrow}>BUS ROUTE</Text><Text style={styles.title}>{routeName}</Text></View>
       <StatusPill label={loading?'Loading':error?(stale?'Stale data':'Unavailable'):vehicles.length?(`${vehicles.length} live`):'No live buses'} tone={loading?'muted':error?(stale?'warning':'danger'):vehicles.length?'ok':'muted'}/>
     </View>
