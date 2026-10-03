@@ -22,7 +22,7 @@ Static GTFS data and realtime access require the relevant OTD access steps. The 
 - Security Policy: `SECURITY.md`
 - Legal & Compliance Checklist: `LEGAL_COMPLIANCE.md`
 
-The app uses a first-launch Terms of Service and Privacy Policy acknowledgement screen; age-specific requirements should be reviewed before any public or commercial launch.
+The app uses a Terms of Service and Privacy Policy acknowledgement screen before entering the main experience; age-specific requirements should be reviewed before any public or commercial launch.
 
 
 ## Platforms
