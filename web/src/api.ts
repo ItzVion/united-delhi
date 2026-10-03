@@ -1,4 +1,8 @@
-export const API='https://united-delhi.wasmer.app';
+const configuredApi=String(import.meta.env.VITE_API_BASE_URL||'https://united-delhi.wasmer.app').trim().replace(/\/+$/,'');
+if(!/^https:\/\//i.test(configuredApi) && !/^http:\/\/localhost(?::\d+)?$/i.test(configuredApi) && !/^http:\/\/127\.0\.0\.1(?::\d+)?$/i.test(configuredApi)){
+  throw new Error('VITE_API_BASE_URL must use HTTPS outside localhost development.');
+}
+export const API=configuredApi;
 
 async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   const controller=new AbortController();
@@ -42,5 +46,10 @@ export const api={
     request<any>(`/api/stops/${encodeURIComponent(id)}/arrivals`)
   ]),
   nearby:(lat:number,lon:number)=>request<any>('/api/stops/nearby',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat,lon,limit:30})}),
-  plan:(from:string,to:string)=>request<any>(`/api/plan?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+  plan:(from:string,to:string,fromStopId?:string|null,toStopId?:string|null)=>{
+    const params=new URLSearchParams({from,to});
+    if(fromStopId)params.set('fromStopId',fromStopId);
+    if(toStopId)params.set('toStopId',toStopId);
+    return request<any>(`/api/plan?${params.toString()}`);
+  }
 };
