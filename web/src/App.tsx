@@ -3,6 +3,11 @@ import L from 'leaflet';
 import {api} from './api';
 import type {Vehicle} from './api';
 
+declare module 'leaflet' {
+  interface Marker { _udBg?: string; _udKind?: 'label' | 'dot'; }
+  interface CircleMarker { _udBg?: string; _udKind?: 'label' | 'dot'; }
+}
+
 type Page={kind:'home'|'plan'|'legal'|'privacy'|'terms'|'route'|'stop';id?:string};
 type Point={lat:number;lon:number};
 
