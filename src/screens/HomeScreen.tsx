@@ -43,6 +43,7 @@ export default function HomeScreen(){
   const [searchLoading,setSearchLoading]=useState(false);
   const [searchError,setSearchError]=useState<string|null>(null);
   const [legendOpen,setLegendOpen]=useState(false);
+  const lastVehiclesRef=useRef<Vehicle[]>([]);
 
   const requestLocation=useCallback(async()=>{
     try{
@@ -76,11 +77,12 @@ export default function HomeScreen(){
   const loadVehicles=useCallback(async()=>{
     try{
       const result=await api.vehicles();
-      if(Array.isArray(result.vehicles))setVehicles(result.vehicles);
+      if(Array.isArray(result.vehicles)&&result.vehicles.length){lastVehiclesRef.current=result.vehicles;setVehicles(result.vehicles);}else if(lastVehiclesRef.current.length){setVehicles(lastVehiclesRef.current);}
       setLastRealtimeAt(result.fetchedAt||null);
       setFresh(result.status==='OK'?'ok':result.status==='STALE'?'stale':'unavailable');
     }catch{
-      setFresh('unavailable');
+      if(lastVehiclesRef.current.length)setVehicles(lastVehiclesRef.current);
+      setFresh(lastVehiclesRef.current.length?'stale':'unavailable');
     }
   },[]);
 
