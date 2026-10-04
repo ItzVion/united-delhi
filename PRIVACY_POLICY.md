@@ -1,7 +1,7 @@
 # United Delhi Privacy Policy
 
-**Effective date:** 27 September 2026  
-**Last updated:** 27 September 2026
+**Effective date:** 4 October 2026  
+**Last updated:** 4 October 2026
 
 United Delhi ("United Delhi", "we", "us", or "our") is a Delhi public-transit information application and website. This Privacy Policy explains what information the current implementation processes, why it is processed, and how you can make a privacy request.
 
@@ -34,8 +34,8 @@ United Delhi does not currently use advertising SDKs, analytics SDKs, crash-repo
 United Delhi currently uses or may rely on:
 - **Delhi Open Transit Data (OTD):** transit route, stop and realtime vehicle data.
 - **OpenStreetMap:** map data and standard map tiles.
-- **Wasmer Edge:** hosting for the current United Delhi API.
-- **Vercel:** hosting for a protected realtime-feed relay.
+- **Render:** hosting for the United Delhi API.
+- **Vercel:** hosting for the web client. The backend contacts Delhi OTD directly; there is no separate realtime relay.
 - **Neon:** PostgreSQL database hosting for transit data and realtime vehicle-position records.
 - **GitHub:** source-code hosting and project infrastructure.
 
