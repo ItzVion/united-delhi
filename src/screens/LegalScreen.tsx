@@ -27,6 +27,8 @@ export default function LegalScreen() {
         <Text style={styles.body}>Hosting, network, security and error-handling infrastructure may process ordinary technical information such as IP addresses, timestamps, request metadata and diagnostic information. Realtime vehicle data is transit data, not a record of a user's personal location.</Text>
         <Text style={styles.heading}>Third-party services</Text>
         <Text style={styles.body}>The service uses Delhi Open Transit Data, OpenStreetMap/Leaflet, Render, Vercel and Neon. Those services may process information under their own terms and privacy policies. United Delhi does not control third-party services.</Text>
+        <Text style={styles.heading}>Design and feature inspiration</Text>
+        <Text style={styles.body}>United Delhi uses familiar transit interaction patterns and functions also found in apps such as Chartr and One Delhi, including live bus maps, route and stop information, route visualisation and journey planning. United Delhi is an independent project and is not affiliated with, endorsed by, or operated by Chartr or One Delhi. Its branding, implementation and backend are independently maintained.</Text>
         <Text style={styles.heading}>Retention and deletion</Text>
         <Text style={styles.body}>We aim to retain personal data only for as long as reasonably necessary for the stated purpose, security, legal obligations and service operation. Where applicable, you may request access, correction, deletion or other rights through the published vion4712@gmail.com.</Text>
         <Text style={styles.heading}>Children and applicable law</Text>
