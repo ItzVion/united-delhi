@@ -1,6 +1,6 @@
 # United Delhi — Legal & Compliance Checklist
 
-**Review date:** 25 September 2026
+**Review date:** 4 October 2026
 
 This file is an internal engineering/compliance checklist. It is not legal advice.
 
@@ -37,8 +37,7 @@ Before release:
 - publish the Privacy Policy at a stable public HTTPS URL;
 - put the same policy URL in the app store listing;
 - make the policy accessible inside the app;
-- replace [LEGAL CONTACT EMAIL] everywhere;
-- provide a monitored privacy/grievance contact;
+- provide a monitored privacy/grievance contact before public release;
 - keep a process for access, correction, erasure, consent withdrawal, and complaints;
 - document retention periods for every personal-data category;
 - maintain an incident-response procedure;
@@ -48,7 +47,7 @@ Before release:
 
 ## Children's data
 
-The current client does not perform age verification. Before public release, the operator must choose and document the intended age audience and align the app, policy, and store disclosures with that decision.
+The current client does not perform age verification or verifiable parental-consent verification. Before public release, the operator must choose and document the intended age audience and align the app, policy, consent flow, and store disclosures with that decision. A simple self-attestation checkbox is not a substitute for legally required verifiable parental consent.
 
 If the service is later opened to users under 18, do not rely on a simple checkbox saying "my parent agrees". Implement a legally appropriate parental-consent mechanism and review the DPDP Act/Rules and app-store child-safety requirements before collecting children's personal data.
 
