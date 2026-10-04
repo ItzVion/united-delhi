@@ -16,7 +16,7 @@ async function request<T>(path:string,init:RequestInit={},timeoutMs=10000):Promi
 }
 export type Vehicle={id:string;routeId:string|null;routeShortName:string|null;routeColor?:string|null;routeTextColor?:string|null;fromStop?:string|null;toStop?:string|null;serviceType?:'dtc'|'cluster'|'electric'|'unknown';serviceColor?:string|null;vehicleLabel?:string|null;licensePlate?:string|null;latitude:number;longitude:number;observedAt?:string};
 export const api={
-  vehicles:()=>request<{status:string;count:number;vehicles:Vehicle[];reason?:string;fetchedAt?:string;stale?:boolean}>('/api/realtime/vehicles'),
+  vehicles:()=>request<{status:string;count:number;vehicles:Vehicle[];reason?:string;fetchedAt?:string;stale?:boolean}>('/api/realtime/vehicles',{},20000),
   search:(q:string)=>request<{status:string;results:any[]}>(`/api/search?q=${encodeURIComponent(q)}`),
   route:(id:string)=>request<any>(`/api/routes/${encodeURIComponent(id)}`),
   stop:async(id:string)=>{const stopResult=await request<any>(`/api/stops/${encodeURIComponent(id)}`);let arrivals:any={status:'UNAVAILABLE',arrivals:[],reason:'Live arrival data is unavailable.'};try{arrivals=await request<any>(`/api/stops/${encodeURIComponent(id)}/arrivals`);}catch(error){arrivals={status:'UNAVAILABLE',arrivals:[],reason:error instanceof Error?error.message:'Live arrival data is unavailable.'};}return [stopResult,arrivals] as const;},
