@@ -7,6 +7,7 @@ import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import { importGtfs, GTFS_SOURCE_KEY, GTFS_SOURCE_URL } from './lib/gtfsBootstrap.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { parse as parseCsv } from 'csv-parse/sync';
 
@@ -187,10 +188,26 @@ async function getRealtimeVehicles(){
     }
     const length=Number(upstream.headers.get('content-length')||0);
     if(Number.isFinite(length)&&length>MAX)throw new Error('OTD realtime feed is unexpectedly large');
-    const buffer=new Uint8Array(await upstream.arrayBuffer());
+    let buffer=new Uint8Array(await upstream.arrayBuffer());
     if(buffer.byteLength>MAX)throw new Error('OTD realtime feed exceeded the 10 MB safety limit');
+    // Some HTTP stacks may deliver the protobuf compressed without a usable
+    // content-encoding header. GTFS-RT itself is still the expected payload.
+    if(buffer.byteLength>=2&&buffer[0]===0x1f&&buffer[1]===0x8b){
+      try{
+        buffer=new Uint8Array(gunzipSync(buffer));
+      }catch{
+        throw new Error('OTD realtime feed returned invalid gzip data');
+      }
+    }
+    if(buffer.byteLength>MAX)throw new Error('OTD realtime feed exceeded the 10 MB safety limit after decompression');
     const contentType=String(upstream.headers.get('content-type')||'').toLowerCase();
     const isJson=contentType.includes('application/json') || contentType.includes('text/json');
+    const firstText=buffer.byteLength<=4096?new TextDecoder().decode(buffer).trimStart():'';
+    if(firstText.startsWith('<!doctype')||firstText.startsWith('<html')||firstText.startsWith('{')||firstText.startsWith('[')){
+      let detail='OTD realtime feed returned a non-protobuf response';
+      try{const parsed=JSON.parse(firstText);detail=String(parsed?.reason||parsed?.message||parsed?.error||detail);}catch{}
+      throw new Error(detail);
+    }
     if(isJson){
       let body='';
       try{body=new TextDecoder().decode(buffer);}catch{}
@@ -199,7 +216,9 @@ async function getRealtimeVehicles(){
       throw new Error(detail);
     }
     const feed=GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(buffer);
-    if(!feed?.header)throw new Error('OTD realtime feed is missing its GTFS-realtime header');
+    if(!feed?.header){
+      throw new Error('OTD realtime feed is not a valid GTFS-realtime FeedMessage');
+    }
     if(!Array.isArray(feed.entity)||feed.entity.length>20000)throw new Error('OTD realtime feed contains too many entities');
     const vehicleMap=new Map();
     for(const entity of feed.entity){
