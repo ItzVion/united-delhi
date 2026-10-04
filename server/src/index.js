@@ -356,7 +356,7 @@ app.get('/api/stops/:id/arrivals',dataRateLimit,async(req,res)=>{
     await ensureFreshRealtimeCache();const stopLat=Number(stop.rows[0].latitude),stopLon=Number(stop.rows[0].longitude),now=Date.now();
     const routeIds=new Set(routeMap.keys());
     const cacheAge=realtimeCache.fetchedAt?Math.max(0,now-Date.parse(realtimeCache.fetchedAt)):Infinity;
-    const liveVehicles=cacheAge<=180000?realtimeCache.vehicles:[];
+    const liveVehicles=cacheAge<=15*60*1000?realtimeCache.vehicles:[];
     const output=liveVehicles
       .filter(v=>{
         const operational=resolveOperationalRoute(v);
@@ -432,7 +432,7 @@ WITH route_meta AS (
 )
 SELECT route_id,short_name,long_name,route_color,route_text_color,public_route_name AS "publicRouteName",from_stop AS "fromStop",to_stop AS "toStop"
 FROM route_meta
-`,[routeId]);if(!routeResult.rows.length)return res.status(404).json({status:'NOT_FOUND',reason:'Route not found'});const stopsResult=await pool.query('SELECT s.stop_id,s.name,s.latitude,s.longitude,rs.stop_sequence FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=$1 ORDER BY rs.stop_sequence,s.name,s.stop_id',[routeId]);const routeStops=stopsResult.rows;await ensureFreshRealtimeCache();const cacheAge=realtimeCache.fetchedAt?Math.max(0,Date.now()-Date.parse(realtimeCache.fetchedAt)):Infinity;const candidates=cacheAge<=180000?realtimeCache.vehicles.filter(v=>{const operational=resolveOperationalRoute(v);return String(operational?.routeId||v.routeId||'')===routeId;}):[];const vehicles=candidates.filter(v=>v.routeId&&routeStops.some(s=>haversineMeters(v.latitude,v.longitude,Number(s.latitude),Number(s.longitude))<=3000));res.json({status:'OK',route:routeResult.rows[0],stops:routeStops,vehicles});}catch(error){console.error('Failed to load route:',error.message);res.status(500).json({status:'ERROR',reason:'Failed to load route'});}});
+`,[routeId]);if(!routeResult.rows.length)return res.status(404).json({status:'NOT_FOUND',reason:'Route not found'});const stopsResult=await pool.query('SELECT s.stop_id,s.name,s.latitude,s.longitude,rs.stop_sequence FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=$1 ORDER BY rs.stop_sequence,s.name,s.stop_id',[routeId]);const routeStops=stopsResult.rows;await ensureFreshRealtimeCache();const cacheAge=realtimeCache.fetchedAt?Math.max(0,Date.now()-Date.parse(realtimeCache.fetchedAt)):Infinity;const candidates=cacheAge<=15*60*1000?realtimeCache.vehicles.filter(v=>{const operational=resolveOperationalRoute(v);return String(operational?.routeId||v.routeId||'')===routeId;}):[];const vehicles=candidates.filter(v=>v.routeId&&routeStops.some(s=>haversineMeters(v.latitude,v.longitude,Number(s.latitude),Number(s.longitude))<=3000));res.json({status:'OK',route:routeResult.rows[0],stops:routeStops,vehicles});}catch(error){console.error('Failed to load route:',error.message);res.status(500).json({status:'ERROR',reason:'Failed to load route'});}});
 app.get('/api/search',searchRateLimit,async(req,res)=>{
   if(!pool)return res.status(503).json({status:'UNAVAILABLE',results:[],reason:'Database is not configured'});
   const raw=String(req.query.q||'').trim();
