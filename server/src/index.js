@@ -33,10 +33,6 @@ app.set('etag', false);
 const appOrigins = String(process.env.APP_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean);
 const defaultAllowedOrigins = new Set([
   'https://united-delhi.vercel.app',
-  'https://uniteddelhi.vercel.app',
-  'https://d-delhi.vercel.app',
-  'https://united-delhi-deathmango.vercel.app',
-  'https://united-delhi-git-main-deathmango.vercel.app',
   'http://localhost',
   'http://localhost:3000',
   'http://localhost:5173',
