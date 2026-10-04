@@ -37,7 +37,7 @@ Before release:
 - publish the Privacy Policy at a stable public HTTPS URL;
 - put the same policy URL in the app store listing;
 - make the policy accessible inside the app;
-- provide a monitored privacy/grievance contact before public release;
+- provide a monitored privacy/grievance contact before public release (vion4712@gmail.com);
 - keep a process for access, correction, erasure, consent withdrawal, and complaints;
 - document retention periods for every personal-data category;
 - maintain an incident-response procedure;
@@ -75,7 +75,7 @@ Required before public release:
 - TERMS_OF_SERVICE.md
 - THIRD_PARTY_NOTICES.md
 - SECURITY.md
-- a working privacy/legal contact
+- a working privacy/legal contact (vion4712@gmail.com)
 - an in-app legal entry point
 - a stable public HTTPS policy URL
 
