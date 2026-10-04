@@ -11,11 +11,9 @@ For a suspected security vulnerability in United Delhi, use a private GitHub sec
 The following values must remain server-side and must never be committed:
 
 - `DTC_API_KEY`
-- `DATABASE_URL` (fallback database connection string)
-- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` (Wasmer managed PostgreSQL)
-- `DTC_REALTIME_RELAY_SECRET`
+- `DATABASE_URL`
 
-The mobile app only receives the public API base URL.
+The mobile app and website receive only the public API base URL. There is no realtime relay secret in the current architecture.
 
 ## Scope
 
