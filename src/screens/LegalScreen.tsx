@@ -1,50 +1,56 @@
 import React from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
+import { useNavigation } from '@react-navigation/native';
 
-const BASE='https://united-delhi.vercel.app/';
-const APP_VERSION='1.0.6';
-const links=[
-  ['Privacy Policy','legal/privacy'],
-  ['Terms of Service','legal/terms']
-] as const;
+const EFFECTIVE_DATE='4 October 2026';
 
 export default function LegalScreen() {
+  const navigation=useNavigation();
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
+        <Pressable onPress={()=>navigation.goBack()}><Text style={styles.back}>‹  Back</Text></Pressable>
         <Text style={styles.eyebrow}>UNITED DELHI</Text>
         <Text style={styles.title}>Legal & privacy</Text>
-        <Text style={styles.intro}>
-          United Delhi is an independent transit-information app. These documents
-          explain how the service handles data, privacy, and use of the app.
-        </Text>
-        <View style={styles.card}>
-          {links.map(([label,file]) => (
-            <Pressable key={file} style={styles.linkRow} onPress={() => Linking.openURL(BASE+file)}>
-              <Text style={styles.link}>{label}</Text>
-              <Text style={styles.arrow}>›</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Text style={styles.section}>Location</Text>
-        <Text style={styles.body}>
-          Location is optional and used only for transit features. Nearby uses a
-          reduced-precision location request to find stops and centre the map.
-        </Text>
-        <Text style={styles.section}>Transit information</Text>
-        <Text style={styles.body}>
-          Route, stop, and realtime information can be delayed or inaccurate.
-          United Delhi is not a transport authority and does not guarantee arrival
-          times or vehicle availability.
-        </Text>
-        <Text style={styles.section}>App version</Text>
-        <Text style={styles.body}>United Delhi {APP_VERSION}. Android and iOS release builds can be generated locally; no EAS build is required.</Text>
-        <Text style={styles.section}>Contact</Text>
-        <Text style={styles.body}>
-          Privacy and legal inquiries can be submitted using the developer contact email shown on the United Delhi Google Play listing.
-        </Text>
+        <Text style={styles.updated}>Effective {EFFECTIVE_DATE}</Text>
+
+        <Text style={styles.section}>Privacy Policy</Text>
+        <Text style={styles.heading}>Information we collect</Text>
+        <Text style={styles.body}>United Delhi is designed to work without an account. We do not intentionally request a name, phone number, email address, contacts, photos, microphone, camera, advertising identifier, or payment information.</Text>
+        <Text style={styles.heading}>Location</Text>
+        <Text style={styles.body}>Location is optional. When you grant permission, foreground device location may be used to find nearby DTC stops and centre the map. The app does not intentionally upload a personal location history to the transit database. Location is processed only as needed for the feature you requested.</Text>
+        <Text style={styles.heading}>Search and journey planning</Text>
+        <Text style={styles.body}>Search terms and journey-planning inputs are sent to the United Delhi API so it can return transit information. They are not intentionally used to create a user profile.</Text>
+        <Text style={styles.heading}>Technical information</Text>
+        <Text style={styles.body}>Hosting, network, security and error-handling infrastructure may process ordinary technical information such as IP addresses, timestamps, request metadata and diagnostic information. Realtime vehicle data is transit data, not a record of a user's personal location.</Text>
+        <Text style={styles.heading}>Third-party services</Text>
+        <Text style={styles.body}>The service uses Delhi Open Transit Data, OpenStreetMap/Leaflet, Render, Vercel and Neon. Those services may process information under their own terms and privacy policies. United Delhi does not control third-party services.</Text>
+        <Text style={styles.heading}>Retention and deletion</Text>
+        <Text style={styles.body}>We aim to retain personal data only for as long as reasonably necessary for the stated purpose, security, legal obligations and service operation. Where applicable, you may request access, correction, deletion or other rights through the published developer contact mechanism.</Text>
+        <Text style={styles.heading}>Children and applicable law</Text>
+        <Text style={styles.body}>United Delhi does not use targeted advertising, behavioural profiling or tracking of children. Where applicable law requires parental or guardian consent, additional safeguards, or other obligations for children, those requirements take priority.</Text>
+        <Text style={styles.heading}>Security</Text>
+        <Text style={styles.body}>We use reasonable technical and organisational safeguards, including HTTPS, input validation, rate limiting, server-side secrets and database controls. No internet service can guarantee absolute security.</Text>
+
+        <Text style={styles.section}>Terms of Service</Text>
+        <Text style={styles.heading}>Service</Text>
+        <Text style={styles.body}>United Delhi is an independent transit-information service providing route, stop, map, journey-planning and realtime vehicle information. It is not a transport operator, government agency, emergency service, or official DTC/Delhi Government application.</Text>
+        <Text style={styles.heading}>Accuracy and availability</Text>
+        <Text style={styles.body}>Transit information may be delayed, incomplete, changed, duplicated, incorrectly mapped, unavailable or inaccurate. Realtime positions, arrivals and journey-planning results are estimates. Do not rely on United Delhi as a guarantee of a vehicle's location, arrival, departure, route or safety.</Text>
+        <Text style={styles.heading}>Acceptable use</Text>
+        <Text style={styles.body}>You must not attack or interfere with the service, bypass safeguards, obtain credentials or secrets, abuse upstream services, send malicious code, attempt unauthorised access, scrape the service in a way that harms availability, stalk or profile people, or falsely represent United Delhi as an official authority.</Text>
+        <Text style={styles.heading}>Third-party data and services</Text>
+        <Text style={styles.body}>Maps, transit feeds, hosting, databases and other third-party components may change or become unavailable and may have separate terms. United Delhi is not responsible for third-party outages or changes outside its reasonable control.</Text>
+        <Text style={styles.heading}>No warranty</Text>
+        <Text style={styles.body}>To the maximum extent permitted by applicable law, the service is provided on an as-is and as-available basis without guarantees that it will be uninterrupted, error-free, complete or suitable for a particular purpose.</Text>
+        <Text style={styles.heading}>Limitation of liability</Text>
+        <Text style={styles.body}>To the maximum extent permitted by applicable law, United Delhi and its developers will not be liable for indirect, incidental, special, consequential or reliance-related losses arising from use of or inability to use the service. Nothing in these terms excludes liability that cannot lawfully be excluded.</Text>
+        <Text style={styles.heading}>Changes</Text>
+        <Text style={styles.body}>We may update the service, these terms or the privacy policy when necessary. The effective date shown above will identify the current version.</Text>
+        <Text style={styles.heading}>Contact and legal review</Text>
+        <Text style={styles.body}>Privacy, security and legal requests should use the developer contact mechanism published with the official app listing. These documents are intended as a practical product policy and are not a substitute for advice from a qualified lawyer. Public or commercial launch should receive appropriate legal review for the actual developer/entity, contact details, applicable jurisdictions and operational data practices.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -52,15 +58,12 @@ export default function LegalScreen() {
 
 const styles=StyleSheet.create({
   safe:{flex:1,backgroundColor:colors.background},
-  content:{padding:20,paddingBottom:40},
+  content:{padding:20,paddingBottom:50},
+  back:{fontSize:15,fontWeight:'800',color:colors.accent,marginBottom:18},
   eyebrow:{fontSize:10,fontWeight:'900',letterSpacing:1,color:colors.accent},
   title:{fontSize:28,fontWeight:'900',color:colors.text,marginTop:3},
-  intro:{fontSize:14,lineHeight:21,color:colors.textMuted,marginTop:10},
-  card:{marginTop:18,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:0,overflow:'hidden'},
-  linkRow:{padding:15,borderBottomWidth:1,borderBottomColor:colors.border,flexDirection:'row',justifyContent:'space-between'},
-  link:{fontSize:14,fontWeight:'900',color:colors.accent},
-  arrow:{fontSize:24,color:colors.textMuted},
-  section:{fontSize:17,fontWeight:'900',color:colors.text,marginTop:20},
-  body:{fontSize:13,lineHeight:20,color:colors.textMuted,marginTop:5},
-  warning:{fontSize:11,lineHeight:16,color:colors.warning,marginTop:8}
+  updated:{fontSize:11,color:colors.textMuted,marginTop:4},
+  section:{fontSize:21,fontWeight:'900',color:colors.text,marginTop:26},
+  heading:{fontSize:16,fontWeight:'900',color:colors.text,marginTop:17},
+  body:{fontSize:13,lineHeight:20,color:colors.textMuted,marginTop:5}
 });
