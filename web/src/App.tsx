@@ -125,7 +125,7 @@ export default function App(){
     if(page.kind==='terms')return <Terms go={go}/>;
     if(page.kind==='legal')return <Legal go={go}/>;
     return <div className="gate"><div className="flat-card consent-card">
-      <img className="gate-mark" src="/united-delhi-logo.png" alt="United Delhi logo"/>
+      <img className="gate-mark" src="/united-delhi-logo.svg" alt="United Delhi logo"/>
       <span className="eyebrow">WELCOME TO UNITED DELHI</span>
       <h1>Delhi transit,<br/>made simple.</h1>
       <p>By continuing to United Delhi, you agree to our <button className="text-button inline" onClick={()=>go('/legal/terms')}>Terms of Service</button> and acknowledge our <button className="text-button inline" onClick={()=>go('/legal/privacy')}>Privacy Policy</button>.</p>
@@ -138,7 +138,7 @@ export default function App(){
   return <div className="app-shell">
     <header className="mobile-header">
       <button className="brand brand-button" onClick={()=>go('/')}>
-        <img className="brand-mark" src="/united-delhi-logo.png" alt="United Delhi logo"/>
+        <img className="brand-mark" src="/united-delhi-logo.svg" alt="United Delhi logo"/>
         <span className="brand-copy"><b>UNITED DELHI</b><small>Delhi transit, made simple</small></span>
       </button>
       <span className={'status '+(liveStatus==='ok'?'ok':'muted')}><i/>{liveStatus==='loading'?'Checking live buses':vehicles.length?(liveStatus==='stale'?vehicles.length+' buses · updating':vehicles.length+' live buses'):'Live data unavailable'}</span>
