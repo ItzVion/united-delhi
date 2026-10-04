@@ -296,7 +296,12 @@ let realtimeRefreshInFlight=null;
 let lastVehiclePersistAt=0;
 let vehicleSaveInFlight=false;
 let realtimePollingTimer=null;
-async function persistVehiclesIfIdle(vehicles){if(!pool||vehicleSaveInFlight)return;if(Date.now()-lastVehiclePersistAt<60_000)return;vehicleSaveInFlight=true;lastVehiclePersistAt=Date.now();try{await saveVehicles(vehicles);}catch(error){console.error('Failed to save realtime vehicles:',error.message);}finally{vehicleSaveInFlight=false;}}
+async function persistVehiclesIfIdle(_vehicles){
+  // Realtime positions are an in-memory cache. Do not make the public API
+  // depend on a large Neon write on every refresh; this was causing repeated
+  // statement timeouts on the small Render instance.
+  return;
+}
 async function refreshRealtimeCache(){if(realtimeRefreshInFlight)return realtimeRefreshInFlight;realtimeRefreshInFlight=(async()=>{try{const vehicles=await getRealtimeVehicles();realtimeCache.vehicles=vehicles;realtimeCache.status='OK';realtimeCache.reason=null;realtimeCache.fetchedAt=new Date().toISOString();if(pool)void persistVehiclesIfIdle(vehicles);}catch(error){if(!realtimeCache.fetchedAt)realtimeCache.status='UNAVAILABLE';realtimeCache.reason=error instanceof Error?error.message:'Realtime request failed';console.error('Realtime poll failed:',realtimeCache.reason);}})().finally(()=>{realtimeRefreshInFlight=null;});return realtimeRefreshInFlight;}
 async function ensureFreshRealtimeCache(maxAgeMs=30000){
   const age=realtimeCache.fetchedAt?Math.max(0,Date.now()-Date.parse(realtimeCache.fetchedAt)):Infinity;
