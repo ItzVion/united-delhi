@@ -13,6 +13,8 @@ type Point={lat:number;lon:number};
 
 const CENTER:[number,number]=[28.6139,77.209];
 const BOUNDS:any=[[28.40,76.84],[28.88,77.35]];
+const storageGet=(key:string)=>{try{return window.localStorage.getItem(key);}catch{return null;}};
+const storageSet=(key:string,value:string)=>{try{window.localStorage.setItem(key,value);return true;}catch{return false;}};
 
 const routeName=(value:any)=>{const text=String(value||'').trim();if(!text)return null;return text.replace(/(?:UP|DOWN|DWN)$/i,'').replace(/^AIR-0+/i,'AIR-')||null;};
 const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||'LIVE';
@@ -42,7 +44,7 @@ function parsePath(path:string=window.location.pathname):Page{
 
 export default function App(){
   const[page,setPage]=useState<Page>(parsePath());
-  const[accepted,setAccepted]=useState(localStorage.getItem('ud-consent-v1')==='1');
+  const[accepted,setAccepted]=useState(()=>storageGet('ud-consent-v1')==='1');
   const[checked,setChecked]=useState(false);
   const[vehicles,setVehicles]=useState<Vehicle[]>([]);
   const lastVehiclesRef=useRef<Vehicle[]>([]);
@@ -71,12 +73,12 @@ export default function App(){
     navigator.geolocation.getCurrentPosition(p=>{
       const next={lat:p.coords.latitude,lon:p.coords.longitude};
       setLocation(next);setLocationRequesting(false);
-      try{localStorage.setItem('ud-last-location',JSON.stringify(next));}catch{}
+      try{storageSet('ud-last-location',JSON.stringify(next));}catch{}
       setLocationStatus('');
     },()=>{
       setLocationRequesting(false);
       try{
-        const cached=JSON.parse(localStorage.getItem('ud-last-location')||'null');
+        const cached=JSON.parse(storageGet('ud-last-location')||'null');
         if(Number.isFinite(cached?.lat)&&Number.isFinite(cached?.lon)){setLocation({lat:cached.lat,lon:cached.lon});setLocationStatus('Using your last known location.');return;}
       }catch{}
       setLocationStatus('Location not available. Showing whole Delhi.');
@@ -156,7 +158,7 @@ export default function App(){
       <h1>Delhi transit,<br/>made simple.</h1>
       <p>By continuing to United Delhi, you agree to our <button className="text-button inline" onClick={()=>go('/legal/terms')}>Terms of Service</button> and acknowledge our <button className="text-button inline" onClick={()=>go('/legal/privacy')}>Privacy Policy</button>.</p>
       <label className="check-row"><input type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)}/><span>I agree to the Terms of Service and acknowledge the Privacy Policy.</span></label>
-      <button className="primary-button" disabled={!checked} onClick={()=>{localStorage.setItem('ud-consent-v1','1');setAccepted(true);}}>Continue to United Delhi</button>
+      <button className="primary-button" disabled={!checked} onClick={()=>{storageSet('ud-consent-v1','1');setAccepted(true);}}>Continue to United Delhi</button>
       <small>No account or phone number is required. Location is optional and is requested after consent to support nearby stops and map centering.</small>
     </div></div>;
   }
@@ -288,7 +290,7 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
     let initial:[number,number]=[CENTER[0],CENTER[1]];
     let initialZoom=10.5;
     try{
-      const saved=localStorage.getItem('ud-map-center');
+      const saved=storageGet('ud-map-center');
       if(saved){
         const p=JSON.parse(saved);
         if(Number.isFinite(p.lat)&&Number.isFinite(p.lon)){initial=[p.lat,p.lon];initialZoom=14;}
@@ -353,7 +355,7 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
       }
     };
 
-    const report=()=>{try{const c=map.getCenter();localStorage.setItem('ud-map-center',JSON.stringify({lat:c.lat,lon:c.lng}));}catch{}renderVisible();};
+    const report=()=>{try{const c=map.getCenter();storageSet('ud-map-center',JSON.stringify({lat:c.lat,lon:c.lng}));}catch{}renderVisible();};
     map.on('moveend',report);
     map.on('zoomend',report);
     window.setTimeout(()=>{map.invalidateSize();renderVisible();},100);
