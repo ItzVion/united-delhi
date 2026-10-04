@@ -1,6 +1,6 @@
 # United Delhi — Third-Party Notices
 
-**Last updated:** 25 September 2026
+**Last updated:** 4 October 2026
 
 United Delhi uses third-party software, data, maps, and infrastructure. Their licences and terms remain separate from the United Delhi Terms of Service.
 
@@ -38,7 +38,7 @@ The repository should retain the package-lock files and package metadata so depe
 
 ## Hosting and infrastructure
 
-The production backend uses Wasmer Edge for the United Delhi API, Vercel for the realtime relay, and Neon for PostgreSQL data storage. Their own terms, privacy policies, security practices, and data-processing arrangements apply to their services.
+The production backend uses Render for the United Delhi API, Vercel for the web client, and Neon for PostgreSQL data storage. The backend contacts Delhi OTD directly for realtime transit data; there is no separate realtime relay. Their own terms, privacy policies, security practices, and data-processing arrangements apply to their services.
 
 ## No government affiliation
 
