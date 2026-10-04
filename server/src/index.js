@@ -272,6 +272,7 @@ async function getRealtimeVehicles(){
 const realtimeCache={vehicles:[],status:'INIT',reason:null,fetchedAt:null};
 const staticDataCache={status:'INIT',reason:null,completedAt:null};
 let realtimeRefreshInFlight=null;
+let lastVehiclePersistAt=0;
 let vehicleSaveInFlight=false;
 let realtimePollingTimer=null;
 async function persistVehiclesIfIdle(vehicles){if(!pool||vehicleSaveInFlight)return;if(Date.now()-lastVehiclePersistAt<60_000)return;vehicleSaveInFlight=true;lastVehiclePersistAt=Date.now();try{await saveVehicles(vehicles);}catch(error){console.error('Failed to save realtime vehicles:',error.message);}finally{vehicleSaveInFlight=false;}}
