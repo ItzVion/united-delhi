@@ -102,7 +102,7 @@ export default function HomeScreen(){
       ? vehicles.filter(v=>Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)&&
           v.latitude>=bounds.south && v.latitude<=bounds.north &&
           v.longitude>=bounds.west && v.longitude<=bounds.east)
-      : [];
+      : vehicles.filter(v=>Number.isFinite(v.latitude)&&Number.isFinite(v.longitude));
     const payload={
       center,
       stops:nearbyStops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
