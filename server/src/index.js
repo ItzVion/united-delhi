@@ -14,19 +14,17 @@ const { Pool } = pg;
 const app = express();
 const port = Number(process.env.PORT || 10000);
 const databaseUrl = String(process.env.DATABASE_URL || '').trim();
-const managedDbHost = String(process.env.DB_HOST || '').trim();
-const managedDbPort = Number(process.env.DB_PORT || 0);
-const managedDbName = String(process.env.DB_NAME || '').trim();
-const managedDbUser = String(process.env.DB_USERNAME || '').trim();
-const managedDbPassword = String(process.env.DB_PASSWORD || '');
-const hasManagedDatabase = Boolean(managedDbHost && Number.isInteger(managedDbPort) && managedDbPort > 0 && managedDbName && managedDbUser && managedDbPassword);
-const databaseHost = hasManagedDatabase ? managedDbHost : databaseUrl;
-const isLocalDatabase = /(?:localhost|127(?:\.\d+){3}|::1)/i.test(databaseHost);
-const pool = hasManagedDatabase
-  ? new Pool({ host: managedDbHost, port: managedDbPort, database: managedDbName, user: managedDbUser, password: managedDbPassword, max: 5, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000, statement_timeout: 10000, ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: true } }) })
-  : databaseUrl
-    ? new Pool({ connectionString: databaseUrl, max: 10, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000, statement_timeout: 10000, ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: true } }) })
-    : null;
+const isLocalDatabase = /(?:localhost|127(?:\.\d+){3}|::1)/i.test(databaseUrl);
+const pool = databaseUrl
+  ? new Pool({
+      connectionString: databaseUrl,
+      max: 10,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 30000,
+      statement_timeout: 10000,
+      ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: true } }),
+    })
+  : null;
 if (pool) pool.on('error', error => console.error('PostgreSQL pool error:', error.message));
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
@@ -183,7 +181,7 @@ async function getRealtimeVehicles(){
           if(body?.reason)detail=String(body.reason);
         }catch{}
       }
-      throw new Error((relayUrl?'Realtime relay returned ':'OTD returned ')+detail);
+      throw new Error('OTD returned '+detail);
     }
     const length=Number(upstream.headers.get('content-length')||0);
     if(Number.isFinite(length)&&length>MAX)throw new Error('OTD realtime feed is unexpectedly large');
@@ -669,7 +667,7 @@ app.use((error,_req,res,_next)=>{
 });
 loadOperationalMappings();
 
-const server=app.listen(port,()=>{
+const server=app.listen(port,'0.0.0.0',()=>{
   console.log('United Delhi API listening on :'+port);
   startRealtimePolling();
   void ensureStaticData().catch(error=>{
