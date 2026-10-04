@@ -28,7 +28,7 @@ export default function LegalScreen() {
         <Text style={styles.heading}>Third-party services</Text>
         <Text style={styles.body}>The service uses Delhi Open Transit Data, OpenStreetMap/Leaflet, Render, Vercel and Neon. Those services may process information under their own terms and privacy policies. United Delhi does not control third-party services.</Text>
         <Text style={styles.heading}>Retention and deletion</Text>
-        <Text style={styles.body}>We aim to retain personal data only for as long as reasonably necessary for the stated purpose, security, legal obligations and service operation. Where applicable, you may request access, correction, deletion or other rights through the published developer contact mechanism.</Text>
+        <Text style={styles.body}>We aim to retain personal data only for as long as reasonably necessary for the stated purpose, security, legal obligations and service operation. Where applicable, you may request access, correction, deletion or other rights through the published vion4712@gmail.com.</Text>
         <Text style={styles.heading}>Children and applicable law</Text>
         <Text style={styles.body}>United Delhi does not use targeted advertising, behavioural profiling or tracking of children. Where applicable law requires parental or guardian consent, additional safeguards, or other obligations for children, those requirements take priority.</Text>
         <Text style={styles.heading}>Security</Text>
@@ -50,7 +50,7 @@ export default function LegalScreen() {
         <Text style={styles.heading}>Changes</Text>
         <Text style={styles.body}>We may update the service, these terms or the privacy policy when necessary. The effective date shown above will identify the current version.</Text>
         <Text style={styles.heading}>Contact and legal review</Text>
-        <Text style={styles.body}>Privacy, security and legal requests should use the developer contact mechanism published with the official app listing. These documents are intended as a practical product policy and are not a substitute for advice from a qualified lawyer. Public or commercial launch should receive appropriate legal review for the actual developer/entity, contact details, applicable jurisdictions and operational data practices.</Text>
+        <Text style={styles.body}>Privacy, security and legal requests should use vion4712@gmail.com. These documents are intended as a practical product policy and are not a substitute for advice from a qualified lawyer. Public or commercial launch should receive appropriate legal review for the actual developer/entity, contact details, applicable jurisdictions and operational data practices.</Text>
       </ScrollView>
     </SafeAreaView>
   );
