@@ -42,7 +42,7 @@ Reviewed:
 
 ### Database
 
-Added server/sql/002_security_hardening.sql with rerunnable integrity hardening:
+Added server/sql/002_security_hardening.sql and server/sql/006_database_security.sql with rerunnable integrity and access-control hardening:
 
 - stop ID/name length checks
 - stop latitude/longitude bounds
@@ -54,7 +54,8 @@ Added server/sql/002_security_hardening.sql with rerunnable integrity hardening:
 - vehicle coordinate/bearing bounds
 - indexes for stop-name lookup, route-name lookup, route sequencing, and stop-to-route lookup
 - revoked public CREATE privilege on the public PostgreSQL schema to reduce object-shadowing risk
-- enabled PostgreSQL Row Level Security on all four transit tables; no permissive policies are created because the mobile app has no direct database connection, so non-owner roles default to deny
+- enabled PostgreSQL Row Level Security on all five application tables, including static_feed_meta; no permissive policies are created because the mobile app has no direct database connection, so non-owner roles default to deny
+- revoked PUBLIC table privileges for the application tables and revoked future default table/sequence/function privileges from PUBLIC
 
 The migration is applied before static-data checks and by the GTFS importer.
 
@@ -83,10 +84,10 @@ No foreign key was added from realtime vehicle_positions.route_id to routes.rout
 - GitHub Actions checkout and setup-node are pinned to immutable commit SHAs.
 - Dependency audits run in CI.
 - Added an npm override for uuid 11.1.1 to eliminate the transitive moderate-severity advisory without forcing an Expo SDK downgrade.
-- CI fails on any known npm audit issue.
+- CI enforces the repository's configured npm audit severity gate; the current gate is `critical` because the Expo toolchain has higher-severity advisories that cannot be removed safely without an incompatible toolchain upgrade.
 - Added a security reporting policy.
 - Workflow permissions are read-only for CI.
-- CI uses severity thresholds appropriate to the current Expo toolchain rather than pretending a non-zero advisory count can be made zero without potentially unsafe major upgrades.
+- Security review distinguishes known advisories from exploitable production exposure instead of claiming that a non-zero advisory count is automatically zero risk.
 
 ## Database export audit
 
