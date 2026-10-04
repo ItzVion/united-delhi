@@ -85,14 +85,39 @@ export default function App(){
 
   useEffect(()=>{if(accepted)locate();},[accepted,locate]);
 
+  const vehiclesRequestRef=useRef(false);
+  const loadVehicles=useCallback(async()=>{
+    if(vehiclesRequestRef.current)return;
+    vehiclesRequestRef.current=true;
+    try{
+      const r=await api.vehicles();
+      const next=Array.isArray(r.vehicles)?r.vehicles:[];
+      if(next.length){
+        vehicleCountRef.current=next.length;
+        lastVehiclesRef.current=next;
+        setVehicles(next);
+      }else if(lastVehiclesRef.current.length){
+        setVehicles(lastVehiclesRef.current);
+      }
+      setLiveStatus(r.status==='OK'?'ok':r.status==='STALE'?'stale':'unavailable');
+      setError(r.status==='UNAVAILABLE'&&next.length===0&&lastVehiclesRef.current.length===0
+        ?(r.reason||'Live data is currently unavailable.')
+        :'');
+    }catch(e){
+      if(lastVehiclesRef.current.length)setVehicles(lastVehiclesRef.current);
+      setLiveStatus(vehicleCountRef.current?'stale':'unavailable');
+      if(!lastVehiclesRef.current.length)setError((e as Error).message||'Live data is unavailable.');
+    }finally{
+      vehiclesRequestRef.current=false;
+    }
+  },[]);
+
   useEffect(()=>{
     if(!accepted)return;
-    let active=true;
-    const load=async()=>{try{const r=await api.vehicles();if(active){const next=Array.isArray(r.vehicles)?r.vehicles:[];if(next.length){vehicleCountRef.current=next.length;lastVehiclesRef.current=next;setVehicles(next);}else if(vehicleCountRef.current===0&&lastVehiclesRef.current.length){setVehicles(lastVehiclesRef.current);}setLiveStatus(r.status==='OK'?'ok':r.status==='STALE'?'stale':'unavailable');setError(r.status==='UNAVAILABLE'&&next.length===0&&vehicleCountRef.current===0?(r.reason||'Live data is currently unavailable.'):'');}}catch(e){if(active){if(vehicleCountRef.current===0&&lastVehiclesRef.current.length)setVehicles(lastVehiclesRef.current);setLiveStatus(vehicleCountRef.current?'stale':'unavailable');if(vehicleCountRef.current===0&&!lastVehiclesRef.current.length)setError((e as Error).message||'Live data is unavailable.');}}};
-    void load();
-    const id=window.setInterval(()=>void load(),15000);
-    return()=>{active=false;window.clearInterval(id);};
-  },[accepted]);
+    void loadVehicles();
+    const id=window.setInterval(()=>void loadVehicles(),15000);
+    return()=>window.clearInterval(id);
+  },[accepted,loadVehicles]);
 
   useEffect(()=>{
     const term=q.trim();
