@@ -1,18 +1,23 @@
 export const API=String(import.meta.env.VITE_API_BASE_URL || 'https://united-delhi.onrender.com').trim().replace(/\/+$/,'');
 async function request<T>(path:string,init:RequestInit={},timeoutMs=10000):Promise<T>{
-  const controller=new AbortController();
-  const timer=window.setTimeout(()=>controller.abort(),timeoutMs);
-  try{
-    const r=await fetch(API+path,{...init,signal:controller.signal,headers:{Accept:'application/json',...(init.headers??{})}});
-    const text=await r.text();
-    let d:any={};
-    try{d=text?JSON.parse(text):{};}catch{d={reason:text.slice(0,160)};}
-    if(!r.ok)throw new Error(d.reason||`Request failed with ${r.status}`);
-    return d as T;
-  }catch(error){
-    if((error as Error)?.name==='AbortError')throw new Error('Request timed out');
-    throw error instanceof Error?error:new Error('Network error');
-  }finally{window.clearTimeout(timer);}
+  let lastError:Error|null=null;
+  for(let attempt=0;attempt<3;attempt++){
+    const controller=new AbortController();
+    const timer=window.setTimeout(()=>controller.abort(),timeoutMs);
+    try{
+      const r=await fetch(API+path,{...init,signal:controller.signal,headers:{Accept:'application/json',...(init.headers??{})}});
+      const text=await r.text();
+      let d:any={};
+      try{d=text?JSON.parse(text):{};}catch{d={reason:text.slice(0,160)};}
+      if(!r.ok)throw new Error(d.reason||'Request failed with '+r.status);
+      return d as T;
+    }catch(error){
+      lastError=error instanceof Error?error:new Error('Network error');
+      if((error as Error)?.name==='AbortError')lastError=new Error('Request timed out');
+      if(attempt<2)await new Promise(resolve=>window.setTimeout(resolve,350*(attempt+1)));
+    }finally{window.clearTimeout(timer);}
+  }
+  throw lastError||new Error('Network error');
 }
 export type Vehicle={id:string;routeId:string|null;routeShortName:string|null;routeColor?:string|null;routeTextColor?:string|null;fromStop?:string|null;toStop?:string|null;serviceType?:'dtc'|'cluster'|'electric'|'unknown';serviceColor?:string|null;vehicleLabel?:string|null;licensePlate?:string|null;latitude:number;longitude:number;observedAt?:string};
 export const api={
