@@ -4,7 +4,7 @@
 
 Please do not publish credentials, API keys, database URLs, or a working exploit in a public issue.
 
-For a suspected security vulnerability in United Delhi, use a private GitHub security report if the repository enables GitHub Security Advisories. Otherwise, contact the repository owner privately through GitHub.
+For a suspected security vulnerability in United Delhi, use a private GitHub security report if the repository enables GitHub Security Advisories. Otherwise, email **vion4712@gmail.com** with the subject **Security Report — United Delhi**. Do not include secrets in the initial report.
 
 ## Secrets
 
