@@ -15,7 +15,7 @@ Required environment variables:
 - DTC_REALTIME_RELAY_URL=https://united-delhi-realtime-relay.vercel.app/api/vehicles
 - DTC_REALTIME_RELAY_SECRET (private; shared only between the backend and relay)
 - DTC_API_KEY (private fallback; only needed if the relay is not used)
-- DATABASE_URL (private Neon PostgreSQL connection string), or the Wasmer managed PostgreSQL fields:
+- DATABASE_URL (private Neon PostgreSQL connection string), or the Render managed PostgreSQL fields:
   - DB_HOST
   - DB_PORT
   - DB_NAME
