@@ -1,7 +1,7 @@
 # United Delhi Terms of Service
 
-**Effective date:** 27 September 2026  
-**Last updated:** 27 September 2026
+**Effective date:** 4 October 2026  
+**Last updated:** 4 October 2026
 
 These Terms of Service ("Terms") govern access to and use of the United Delhi application, website, and related API (together, the "Service").
 
