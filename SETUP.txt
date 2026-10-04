@@ -16,21 +16,18 @@ UNITED DELHI SETUP
    Never put either secret in frontend source or the mobile bundle.
 
 4. Current hosted backend
-   Provider: Wasmer
-   Service: https://united-delhi.wasmer.app
+   Provider: Render
+   Service: https://united-delhi.onrender.com
    Service root: ./server
    Build command: npm ci
    Start command: npm start
-   Health endpoint: https://united-delhi.wasmer.app/health
-   API base URL: https://united-delhi.wasmer.app
+   Health endpoint: https://united-delhi.onrender.com/health
+   API base URL: https://united-delhi.onrender.com
 
    Required environment variables:
    - DTC_API_KEY
    - DATABASE_URL
-   - DTC_REALTIME_RELAY_URL
-   - DTC_REALTIME_RELAY_SECRET
    - APP_ORIGINS
-
-6. Static GTFS data
+5. Static GTFS data
    The repository uses its pinned GTFS snapshot unless a newer compatible source is
    verified against the realtime route IDs.
