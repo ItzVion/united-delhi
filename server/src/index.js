@@ -14,10 +14,11 @@ const { Pool } = pg;
 const app = express();
 const port = Number(process.env.PORT || 10000);
 const databaseUrl = String(process.env.DATABASE_URL || '').trim();
-const isLocalDatabase = /(?:localhost|127(?:\.\d+){3}|::1)/i.test(databaseUrl);
-const pool = databaseUrl
+const normalizedDatabaseUrl = databaseUrl.replace(/([?&])sslmode=(?:prefer|require|verify-ca)(?=(&|$))/i, '$1sslmode=verify-full');
+const isLocalDatabase = /(?:localhost|127(?:\.\d+){3}|::1)/i.test(normalizedDatabaseUrl);
+const pool = normalizedDatabaseUrl
   ? new Pool({
-      connectionString: databaseUrl,
+      connectionString: normalizedDatabaseUrl,
       max: 10,
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
@@ -306,7 +307,7 @@ function startRealtimePolling(){
 }
 async function saveVehicles(vehicles){if(!pool)return;const client=await pool.connect();try{await client.query('BEGIN');await client.query("SET LOCAL statement_timeout='15000'");const chunkSize=200;for(let i=0;i<vehicles.length;i+=chunkSize){const chunk=vehicles.slice(i,i+chunkSize),values=[];const placeholders=chunk.map((v,index)=>{const base=index*7;values.push(v.id,v.routeId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);return '($'+(base+1)+',$'+(base+2)+',$'+(base+3)+',$'+(base+4)+',$'+(base+5)+',$'+(base+6)+',$'+(base+7)+',NOW())';}).join(',');await client.query('INSERT INTO vehicle_positions(vehicle_id,route_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+placeholders+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values);}await client.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '5 minutes'");await client.query('COMMIT');}catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}}
 app.get('/',(_req,res)=>res.status(200).json({service:'united-delhi-api',status:'ok'}));
-app.get('/health',healthRateLimit,async(_req,res)=>{res.setHeader('Cache-Control','no-store');let database='not_configured';if(pool){try{await pool.query('SELECT 1');database='ok';}catch{database='error';}}res.status(database==='ok'?200:503).json({ok:database==='ok',service:'united-delhi-api',database,staticData:staticDataCache.status,staticDataCompletedAt:staticDataCache.completedAt,staticDataSource:GTFS_SOURCE_KEY,staticDataUrl:GTFS_SOURCE_URL,realtime:realtimeCache.status,lastRealtimeFetch:realtimeCache.fetchedAt,time:new Date().toISOString()});});
+app.get('/health',async(_req,res)=>{res.setHeader('Cache-Control','no-store');let database='not_configured';if(pool){try{await pool.query('SELECT 1');database='ok';}catch{database='error';}}res.status(database==='ok'?200:503).json({ok:database==='ok',service:'united-delhi-api',database,staticData:staticDataCache.status,staticDataCompletedAt:staticDataCache.completedAt,staticDataSource:GTFS_SOURCE_KEY,staticDataUrl:GTFS_SOURCE_URL,realtime:realtimeCache.status,lastRealtimeFetch:realtimeCache.fetchedAt,time:new Date().toISOString()});});
 app.get('/api/status',(_req,res)=>res.json({realtime:process.env.DTC_API_KEY?'configured':'unavailable',database:pool?'configured':'unavailable',realtimeCache:realtimeCache.status,lastRealtimeFetch:realtimeCache.fetchedAt}));
 app.get('/api/realtime/vehicles',realtimeRateLimit,async(_req,res)=>{res.setHeader('Cache-Control','no-store');await ensureFreshRealtimeCache();const fetchedAt=realtimeCache.fetchedAt,age=fetchedAt?Math.max(0,Date.now()-Date.parse(fetchedAt)):Infinity,stale=age>180000;if(realtimeCache.status==='UNAVAILABLE'&&!realtimeCache.vehicles.length)return res.status(503).json({status:'UNAVAILABLE',count:0,vehicles:[],reason:'Realtime data is currently unavailable'});res.json({status:stale?'STALE':'OK',count:realtimeCache.vehicles.length,vehicles:realtimeCache.vehicles,fetchedAt,stale});});
 app.post('/api/stops/nearby',dataRateLimit,async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',stops:[],reason:'Database is not configured'});const lat=parseCoordinate(req.body?.lat,-90,90),lon=parseCoordinate(req.body?.lon,-180,180),ln=Number(req.body?.limit),limit=Number.isFinite(ln)?Math.min(Math.max(Math.trunc(ln),1),50):10,rad=Number(req.body?.radius_m),radiusM=Number.isFinite(rad)?Math.min(Math.max(Math.trunc(rad),500),15000):10000;if(lat===null||lon===null)return res.status(400).json({status:'ERROR',stops:[],reason:'Valid lat and lon are required'});res.setHeader('Cache-Control','no-store');try{const result=await pool.query(`SELECT stop_id,name,latitude,longitude,distance_m FROM (SELECT stop_id,name,latitude,longitude,(6371000*acos(LEAST(1,GREATEST(-1,sin(radians($1))*sin(radians(latitude))+cos(radians($1))*cos(radians(latitude))*cos(radians(longitude)-radians($2)))))) distance_m FROM stops WHERE latitude BETWEEN $1-$4/111320.0 AND $1+$4/111320.0 AND longitude BETWEEN $2-($4/(111320.0*GREATEST(0.1,cos(radians($1))))) AND $2+($4/(111320.0*GREATEST(0.1,cos(radians($1))))) ) calculated WHERE distance_m <= $4 ORDER BY distance_m,stop_id LIMIT $3`,[lat,lon,limit,radiusM]);res.json({status:'OK',stops:result.rows});}catch(error){console.error('Failed to load nearby stops:',error.message);res.status(500).json({status:'ERROR',stops:[],reason:'Failed to load nearby stops'});}});
@@ -667,8 +668,10 @@ app.use((error,_req,res,_next)=>{
 });
 loadOperationalMappings();
 
-const server=app.listen(port,'0.0.0.0',()=>{
-  console.log('United Delhi API listening on :'+port);
+const server=app.listen({port,host:'0.0.0.0',ipv6Only:false},()=>{
+  const address=server.address();
+  const boundPort=typeof address==='object'&&address?address.port:port;
+  console.log('United Delhi API listening on 0.0.0.0:'+boundPort);
   startRealtimePolling();
   void ensureStaticData().catch(error=>{
     staticDataCache.status='ERROR';
