@@ -2,9 +2,9 @@ services:
   - type: web
     name: united-delhi
     runtime: node
-    rootDir: server
-    buildCommand: npm ci
-    startCommand: npm start
+    rootDir: ""
+    buildCommand: cd server && npm ci
+    startCommand: cd server && npm start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
