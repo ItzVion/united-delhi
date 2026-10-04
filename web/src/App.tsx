@@ -45,6 +45,7 @@ export default function App(){
   const[accepted,setAccepted]=useState(localStorage.getItem('ud-consent-v1')==='1');
   const[checked,setChecked]=useState(false);
   const[vehicles,setVehicles]=useState<Vehicle[]>([]);
+  const[liveStatus,setLiveStatus]=useState<'loading'|'ok'|'stale'|'unavailable'>('loading');
   const vehicleCountRef=useRef(0);
   const[q,setQ]=useState('');
   const[searchOpen,setSearchOpen]=useState(false);
@@ -86,7 +87,7 @@ export default function App(){
   useEffect(()=>{
     if(!accepted)return;
     let active=true;
-    const load=async()=>{try{const r=await api.vehicles();if(active){const next=Array.isArray(r.vehicles)?r.vehicles:[];vehicleCountRef.current=next.length;setVehicles(next);setError('');}}catch(e){if(active&&vehicleCountRef.current===0)setError((e as Error).message||'Live data is unavailable.');}};
+    const load=async()=>{try{const r=await api.vehicles();if(active){const next=Array.isArray(r.vehicles)?r.vehicles:[];vehicleCountRef.current=next.length;setVehicles(next);setLiveStatus(r.status==='OK'?'ok':r.status==='STALE'?'stale':'unavailable');setError(r.status==='UNAVAILABLE'&&next.length===0?(r.reason||'Live data is currently unavailable.'):'');}}catch(e){if(active){setLiveStatus(vehicleCountRef.current?'stale':'unavailable');if(vehicleCountRef.current===0)setError((e as Error).message||'Live data is unavailable.');}}};
     void load();
     const id=window.setInterval(()=>void load(),15000);
     return()=>{active=false;window.clearInterval(id);};
@@ -140,7 +141,7 @@ export default function App(){
         <img className="brand-mark" src="/united-delhi-logo.png" alt="United Delhi logo"/>
         <span className="brand-copy"><b>UNITED DELHI</b><small>Delhi transit, made simple</small></span>
       </button>
-      <span className={'status '+(vehicles.length?'ok':'muted')}><i/>{vehicles.length?vehicles.length+' live buses':'Live data unavailable'}</span>
+      <span className={'status '+(liveStatus==='ok'?'ok':'muted')}><i/>{liveStatus==='loading'?'Checking live buses':vehicles.length?(liveStatus==='stale'?vehicles.length+' buses · updating':vehicles.length+' live buses'):'Live data unavailable'}</span>
     </header>
 
     <main className="app-main">
@@ -201,7 +202,7 @@ function Home({vehicles,location,locationStatus,locate,go,onLegend}:{vehicles:Ve
     <section className="section-line live-section"><span className="eyebrow">LIVE TRANSIT</span><button className="text-button" onClick={locate}>{location?'Recenter':'Use my location'}</button></section>
     <div className="map-card">
       <DtcMap vehicles={vehicles} location={location} onSelect={setSelected} onLegend={onLegend}/>
-      <div className="map-topbar"><i/><b>{vehicles.length?vehicles.length+' buses live':'Checking live buses'}</b></div>
+      <div className="map-topbar"><i/><b>{liveStatus==='loading'?'Checking live buses':vehicles.length?(liveStatus==='stale'?vehicles.length+' buses · updating':vehicles.length+' buses live'):'Live data unavailable'}</b></div>
       <div className="map-attribution">© OpenStreetMap contributors</div><div className="map-legend"><span><i style={{background:BUS_COLORS.cngNonAcGreen}}/>DTC</span><span><i style={{background:BUS_COLORS.evDeviOrange}}/>Cluster</span><span><i style={{background:BUS_COLORS.evAc}}/>Electric</span></div>
       {selected?<BusPreview bus={selected} go={go}/>:null}
     </div>
