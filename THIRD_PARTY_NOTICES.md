@@ -40,9 +40,9 @@ The repository should retain the package-lock files and package metadata so depe
 
 The production backend uses Render for the United Delhi API, Vercel for the web client, and Neon for PostgreSQL data storage. The backend contacts Delhi OTD directly for realtime transit data; there is no separate realtime relay. Their own terms, privacy policies, security practices, and data-processing arrangements apply to their services.
 
-## Design and feature references
+## Design and feature inspiration
 
-United Delhi uses common transit-product interaction patterns and functions that are also present in established Delhi transit apps such as Chartr and One Delhi, including live vehicle maps, route/stop information and journey-planning workflows. This reference does not imply affiliation, endorsement, partnership, licensing, or use of their proprietary code or assets. United Delhi's branding and implementation are maintained independently.
+United Delhi is inspired by familiar transit apps such as Chartr and One Delhi, including ideas such as live vehicle maps, route/stop information and journey-planning workflows. These are inspirations rather than a claim of identical design, code, or assets. This does not imply affiliation, endorsement, partnership, licensing, or use of their proprietary code or assets. United Delhi's branding and implementation are maintained independently.
 
 ## No government affiliation
 
