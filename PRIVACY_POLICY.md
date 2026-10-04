@@ -5,7 +5,7 @@
 
 United Delhi ("United Delhi", "we", "us", or "our") is a Delhi public-transit information application and website. This Privacy Policy explains what information the current implementation processes, why it is processed, and how you can make a privacy request.
 
-**Privacy and legal contact:** Use the developer contact email shown on the United Delhi Google Play listing for privacy requests.
+**Privacy and legal contact:** Use **vion4712@gmail.com** for privacy requests.
 
 ## 1. What United Delhi currently collects
 
@@ -88,7 +88,7 @@ Subject to applicable law and its commencement, you may have rights including:
 - grievance redressal; and
 - other rights provided by applicable law.
 
-To make a request, contact **the developer contact email shown on the United Delhi Google Play listing** with the subject line **Privacy Request — United Delhi**. We may need reasonable information to verify that a request concerns the person making it and to prevent unauthorized disclosure.
+To make a request, contact ****vion4712@gmail.com**** with the subject line **Privacy Request — United Delhi**. We may need reasonable information to verify that a request concerns the person making it and to prevent unauthorized disclosure.
 
 ## 8. Security
 
@@ -108,7 +108,7 @@ We may update this policy when the app, infrastructure, data practices, or appli
 
 ## 11. Contact
 
-**Privacy and legal contact:** the developer contact email shown on the United Delhi Google Play listing
+**Privacy and legal contact:** **vion4712@gmail.com**
 
 Please do not send passwords, API keys, database credentials, or other secrets in a privacy request.
 
