@@ -45,6 +45,7 @@ export default function App(){
   const[accepted,setAccepted]=useState(localStorage.getItem('ud-consent-v1')==='1');
   const[checked,setChecked]=useState(false);
   const[vehicles,setVehicles]=useState<Vehicle[]>([]);
+  const lastVehiclesRef=useRef<Vehicle[]>([]);
   const[liveStatus,setLiveStatus]=useState<'loading'|'ok'|'stale'|'unavailable'>('loading');
   const vehicleCountRef=useRef(0);
   const[q,setQ]=useState('');
@@ -87,11 +88,11 @@ export default function App(){
   useEffect(()=>{
     if(!accepted)return;
     let active=true;
-    const load=async()=>{try{const r=await api.vehicles();if(active){const next=Array.isArray(r.vehicles)?r.vehicles:[];if(next.length){vehicleCountRef.current=next.length;setLastVehicles(next);setVehicles(next);}else if(vehicleCountRef.current===0&&lastVehicles.length){setVehicles(lastVehicles);}setLiveStatus(r.status==='OK'?'ok':r.status==='STALE'?'stale':'unavailable');setError(r.status==='UNAVAILABLE'&&next.length===0&&vehicleCountRef.current===0?(r.reason||'Live data is currently unavailable.'):'');}}catch(e){if(active){if(vehicleCountRef.current===0&&lastVehicles.length)setVehicles(lastVehicles);setLiveStatus(vehicleCountRef.current?'stale':'unavailable');if(vehicleCountRef.current===0&&!lastVehicles.length)setError((e as Error).message||'Live data is unavailable.');}}};
+    const load=async()=>{try{const r=await api.vehicles();if(active){const next=Array.isArray(r.vehicles)?r.vehicles:[];if(next.length){vehicleCountRef.current=next.length;lastVehiclesRef.current=next;setVehicles(next);}else if(vehicleCountRef.current===0&&lastVehiclesRef.current.length){setVehicles(lastVehiclesRef.current);}setLiveStatus(r.status==='OK'?'ok':r.status==='STALE'?'stale':'unavailable');setError(r.status==='UNAVAILABLE'&&next.length===0&&vehicleCountRef.current===0?(r.reason||'Live data is currently unavailable.'):'');}}catch(e){if(active){if(vehicleCountRef.current===0&&lastVehiclesRef.current.length)setVehicles(lastVehiclesRef.current);setLiveStatus(vehicleCountRef.current?'stale':'unavailable');if(vehicleCountRef.current===0&&!lastVehiclesRef.current.length)setError((e as Error).message||'Live data is unavailable.');}}};
     void load();
     const id=window.setInterval(()=>void load(),15000);
     return()=>{active=false;window.clearInterval(id);};
-  },[accepted,lastVehicles]);
+  },[accepted]);
 
   useEffect(()=>{
     const term=q.trim();
