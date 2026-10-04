@@ -87,11 +87,11 @@ export default function App(){
   useEffect(()=>{
     if(!accepted)return;
     let active=true;
-    const load=async()=>{try{const r=await api.vehicles();if(active){const next=Array.isArray(r.vehicles)?r.vehicles:[];vehicleCountRef.current=next.length;setVehicles(next);setLiveStatus(r.status==='OK'?'ok':r.status==='STALE'?'stale':'unavailable');setError(r.status==='UNAVAILABLE'&&next.length===0?(r.reason||'Live data is currently unavailable.'):'');}}catch(e){if(active){setLiveStatus(vehicleCountRef.current?'stale':'unavailable');if(vehicleCountRef.current===0)setError((e as Error).message||'Live data is unavailable.');}}};
+    const load=async()=>{try{const r=await api.vehicles();if(active){const next=Array.isArray(r.vehicles)?r.vehicles:[];if(next.length){vehicleCountRef.current=next.length;setLastVehicles(next);setVehicles(next);}else if(vehicleCountRef.current===0&&lastVehicles.length){setVehicles(lastVehicles);}setLiveStatus(r.status==='OK'?'ok':r.status==='STALE'?'stale':'unavailable');setError(r.status==='UNAVAILABLE'&&next.length===0&&vehicleCountRef.current===0?(r.reason||'Live data is currently unavailable.'):'');}}catch(e){if(active){if(vehicleCountRef.current===0&&lastVehicles.length)setVehicles(lastVehicles);setLiveStatus(vehicleCountRef.current?'stale':'unavailable');if(vehicleCountRef.current===0&&!lastVehicles.length)setError((e as Error).message||'Live data is unavailable.');}}};
     void load();
     const id=window.setInterval(()=>void load(),15000);
     return()=>{active=false;window.clearInterval(id);};
-  },[accepted]);
+  },[accepted,lastVehicles]);
 
   useEffect(()=>{
     const term=q.trim();
@@ -125,7 +125,7 @@ export default function App(){
     if(page.kind==='terms')return <Terms go={go}/>;
     if(page.kind==='legal')return <Legal go={go}/>;
     return <div className="gate"><div className="flat-card consent-card">
-      <img className="gate-mark" src="/united-delhi-logo.svg" alt="United Delhi logo"/>
+      <img className="gate-mark" src="/icon.svg" alt="United Delhi logo"/>
       <span className="eyebrow">WELCOME TO UNITED DELHI</span>
       <h1>Delhi transit,<br/>made simple.</h1>
       <p>By continuing to United Delhi, you agree to our <button className="text-button inline" onClick={()=>go('/legal/terms')}>Terms of Service</button> and acknowledge our <button className="text-button inline" onClick={()=>go('/legal/privacy')}>Privacy Policy</button>.</p>
@@ -138,7 +138,7 @@ export default function App(){
   return <div className="app-shell">
     <header className="mobile-header">
       <button className="brand brand-button" onClick={()=>go('/')}>
-        <img className="brand-mark" src="/united-delhi-logo.svg" alt="United Delhi logo"/>
+        <img className="brand-mark" src="/icon.svg" alt="United Delhi logo"/>
         <span className="brand-copy"><b>UNITED DELHI</b><small>Delhi transit, made simple</small></span>
       </button>
       <span className={'status '+(liveStatus==='ok'?'ok':'muted')}><i/>{liveStatus==='loading'?'Checking live buses':vehicles.length?(liveStatus==='stale'?vehicles.length+' buses · updating':vehicles.length+' live buses'):'Live data unavailable'}</span>
