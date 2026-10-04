@@ -13,7 +13,7 @@ button:disabled{cursor:not-allowed}
 .mobile-header{width:min(760px,100%);margin:0 auto;padding:12px 18px 10px;min-height:70px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#F4F6F7}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
 .brand-button{border:0;background:transparent;padding:0;color:inherit;text-align:left}
-.brand-mark{width:50px;height:50px;object-fit:contain;display:block;background:#004D40}
+.brand-mark{width:50px;height:50px;object-fit:contain;display:block;background:transparent}
 .brand-copy{display:flex;flex-direction:column;min-width:0}
 .brand-copy b{font-size:18px;line-height:20px;letter-spacing:1px;color:#1F2A30}
 .brand-copy small{font-size:9px;line-height:12px;color:#68757B;margin-top:2px}
@@ -203,7 +203,7 @@ button:disabled{cursor:not-allowed}
 
 .gate{min-height:100vh;padding:28px 18px;display:grid;place-items:center;background:#F4F6F7}
 .consent-card{width:min(520px,100%);padding:28px}
-.gate-mark{width:64px;height:64px;object-fit:contain;background:#004D40;display:block;margin-bottom:18px}
+.gate-mark{width:64px;height:64px;object-fit:contain;background:transparent;display:block;margin-bottom:18px}
 .consent-card h1{font-size:30px;line-height:31px;margin:6px 0;color:#1F2A30}
 .consent-card p{font-size:14px;line-height:21px;color:#68757B}
 .check-row{display:flex;gap:10px;align-items:flex-start;margin:20px 0;padding:14px;border:1px solid #D4DDE0;background:#FFFFFF}
