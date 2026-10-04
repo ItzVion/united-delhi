@@ -181,7 +181,7 @@ export default function App(){
       {searchOpen&&q.trim().length>=2?<SearchResults loading={searchBusy} error={searchError} results={searchResults} go={go}/>:null}
       {error?<div className="error-box"><b>Live data issue</b><span>{error}</span></div>:null}
 
-      {page.kind==='home'?<Home vehicles={vehicles} location={location} locationStatus={locationStatus} locate={locate} go={go} onLegend={()=>setLegendOpen(true)}/>
+      {page.kind==='home'?<Home vehicles={vehicles} location={location} locationStatus={locationStatus} liveStatus={liveStatus} locate={locate} go={go} onLegend={()=>setLegendOpen(true)}/>
        :page.kind==='plan'?<Planner go={go}/>
        :page.kind==='legal'?<Legal go={go}/>
        :page.kind==='privacy'?<Privacy go={go}/>
@@ -213,7 +213,7 @@ function SearchResults({loading,error,results,go}:{loading:boolean;error:string;
   </section>;
 }
 
-function Home({vehicles,location,locationStatus,locate,go,onLegend}:{vehicles:Vehicle[];location:Point|null;locationStatus:string;locate:()=>void;go:(path:string)=>void;onLegend:()=>void}){
+function Home({vehicles,location,locationStatus,liveStatus,locate,go,onLegend}:{vehicles:Vehicle[];location:Point|null;locationStatus:string;liveStatus:'loading'|'ok'|'stale'|'unavailable';locate:()=>void;go:(path:string)=>void;onLegend:()=>void}){
   const[stops,setStops]=useState<any[]>([]);
   const[selected,setSelected]=useState<Vehicle|null>(null);
 
