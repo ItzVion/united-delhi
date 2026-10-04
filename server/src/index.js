@@ -348,6 +348,7 @@ function startRealtimePolling(){
 async function saveVehicles(vehicles){if(!pool)return;const client=await pool.connect();try{await client.query('BEGIN');await client.query("SET LOCAL statement_timeout='30000'");await client.query("SELECT pg_advisory_xact_lock(hashtext('united-delhi-static-gtfs'))");const chunkSize=1000;for(let i=0;i<vehicles.length;i+=chunkSize){const chunk=vehicles.slice(i,i+chunkSize),values=[];const placeholders=chunk.map((v,index)=>{const base=index*7;values.push(v.id,v.routeId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);return '($'+(base+1)+',$'+(base+2)+',$'+(base+3)+',$'+(base+4)+',$'+(base+5)+',$'+(base+6)+',$'+(base+7)+',NOW())';}).join(',');await client.query('INSERT INTO vehicle_positions(vehicle_id,route_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+placeholders+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values);}await client.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '15 minutes'");await client.query('COMMIT');}catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}}
 app.get('/',(_req,res)=>res.status(200).json({service:'united-delhi-api',status:'ok'}));
 app.get('/health',(_req,res)=>{res.setHeader('Cache-Control','no-store');res.status(200).json({ok:true,service:'united-delhi-api',time:new Date().toISOString()});});
+app.get('/healthz',(_req,res)=>{res.setHeader('Cache-Control','no-store');res.status(200).send('ok');});
 app.get('/ready',async(_req,res)=>{res.setHeader('Cache-Control','no-store');let database='not_configured';if(pool){try{await pool.query('SELECT 1');database='ok';}catch{database='error';}}const ready=database==='ok'&&staticDataCache.status==='OK';res.status(ready?200:503).json({ok:ready,service:'united-delhi-api',database,staticData:staticDataCache.status,staticDataCompletedAt:staticDataCache.completedAt,staticDataSource:GTFS_SOURCE_KEY,staticDataUrl:GTFS_SOURCE_URL,realtime:realtimeCache.status,lastRealtimeFetch:realtimeCache.fetchedAt,time:new Date().toISOString()});});
 app.get('/api/status',(_req,res)=>res.json({realtime:process.env.DTC_API_KEY?'configured':'unavailable',database:pool?'configured':'unavailable',realtimeCache:realtimeCache.status,lastRealtimeFetch:realtimeCache.fetchedAt}));
 app.get('/api/realtime/vehicles',realtimeRateLimit,async(_req,res)=>{res.setHeader('Cache-Control','no-store');const fetchedAt=realtimeCache.fetchedAt,age=fetchedAt?Math.max(0,Date.now()-Date.parse(fetchedAt)):Infinity,stale=age>180000;if(process.env.DTC_API_KEY&&age>30000&&!realtimeRefreshInFlight)void refreshRealtimeCache();if(realtimeCache.status==='UNAVAILABLE'&&!realtimeCache.vehicles.length)return res.status(503).json({status:'UNAVAILABLE',count:0,vehicles:[],reason:'Realtime data is currently unavailable'});res.json({status:stale?'STALE':realtimeCache.status==='STALE'?'STALE':'OK',count:realtimeCache.vehicles.length,vehicles:realtimeCache.vehicles,fetchedAt,stale});});
@@ -707,24 +708,29 @@ app.use((error,_req,res,_next)=>{
   const status=Number(error?.status);
   res.status(Number.isInteger(status)&&status>=400&&status<500?status:500).json({status:'ERROR',reason:status===400?'Invalid request':'Internal server error'});
 });
-loadOperationalMappings();
-
-const server=app.listen(port,'0.0.0.0',()=>{
+const server=app.listen({port,host},()=>{
   const address=server.address();
   const boundPort=typeof address==='object'&&address?address.port:port;
-  console.log('United Delhi API listening on 0.0.0.0:'+boundPort);
-  // Realtime must not wait for the static GTFS bootstrap.
-  startRealtimePolling();
-  void ensureStaticData().catch(error=>{
-    staticDataCache.status='ERROR';
-    staticDataCache.reason=error instanceof Error?error.message:'Static GTFS bootstrap failed';
-    console.error('Static GTFS bootstrap failed:',staticDataCache.reason);
-  });
+  console.log('United Delhi API listening on '+host+':'+boundPort);
+  // IMPORTANT: let Render see a completely idle, responsive HTTP server before
+  // starting any database/realtime work. This avoids the recurring "No open
+  // HTTP ports detected" / 502 cycle when background startup work is slow.
+  setTimeout(()=>{
+    loadOperationalMappings();
+    startRealtimePolling();
+    void ensureStaticData().catch(error=>{
+      staticDataCache.status='ERROR';
+      staticDataCache.reason=error instanceof Error?error.message:'Static GTFS bootstrap failed';
+      console.error('Static GTFS bootstrap failed:',staticDataCache.reason);
+    });
+  },15000);
 });
-server.requestTimeout=15000;
-server.headersTimeout=20000;
-server.keepAliveTimeout=65000;
+server.requestTimeout=120000;
+server.headersTimeout=120000;
+server.keepAliveTimeout=120000;
 server.maxHeadersCount=100;
+process.on('uncaughtException',error=>console.error('Uncaught exception:',error instanceof Error?error.stack:String(error)));
+process.on('unhandledRejection',reason=>console.error('Unhandled rejection:',reason instanceof Error?reason.stack:String(reason)));
 let shuttingDown=false;
 const shutdown=async(signal)=>{
   if(shuttingDown)return;
