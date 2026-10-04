@@ -424,25 +424,28 @@ function Legal({go}:{go:(path:string)=>void}){
   </section>;
 }
 function Privacy({go}:{go:(path:string)=>void}){
-  return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/legal')}>‹</button><div><span className="eyebrow">PRIVACY</span><h1>Privacy Policy</h1><p>Effective 27 September 2026</p></div></div>
+  return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/legal')}>‹</button><div><span className="eyebrow">PRIVACY</span><h1>Privacy Policy</h1><p>Effective 4 October 2026</p></div></div>
     <div className="flat-card detail-section legal-copy">
-      <h3>What United Delhi collects</h3><p>United Delhi is designed to work without an account. The service does not currently ask for a name, phone number, email address, contacts, photos, microphone, camera, advertising identifier, or payment information.</p>
-      <h3>Location</h3><p>Location is optional. When you allow location access, foreground device location may be used to find nearby DTC stops and centre the map. Nearby coordinates are reduced in precision before being sent to the United Delhi API. The web client may keep the last successful map/location coordinates in browser local storage so the previous map area can be restored; this is not stored in the United Delhi transit database.</p>
-      <h3>Search and journey planning</h3><p>Search and journey-planning inputs are sent to the United Delhi API to return transit information. They are not intentionally used to create a user profile.</p>
-      <h3>Technical information</h3><p>Hosting, CDN, network and security infrastructure may process ordinary technical information such as IP addresses, timestamps, request metadata and error information.</p>
-      <h3>Third-party services</h3><p>United Delhi uses Delhi Open Transit Data, OpenStreetMap/Leaflet, the current API hosting provider, Vercel for the realtime-feed relay, PostgreSQL infrastructure and GitHub. These providers have their own terms and privacy policies.</p>
-      <h3>Security and retention</h3><p>Production API traffic uses HTTPS. Server-side credentials are kept on backend infrastructure. Rate limiting, input validation and database controls are used as appropriate. Realtime vehicle data may be retained for service operation and data quality.</p>
-      <h3>Your rights</h3><p>Subject to applicable law, privacy requests may include access, correction, deletion, withdrawal of consent and grievance redressal. Use the developer contact mechanism shown on the official app listing.</p>
+      <h3>Information we collect</h3><p>United Delhi is designed to work without an account. We do not intentionally request a name, phone number, email address, contacts, photos, microphone, camera, advertising identifier, or payment information.</p>
+      <h3>Location</h3><p>Location is optional. Foreground device location may be used to find nearby DTC stops and centre the map. The app does not intentionally upload a personal location history to the transit database.</p>
+      <h3>Search and journey planning</h3><p>Search terms and journey-planning inputs are sent to the United Delhi API to return transit information and are not intentionally used to create a user profile.</p>
+      <h3>Technical information</h3><p>Hosting, network, security and error-handling infrastructure may process ordinary technical information such as IP addresses, timestamps, request metadata and diagnostics.</p>
+      <h3>Third-party services</h3><p>United Delhi uses Delhi Open Transit Data, OpenStreetMap/Leaflet, Render, Vercel and Neon. Third parties have their own terms and privacy policies.</p>
+      <h3>Retention and rights</h3><p>We aim to retain personal data only as reasonably necessary for stated purposes, security, legal obligations and service operation. Where applicable law provides rights such as access, correction or deletion, requests may be made through the published developer contact mechanism.</p>
+      <h3>Children and applicable law</h3><p>United Delhi does not use targeted advertising, behavioural profiling or tracking of children. Where applicable law requires parental or guardian consent, additional safeguards or other obligations for children, those requirements take priority.</p>
+      <h3>Security</h3><p>Reasonable safeguards include HTTPS, input validation, rate limiting, server-side secrets and database controls. No internet service can guarantee absolute security.</p>
     </div></section>;
 }
 function Terms({go}:{go:(path:string)=>void}){
-  return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/legal')}>‹</button><div><span className="eyebrow">LEGAL</span><h1>Terms of Service</h1><p>Effective 27 September 2026</p></div></div>
+  return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/legal')}>‹</button><div><span className="eyebrow">LEGAL</span><h1>Terms of Service</h1><p>Effective 4 October 2026</p></div></div>
     <div className="flat-card detail-section legal-copy">
-      <h3>Service</h3><p>United Delhi is an independent transit-information service providing route, stop, map, journey-planning and realtime vehicle information. It is not a transport operator, government agency or emergency service.</p>
-      <h3>Transit information</h3><p>Transit information can be delayed, incomplete, changed, duplicated, incorrectly mapped or unavailable. Realtime positions, arrivals and journey-planning results are estimates and should not be treated as guarantees.</p>
-      <h3>Acceptable use</h3><p>Do not attack or interfere with the Service, bypass safeguards, obtain secrets, abuse upstream services, transmit malicious code, stalk or profile people, or misrepresent United Delhi or its data sources.</p>
-      <h3>Availability</h3><p>The Service may change, be suspended or become unavailable. Third-party data, maps and infrastructure have their own terms.</p>
-      <h3>Contact</h3><p>Privacy and legal inquiries may be submitted using the developer contact mechanism shown on the official app listing.</p>
+      <h3>Service</h3><p>United Delhi is an independent transit-information service providing route, stop, map, journey-planning and realtime vehicle information. It is not a transport operator, government agency, emergency service, or official DTC/Delhi Government application.</p>
+      <h3>Accuracy and availability</h3><p>Transit information may be delayed, incomplete, changed, duplicated, incorrectly mapped, unavailable or inaccurate. Realtime positions, arrivals and journey-planning results are estimates and are not guarantees.</p>
+      <h3>Acceptable use</h3><p>Do not attack or interfere with the service, bypass safeguards, obtain secrets, abuse upstream services, transmit malicious code, attempt unauthorised access, harmful scraping, stalking or profiling, or misrepresent United Delhi as an official authority.</p>
+      <h3>Third-party services</h3><p>Maps, transit feeds, hosting, databases and other third-party components may change or become unavailable and have their own terms.</p>
+      <h3>No warranty</h3><p>To the maximum extent permitted by applicable law, the service is provided as-is and as-available without guarantees of uninterrupted, error-free, complete or fit-for-purpose service.</p>
+      <h3>Limitation of liability</h3><p>To the maximum extent permitted by applicable law, United Delhi and its developers are not liable for indirect, incidental, special, consequential or reliance-related losses arising from use of or inability to use the service. Nothing excludes liability that cannot lawfully be excluded.</p>
+      <h3>Changes and contact</h3><p>We may update the service or these terms. Privacy, security and legal requests should use the developer contact mechanism published with the official app listing. These terms are a product policy and are not a substitute for qualified legal advice.</p>
     </div></section>;
 }
 function Details({detail,go}:{detail:any;go:(path:string)=>void}){
