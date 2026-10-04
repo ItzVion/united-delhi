@@ -5,7 +5,7 @@
 
 These Terms of Service ("Terms") govern access to and use of the United Delhi application, website, and related API (together, the "Service").
 
-**Privacy and legal contact:** Use the developer contact email shown on the United Delhi Google Play listing for privacy and legal inquiries.
+**Privacy and legal contact:** Use **vion4712@gmail.com** for privacy and legal inquiries.
 
 ## 1. Acceptance
 
@@ -103,6 +103,6 @@ Subject to mandatory jurisdiction or consumer-protection rights that cannot lawf
 
 ## 15. Contact and legal review
 
-**Legal/support contact:** the developer contact email shown on the United Delhi Google Play listing
+**Legal/support contact:** **vion4712@gmail.com**
 
 These Terms are a project-level starting document, not a substitute for advice from a qualified Indian lawyer. Before a public or commercial launch, the operator should have the final Terms, Privacy Policy, data-processing arrangements, third-party licences, and publishing setup reviewed together.
