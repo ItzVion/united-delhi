@@ -1,6 +1,6 @@
 # United Delhi Security & Reliability Audit
 
-Audit date: 2026-09-25
+Audit date: 2026-10-04
 
 ## Scope
 
@@ -85,7 +85,8 @@ No foreign key was added from realtime vehicle_positions.route_id to routes.rout
 - Added an npm override for uuid 11.1.1 to eliminate the transitive moderate-severity advisory without forcing an Expo SDK downgrade.
 - CI fails on any known npm audit issue.
 - Added a security reporting policy.
-- Workflow permissions are read-only for the remaining CI and APK-trigger workflows.
+- Workflow permissions are read-only for CI.
+- CI uses severity thresholds appropriate to the current Expo toolchain rather than pretending a non-zero advisory count can be made zero without potentially unsafe major upgrades.
 
 ## Database export audit
 
@@ -138,8 +139,4 @@ The current realtime/static route-ID reconciliation also remains unresolved and 
 
 ## Branch policy
 
-The repository currently has exactly one branch:
-
-- main
-
-No extra working branches were left behind.
+The production branch is `main`. Historical/test branches have been reviewed; branches that are strictly behind `main` or contain obsolete experiments should not be merged into production. Dependency-update branches that upgrade React Native outside Expo SDK 57's supported version should remain unmerged until the corresponding Expo SDK upgrade is performed.
