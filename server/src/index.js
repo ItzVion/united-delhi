@@ -334,7 +334,7 @@ function startRealtimePolling(){
   if(realtimePollingTimer)return;
   realtimePollingTimer=setInterval(()=>void refreshRealtimeCache(),12000);
   void warmRealtimeCacheFromDatabase().finally(()=>void refreshRealtimeCache());
-  console.log('Realtime polling started after static GTFS bootstrap.');
+  console.log('Realtime polling started independently of static GTFS bootstrap.');
 }
 async function saveVehicles(vehicles){if(!pool)return;const client=await pool.connect();try{await client.query('BEGIN');await client.query("SET LOCAL statement_timeout='30000'");await client.query("SELECT pg_advisory_xact_lock(hashtext('united-delhi-static-gtfs'))");const chunkSize=1000;for(let i=0;i<vehicles.length;i+=chunkSize){const chunk=vehicles.slice(i,i+chunkSize),values=[];const placeholders=chunk.map((v,index)=>{const base=index*7;values.push(v.id,v.routeId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);return '($'+(base+1)+',$'+(base+2)+',$'+(base+3)+',$'+(base+4)+',$'+(base+5)+',$'+(base+6)+',$'+(base+7)+',NOW())';}).join(',');await client.query('INSERT INTO vehicle_positions(vehicle_id,route_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+placeholders+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values);}await client.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '15 minutes'");await client.query('COMMIT');}catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}}
 app.get('/',(_req,res)=>res.status(200).json({service:'united-delhi-api',status:'ok'}));
@@ -704,9 +704,9 @@ const server=app.listen(port,'0.0.0.0',()=>{
   const address=server.address();
   const boundPort=typeof address==='object'&&address?address.port:port;
   console.log('United Delhi API listening on 0.0.0.0:'+boundPort);
-  void ensureStaticData().then(()=>{
-    startRealtimePolling();
-  }).catch(error=>{
+  // Realtime must not wait for the static GTFS bootstrap.
+  startRealtimePolling();
+  void ensureStaticData().catch(error=>{
     staticDataCache.status='ERROR';
     staticDataCache.reason=error instanceof Error?error.message:'Static GTFS bootstrap failed';
     console.error('Static GTFS bootstrap failed:',staticDataCache.reason);
