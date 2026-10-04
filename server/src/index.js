@@ -40,8 +40,7 @@ const defaultAllowedOrigins = new Set([
 ]);
 const allowedOrigin = (origin) => {
   if (!origin) return true;
-  if (appOrigins.includes(origin) || defaultAllowedOrigins.has(origin)) return true;
-  return /^https:\/\/united-delhi(?:-[a-z0-9-]+)?-deathmango\.vercel\.app$/i.test(origin);
+  return appOrigins.includes(origin) || defaultAllowedOrigins.has(origin);
 };
 app.use(cors({ origin: allowedOrigin, methods: ['GET', 'POST'], optionsSuccessStatus: 204 }));
 app.use(express.json({ limit: '32kb', strict: true }));
