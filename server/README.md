@@ -11,17 +11,12 @@ Current production backend:
 - API base URL: `https://united-delhi.onrender.com`
 
 Required environment variables:
-- PORT (the host supplies this)
-- DTC_REALTIME_RELAY_URL=https://united-delhi-realtime-relay.vercel.app/api/vehicles
-- DTC_REALTIME_RELAY_SECRET (private; shared only between the backend and relay)
-- DTC_API_KEY (private fallback; only needed if the relay is not used)
-- DATABASE_URL (private Neon PostgreSQL connection string), or the Render managed PostgreSQL fields:
-  - DB_HOST
-  - DB_PORT
-  - DB_NAME
-  - DB_USERNAME
-  - DB_PASSWORD
-- APP_ORIGINS (comma-separated browser origins; production should include https://united-delhi.vercel.app)
+- `PORT` (Render supplies this; the app defaults to 10000)
+- `DTC_API_KEY` (private OTD realtime API key)
+- `DATABASE_URL` (private Neon PostgreSQL connection string)
+- `APP_ORIGINS` (optional comma-separated browser origins; production should include `https://united-delhi.vercel.app`)
+
+There is no realtime relay. Render calls the official OTD realtime VehiclePositions protobuf endpoint directly with the private `DTC_API_KEY`.
 
 Secrets must remain in the hosting provider's environment and must never be committed.
 
@@ -33,4 +28,4 @@ npm run check
 npm start
 ```
 
-The importer creates the required PostgreSQL tables when static GTFS data is missing or incomplete. The backend returns `UNAVAILABLE` when required production data is missing and never fabricates live vehicles.
+On startup, the backend applies the checked-in SQL migrations. If the pinned static GTFS data is missing or incomplete, it imports the validated dataset into Neon. Live vehicle positions are refreshed independently every 12 seconds and retained briefly in Neon for warm-cache fallback.
