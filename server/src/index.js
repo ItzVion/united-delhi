@@ -300,7 +300,9 @@ async function persistVehiclesIfIdle(vehicles){if(!pool||vehicleSaveInFlight)ret
 async function refreshRealtimeCache(){if(realtimeRefreshInFlight)return realtimeRefreshInFlight;realtimeRefreshInFlight=(async()=>{try{const vehicles=await getRealtimeVehicles();realtimeCache.vehicles=vehicles;realtimeCache.status='OK';realtimeCache.reason=null;realtimeCache.fetchedAt=new Date().toISOString();if(pool)void persistVehiclesIfIdle(vehicles);}catch(error){if(!realtimeCache.fetchedAt)realtimeCache.status='UNAVAILABLE';realtimeCache.reason=error instanceof Error?error.message:'Realtime request failed';console.error('Realtime poll failed:',realtimeCache.reason);}})().finally(()=>{realtimeRefreshInFlight=null;});return realtimeRefreshInFlight;}
 async function ensureFreshRealtimeCache(maxAgeMs=30000){
   const age=realtimeCache.fetchedAt?Math.max(0,Date.now()-Date.parse(realtimeCache.fetchedAt)):Infinity;
-  if(age>maxAgeMs&&process.env.DTC_API_KEY)await refreshRealtimeCache();
+  // Never block a user request on the external realtime feed. Refresh in the
+  // background and immediately serve cached/stale data instead.
+  if(age>maxAgeMs&&process.env.DTC_API_KEY)void refreshRealtimeCache();
 }
 async function warmRealtimeCacheFromDatabase(){
   if(!pool||realtimeCache.vehicles.length)return;
