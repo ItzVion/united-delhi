@@ -7,6 +7,7 @@ import { rateLimit } from 'express-rate-limit';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import readline from 'node:readline';
 import { parse } from 'csv-parse/sync';
 
 const {Pool}=pg,app=express();
@@ -41,8 +42,17 @@ async function seed(){
   const read=f=>parse(fs.readFileSync(path.join(DATA,f),'utf8'),{columns:true,skip_empty_lines:true,bom:true,relax_column_count:true,trim:true});
   const routes=read('routes.txt'),stops=read('stops.txt'),trips=read('trips.txt'),tripRoute=new Map();
   for(const x of trips){const t=str(x.trip_id),r=str(x.route_id);if(t&&r)tripRoute.set(t,r)}
-  const stopTimes=read('stop_times.txt'),links=new Map();
-  for(const x of stopTimes){const r=tripRoute.get(str(x.trip_id)),s= str(x.stop_id),seq=num(x.stop_sequence);if(!r||!s||seq===null)continue;const k=r+'\0'+s,o=links.get(k);if(o===undefined||seq<o)links.set(k,seq)}
+  const links=new Map();
+  const rl=readline.createInterface({input:fs.createReadStream(path.join(DATA,'stop_times.txt'),{encoding:'utf8'}),crlfDelay:Infinity});
+  let header=null,ti=-1,si=-1,qi=-1;
+  for await(const line of rl){
+    if(!header){header=line.split(',');ti=header.indexOf('trip_id');si=header.indexOf('stop_id');qi=header.indexOf('stop_sequence');continue}
+    const p=line.split(',');
+    const r=tripRoute.get(str(p[ti])),sid=str(p[si]),seq=num(p[qi]);
+    if(!r||!sid||seq===null)continue;
+    const k=r+'\\0'+sid,o=links.get(k);
+    if(o===undefined||seq<o)links.set(k,seq);
+  }
   await c.query('BEGIN');await c.query("SET LOCAL statement_timeout='120000'");await c.query('TRUNCATE route_stops,routes,stops RESTART IDENTITY CASCADE');
   for(let i=0;i<routes.length;i+=300){const ch=routes.slice(i,i+300),v=[];const p=ch.map((x,j)=>{const b=j*6;v.push(str(x.route_id),str(x.agency_id),str(x.route_short_name),str(x.route_long_name),str(x.route_color),str(x.route_text_color));return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+',$'+(b+5)+',$'+(b+6)+')'}).join(',');await c.query('INSERT INTO routes(route_id,agency_id,short_name,long_name,route_color,route_text_color) VALUES '+p+' ON CONFLICT(route_id) DO UPDATE SET agency_id=EXCLUDED.agency_id,short_name=EXCLUDED.short_name,long_name=EXCLUDED.long_name,route_color=EXCLUDED.route_color,route_text_color=EXCLUDED.route_text_color,updated_at=NOW()',v)}
   for(let i=0;i<stops.length;i+=300){const ch=stops.slice(i,i+300),v=[];const p=ch.map((x,j)=>{const b=j*4;v.push(str(x.stop_id),str(x.stop_name,200),num(x.stop_lat),num(x.stop_lon));return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+')'}).join(',');await c.query('INSERT INTO stops(stop_id,name,latitude,longitude) VALUES '+p+' ON CONFLICT(stop_id) DO UPDATE SET name=EXCLUDED.name,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,updated_at=NOW()',v)}
