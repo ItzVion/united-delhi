@@ -1,12 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import L from 'leaflet';
-import {maplibreGL} from '@maplibre/maplibre-gl-leaflet';
-import {setWorkerUrl} from 'maplibre-gl';
-import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import {api} from './api';
 
-setWorkerUrl(workerUrl);
 import type {Vehicle} from './api';
 
 declare module 'leaflet' {
@@ -341,7 +336,7 @@ function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Poi
       maxBoundsViscosity:.18,attributionControl:true,preferCanvas:true,inertia:false,bounceAtZoomLimits:false
     });
 
-    maplibreGL({style:'https://tiles.openfreemap.org/styles/liberty'}).addTo(map);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true,attribution:'© OpenStreetMap contributors'}).addTo(map);
     userRef.current=L.layerGroup().addTo(map);
 
     const locate=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
