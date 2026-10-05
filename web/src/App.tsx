@@ -380,7 +380,7 @@ function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Poi
     const makeIcon=(v:Vehicle)=>{
       const bg=busColorFor(v),fg=isHex(v.routeTextColor)?String(v.routeTextColor):textFor(bg);
       const label=displayVehicleRoute(v).trim();
-      const width=Math.max(62,Math.min(220,label.length*9+43));
+      const width=Math.max(62,label.length*9+43);
       return L.divIcon({
         className:'web-bus-icon',
         html:'<div class="web-bus one-delhi-bus" style="background:'+escapeHtml(bg)+';color:'+escapeHtml(fg)+';width:'+width+'px"><span class="bus-glyph">'+
