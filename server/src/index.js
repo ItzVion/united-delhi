@@ -13,7 +13,9 @@ import { parse as parseCsv } from 'csv-parse/sync';
 
 const { Pool } = pg;
 const app = express();
-const port = Number(process.env.PORT || 10000);
+const portValue = Number(process.env.PORT || 10000);
+const port = Number.isInteger(portValue) && portValue > 0 && portValue < 65536 ? portValue : 10000;
+const host = String(process.env.HOST || '0.0.0.0').trim() || '0.0.0.0';
 const databaseUrl = String(process.env.DATABASE_URL || '').trim();
 const normalizedDatabaseUrl = databaseUrl.replace(/([?&])sslmode=(?:prefer|require|verify-ca)(?=(&|$))/i, '$1sslmode=verify-full');
 const isLocalDatabase = /(?:localhost|127(?:\.\d+){3}|::1)/i.test(normalizedDatabaseUrl);
@@ -60,6 +62,7 @@ app.use((_req,res,next)=>{
   res.setHeader('Origin-Agent-Cluster','?1');
   next();
 });
+app.get('/healthz',(_req,res)=>res.status(200).json({status:'OK',service:'united-delhi',time:new Date().toISOString()}));
 app.use('/api',(_req,res,next)=>{res.setHeader('Cache-Control','no-store');next();});
 const clientIpKey=req=>ipKeyGenerator(req.ip);
 const apiRateLimit=rateLimit({windowMs:60_000,limit:180,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:clientIpKey,message:{status:'RATE_LIMITED',reason:'Too many requests. Please try again shortly.'}});
