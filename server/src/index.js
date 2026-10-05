@@ -94,7 +94,20 @@ async function seed(){
  }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e}finally{await c.query("SELECT pg_advisory_unlock(hashtext('united-delhi-static-seed'))").catch(()=>{});c.release()}
 }
 
-function parseVehicle(e,feedTs){const v=e?.vehicle,p=v?.position;if(!p)return null;const lat=coord(p.latitude,-90,90),lon=coord(p.longitude,-180,180),id=str(v?.vehicle?.id||v?.id||e?.id);if(lat===null||lon===null||!id)return null;const ts=num(v?.timestamp||feedTs||Math.floor(Date.now()/1000));if(!ts)return null;const at=new Date(ts*1000);if(Math.abs(Date.now()-at.getTime())>15*60000)return null;return{id,routeId:str(v?.trip?.routeId),tripId:str(v?.trip?.tripId),stopId:str(v?.stopId),vehicleLabel:str(v?.vehicle?.label),licensePlate:str(v?.vehicle?.licensePlate),latitude:lat,longitude:lon,bearing:num(p.bearing),observedAt:at.toISOString()}}
+function parseVehicle(e,feedTs){
+ const v=e?.vehicle,p=v?.position;
+ if(!p)return null;
+ const lat=coord(p.latitude,-90,90),lon=coord(p.longitude,-180,180),id=str(v?.vehicle?.id||v?.id||e?.id);
+ if(lat===null||lon===null||!id)return null;
+ const ts=num(v?.timestamp||feedTs);
+ if(!ts)return null;
+ const ageMs=Date.now()-(ts*1000);
+ // Do not display stale/future GPS positions as live buses. GTFS-RT recommends
+ // VehiclePositions be no more than 90 seconds old.
+ if(ageMs>90000||ageMs<-60000)return null;
+ const at=new Date(ts*1000);
+ return{id,routeId:str(v?.trip?.routeId),tripId:str(v?.trip?.tripId),stopId:str(v?.stopId),vehicleLabel:str(v?.vehicle?.label),licensePlate:str(v?.vehicle?.licensePlate),latitude:lat,longitude:lon,bearing:num(p.bearing),observedAt:at.toISOString()}
+}
 
 async function fetchLive(){
  if(!KEY)throw new Error('DTC_API_KEY is not configured');
