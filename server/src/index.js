@@ -165,21 +165,32 @@ function entityToVehicle(entity){
 }
 async function getRealtimeVehicles(){
   const apiKey = String(process.env.DTC_API_KEY || '').trim();
-  if (!apiKey) {
-    const e = new Error('DTC_API_KEY is not configured');
+  const realtimeBaseUrl = String(process.env.DTC_REALTIME_URL || 'https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb').trim();
+  const keyParam = String(process.env.DTC_API_KEY_PARAM || 'key').trim() || 'key';
+  if (!realtimeBaseUrl) {
+    const e = new Error('Realtime source URL is not configured');
     e.code = 'NO_REALTIME_SOURCE';
     throw e;
   }
-  const url = 'https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb?key=' + encodeURIComponent(apiKey);
+  if (!apiKey) {
+    const e = new Error('DTC_API_KEY is not configured');
+    e.code = 'NO_REALTIME_KEY';
+    throw e;
+  }
+  const feedUrl = new URL(realtimeBaseUrl);
+  feedUrl.searchParams.set(keyParam, apiKey);
+  const url = feedUrl.toString();
   const headers = {
     accept:'application/x-protobuf, application/octet-stream, application/protobuf',
     'user-agent':'United-Delhi/1.0 (+https://github.com/ItzVion/united-delhi)',
-    'x-api-key':apiKey,
   };
 
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000),MAX=10*1024*1024;
   try{
     const upstream=await fetch(url,{headers,signal:controller.signal});
+    const contentType=String(upstream.headers.get('content-type')||'');
+    const contentLength=String(upstream.headers.get('content-length')||'unknown');
+    console.log('Realtime upstream response: '+upstream.status+' '+contentType+' '+contentLength);
     if(!upstream.ok){
       const contentType=String(upstream.headers.get('content-type')||'');
       let detail='HTTP '+upstream.status;
@@ -205,7 +216,7 @@ async function getRealtimeVehicles(){
       }
     }
     if(buffer.byteLength>MAX)throw new Error('OTD realtime feed exceeded the 10 MB safety limit after decompression');
-    const contentType=String(upstream.headers.get('content-type')||'').toLowerCase();
+    const responseContentType=String(upstream.headers.get('content-type')||'').toLowerCase();
     const isJson=contentType.includes('application/json') || contentType.includes('text/json');
     const firstText=buffer.byteLength<=4096?new TextDecoder().decode(buffer).trimStart():'';
     if(firstText.startsWith('<!doctype')||firstText.startsWith('<html')||firstText.startsWith('{')||firstText.startsWith('[')){
@@ -299,11 +310,15 @@ let realtimeRefreshInFlight=null;
 let lastVehiclePersistAt=0;
 let vehicleSaveInFlight=false;
 let realtimePollingTimer=null;
-async function persistVehiclesIfIdle(_vehicles){
-  // Realtime positions are an in-memory cache. Do not make the public API
-  // depend on a large Neon write on every refresh; this was causing repeated
-  // statement timeouts on the small Render instance.
-  return;
+async function persistVehiclesIfIdle(vehicles){
+  if(!pool||vehicleSaveInFlight||!Array.isArray(vehicles)||!vehicles.length)return;
+  const now=Date.now();
+  if(now-lastVehiclePersistAt<60_000)return;
+  lastVehiclePersistAt=now;
+  vehicleSaveInFlight=true;
+  try{await saveVehicles(vehicles.slice(0,5000));}
+  catch(error){console.error('Realtime persistence skipped:',error instanceof Error?error.message:String(error));}
+  finally{vehicleSaveInFlight=false;}
 }
 async function refreshRealtimeCache(){if(realtimeRefreshInFlight)return realtimeRefreshInFlight;realtimeRefreshInFlight=(async()=>{try{const vehicles=await getRealtimeVehicles();realtimeCache.vehicles=vehicles;realtimeCache.status='OK';realtimeCache.reason=null;realtimeCache.fetchedAt=new Date().toISOString();if(pool)void persistVehiclesIfIdle(vehicles);}catch(error){if(!realtimeCache.fetchedAt)realtimeCache.status='UNAVAILABLE';realtimeCache.reason=error instanceof Error?error.message:'Realtime request failed';console.error('Realtime poll failed:',realtimeCache.reason);}})().finally(()=>{realtimeRefreshInFlight=null;});return realtimeRefreshInFlight;}
 async function ensureFreshRealtimeCache(maxAgeMs=30000){
@@ -346,7 +361,7 @@ function startRealtimePolling(){
   if(realtimePollingTimer)return;
   realtimePollingTimer=setInterval(()=>void refreshRealtimeCache(),12000);
   void warmRealtimeCacheFromDatabase().finally(()=>void refreshRealtimeCache());
-  console.log('Realtime polling started independently of static GTFS bootstrap.');
+  console.log('Realtime polling started independently of static GTFS bootstrap. API key configured.');
 }
 async function saveVehicles(vehicles){if(!pool)return;const client=await pool.connect();try{await client.query('BEGIN');await client.query("SET LOCAL statement_timeout='30000'");await client.query("SELECT pg_advisory_xact_lock(hashtext('united-delhi-static-gtfs'))");const chunkSize=1000;for(let i=0;i<vehicles.length;i+=chunkSize){const chunk=vehicles.slice(i,i+chunkSize),values=[];const placeholders=chunk.map((v,index)=>{const base=index*7;values.push(v.id,v.routeId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);return '($'+(base+1)+',$'+(base+2)+',$'+(base+3)+',$'+(base+4)+',$'+(base+5)+',$'+(base+6)+',$'+(base+7)+',NOW())';}).join(',');await client.query('INSERT INTO vehicle_positions(vehicle_id,route_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+placeholders+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values);}await client.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '15 minutes'");await client.query('COMMIT');}catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}}
 app.get('/',(_req,res)=>res.status(200).json({service:'united-delhi-api',status:'ok'}));
@@ -374,7 +389,7 @@ app.get('/api/stops/:id/arrivals',dataRateLimit,async(req,res)=>{
       .filter(v=>{
         const operational=resolveOperationalRoute(v);
         const candidateRouteId=operational?.routeId||v.routeId;
-        return candidateRouteId&&routeIds.has(String(candidateRouteId));
+        return !!candidateRouteId;
       })
       .map(v=>{
         const operational=resolveOperationalRoute(v);
@@ -384,7 +399,7 @@ app.get('/api/stops/:id/arrivals',dataRateLimit,async(req,res)=>{
         const observed=Date.parse(v.observedAt);
         const age=Number.isFinite(observed)?Math.max(0,Math.round((now-observed)/1000)):0;
         const row=routeMap.get(String(candidateRouteId));
-        const publicName=operational?.shortName||String(row?.short_name||'').trim()||null;
+        const publicName=operational?.shortName||String(row?.short_name||'').trim()||String(v.routeShortName||candidateRouteId||'').trim()||null;
         return{
           vehicleId:v.id,
           routeId:candidateRouteId?String(candidateRouteId):null,
@@ -395,7 +410,7 @@ app.get('/api/stops/:id/arrivals',dataRateLimit,async(req,res)=>{
           serviceColor:v.serviceColor||null,
           distanceMeters:Math.max(0,Math.round(d)),
           observedAgeSeconds:age,
-          fromStop:row?.from_stop?String(row.from_stop).trim():null,
+          fromStop:row?.from_stop?String(row.from_stop).trim():operational?.shortName?null:null,
           toStop:row?.to_stop?String(row.to_stop).trim():null
         };
       })
@@ -745,4 +760,3 @@ const shutdown=async(signal)=>{
 };
 process.once('SIGTERM',()=>void shutdown('SIGTERM'));
 process.once('SIGINT',()=>void shutdown('SIGINT'));
-
