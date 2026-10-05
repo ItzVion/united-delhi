@@ -214,36 +214,87 @@ function SearchResults({loading,error,results,go}:{loading:boolean;error:string;
 
 function Home({vehicles,location,locationStatus,liveStatus,locate,go,onLegend}:{vehicles:Vehicle[];location:Point|null;locationStatus:string;liveStatus:'loading'|'ok'|'stale'|'unavailable';locate:()=>void;go:(path:string)=>void;onLegend:()=>void}){
   const[stops,setStops]=useState<any[]>([]);
-  const[selected,setSelected]=useState<Vehicle|null>(null);
 
   useEffect(()=>{
     if(!location){setStops([]);return;}
     let active=true;
-    (async()=>{try{const r=await api.nearby(location.lat,location.lon);if(active)setStops(r.status==='OK'?r.stops:[]);}catch{if(active)setStops([])}})();
+    (async()=>{
+      try{
+        const r=await api.nearby(location.lat,location.lon);
+        if(active)setStops(r.status==='OK'?r.stops:[]);
+      }catch{if(active)setStops([])}
+    })();
     return()=>{active=false;};
   },[location]);
 
   return <>
-    <section className="section-line live-section"><span className="eyebrow">LIVE TRANSIT</span><button className="text-button" onClick={locate}>{location?'Recenter':'Use my location'}</button></section>
+    <section className="section-line live-section">
+      <span className="eyebrow">LIVE TRANSIT</span>
+      <button className="text-button" onClick={locate}>{location?'Recenter':'Use my location'}</button>
+    </section>
+
     <div className="map-card">
-      <DtcMap vehicles={vehicles} location={location} onSelect={setSelected} onLegend={onLegend}/>
+      <DtcMap vehicles={vehicles} location={location} onLegend={onLegend}/>
       <div className="map-topbar"><i/><b>{liveStatus==='loading'?'Checking live buses':vehicles.length?(liveStatus==='stale'?vehicles.length+' buses · updating':vehicles.length+' buses live'):'Live data unavailable'}</b></div>
-      <div className="map-attribution">© OpenStreetMap contributors</div><div className="map-legend"><span><i style={{background:BUS_COLORS.cngNonAcGreen}}/>DTC</span><span><i style={{background:BUS_COLORS.evDeviOrange}}/>Cluster</span><span><i style={{background:BUS_COLORS.evAc}}/>Electric</span></div>
-      {selected?<BusPreview bus={selected} go={go}/>:null}
+      <div className="map-attribution">© OpenStreetMap contributors</div>
+      <div className="map-legend">
+        <span><i style={{background:BUS_COLORS.cngNonAcGreen}}/>DTC</span>
+        <span><i style={{background:BUS_COLORS.evDeviOrange}}/>Cluster</span>
+        <span><i style={{background:BUS_COLORS.evAc}}/>Electric</span>
+      </div>
     </div>
+
     {locationStatus?<button className="location-notice" onClick={locate}><span>{locationStatus}</span><b>Retry</b></button>:null}
 
-    <div className="quick-row">
-      <button className="quick-card" onClick={()=>go('/plan')}><span className="quick-icon">↗</span><b>Plan trip</b><small>Find your bus</small></button>
-      <button className="quick-card" onClick={locate}><span className="quick-icon location">◎</span><b>Location</b><small>{location?'Recenter map':'Use my location'}</small></button>
-    </div>
-
-    <section className="section-head"><div><h2>Nearby stops</h2><p>Tap a stop for routes and live arrivals</p></div><button className="text-button" onClick={locate}>{location?'Recenter':'Use location'}</button></section>
-    {stops.length?stops.slice(0,4).map((s:any)=><button className="stop-card" key={s.stop_id} onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}><span className="stop-icon">●</span><span className="stop-copy"><b>{s.name}</b><small>{s.distanceMeters!=null?Math.round(s.distanceMeters)+' m away':'Nearby stop'}</small></span><span className="chevron">›</span></button>):<div className="flat-card empty-stop"><b>No nearby stops yet</b><small>Location is optional; use the map or enable location to find nearby stops.</small></div>}
+    <TransitSheet stops={stops} location={location} locate={locate} go={go}/>
     <button className="legal-link" onClick={()=>go('/legal')}>Legal & privacy</button>
   </>;
 }
 
+function TransitSheet({stops,location,locate,go}:{stops:any[];location:Point|null;locate:()=>void;go:(path:string)=>void}){
+  const[drag,setDrag]=useState(0);
+  const[startY,setStartY]=useState<number|null>(null);
+  const[startDrag,setStartDrag]=useState(0);
+  const collapsed=150;
+  const expanded=0;
+  const onDown=(e:any)=>{
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setStartY(e.clientY);setStartDrag(drag);
+  };
+  const onMove=(e:any)=>{
+    if(startY===null)return;
+    const next=Math.max(expanded,Math.min(collapsed,startDrag+(e.clientY-startY)));
+    setDrag(next);
+  };
+  const onUp=()=>{
+    if(startY===null)return;
+    setDrag(drag>75?collapsed:expanded);
+    setStartY(null);
+  };
+
+  return <section className="transit-sheet" style={{transform:'translateY('+drag+'px)'}}>
+    <button className="sheet-handle" type="button" aria-label="Drag nearby stops panel" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+      <span/>
+    </button>
+    <div className="sheet-head">
+      <div><h2>Nearby stops</h2><p>{location?'Stops around your location':'Enable location to find nearby stops'}</p></div>
+      <button className="text-button" onClick={locate}>{location?'Recenter':'Use location'}</button>
+    </div>
+    <div className="sheet-actions">
+      <button className="sheet-action" onClick={()=>go('/plan')}><span>↗</span><b>Plan trip</b></button>
+      <button className="sheet-action" onClick={locate}><span>◎</span><b>My location</b></button>
+    </div>
+    <div className="sheet-stops">
+      {stops.length?stops.slice(0,6).map((s:any)=>
+        <button className="stop-card" key={s.stop_id} onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}>
+          <span className="stop-icon">●</span>
+          <span className="stop-copy"><b>{s.name}</b><small>{s.distanceMeters!=null?Math.round(s.distanceMeters)+' m away':'Nearby stop'}</small></span>
+          <span className="chevron">›</span>
+        </button>
+      ):<div className="flat-card empty-stop"><b>{location?'No nearby stops found':'No nearby stops yet'}</b><small>{location?'Try moving the map or refreshing your location.':'Location is optional; use the button above to find nearby DTC stops.'}</small></div>}
+    </div>
+  </section>;
+}
 
 function BusLegend({open,onClose}:{open:boolean;onClose:()=>void}){
   if(!open)return null;
@@ -268,18 +319,21 @@ function BusLegend({open,onClose}:{open:boolean;onClose:()=>void}){
   </div>;
 }
 
-function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];location:Point|null;onSelect:(v:Vehicle)=>void;onLegend:()=>void}){
+function DtcMap({vehicles,location,onLegend}:{vehicles:Vehicle[];location:Point|null;onLegend:()=>void}){
   const el=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<any>(null);
-  type BusMarker=L.Marker&{_udBg?:string;_udText?:string;_udLabel?:string};
+  type BusMarker=L.Marker&{_udBg?:string;_udText?:string;_udLabel?:string;_udTip?:L.Tooltip};
   const markersRef=useRef<Map<string,BusMarker>>(new Map());
   const userRef=useRef<any>(null);
   const vehiclesRef=useRef<Vehicle[]>([]);
   const locationRef=useRef<Point|null>(location);
   const legendRef=useRef<()=>void>(onLegend);
   const focused=useRef(false);
+
   useEffect(()=>{locationRef.current=location;},[location]);
   useEffect(()=>{legendRef.current=onLegend;},[onLegend]);
+
+  const busSvg='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   useEffect(()=>{
     if(!el.current||mapRef.current)return;
@@ -288,13 +342,26 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
       const saved=storageGet('ud-map-center'),p=saved?JSON.parse(saved):null;
       if(Number.isFinite(p?.lat)&&Number.isFinite(p?.lon)){initial=[p.lat,p.lon];initialZoom=14;}
     }catch{}
-    const map:any=L.map(el.current,{center:initial,zoom:initialZoom,scrollWheelZoom:true,zoomControl:true,minZoom:9,maxBounds:BOUNDS,maxBoundsViscosity:.18,attributionControl:true,preferCanvas:true,inertia:true,inertiaDeceleration:1800,inertiaMaxSpeed:1800,bounceAtZoomLimits:false});
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true,attribution:'© OpenStreetMap contributors'}).addTo(map);
+
+    const map:any=L.map(el.current,{
+      center:initial,zoom:initialZoom,scrollWheelZoom:true,zoomControl:true,minZoom:9,maxBounds:BOUNDS,
+      maxBoundsViscosity:.18,attributionControl:true,preferCanvas:true,inertia:true,inertiaDeceleration:1800,
+      inertiaMaxSpeed:1800,bounceAtZoomLimits:false
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true,
+      attribution:'© OpenStreetMap contributors'
+    }).addTo(map);
     userRef.current=L.layerGroup().addTo(map);
 
     const locate=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
       const b:any=L.DomUtil.create('button','map-locate');b.type='button';b.innerHTML='◎';b.title='Center on my location';
-      L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',()=>{const current=locationRef.current;if(current)map.flyTo([current.lat,current.lon],14,{duration:1,easeLinearity:.2});});return b;
+      L.DomEvent.disableClickPropagation(b);
+      L.DomEvent.on(b,'click',()=>{
+        const current=locationRef.current;
+        if(current)map.flyTo([current.lat,current.lon],14,{duration:1,easeLinearity:.2});
+      });
+      return b;
     }});
     map.addControl(new locate());
 
@@ -305,25 +372,38 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
     }});
     map.addControl(new legendControl());
 
+    const popupHtml=(v:Vehicle)=>{
+      const route=displayVehicleRoute(v);
+      const destination=escapeHtml(v.toStop||'Destination unknown');
+      const vehicle=escapeHtml(v.vehicleLabel||v.licensePlate||v.id||'Vehicle');
+      const age=escapeHtml(ageLabel(v.observedAt));
+      const routeId=escapeHtml(v.routeId||route);
+      return '<div class="one-delhi-popup">'+
+        '<div class="one-delhi-popup-route"><span class="one-delhi-popup-bus">'+busSvg+'</span><b>'+escapeHtml(route)+'</b></div>'+
+        '<div class="one-delhi-popup-title">'+escapeHtml(route)+' <span>('+routeId+')</span></div>'+
+        '<div class="one-delhi-popup-destination">'+destination+'</div>'+
+        '<div class="one-delhi-popup-meta">'+vehicle+' · '+age+'</div>'+
+      '</div>';
+    };
+
     const makeIcon=(v:Vehicle)=>{
       const bg=busColorFor(v),fg=isHex(v.routeTextColor)?String(v.routeTextColor):textFor(bg);
-      const label=displayVehicleRoute(v).slice(0,14);
-      const compact=map.getZoom()<12;
-      const width=Math.max(34,Math.min(58,label.length*4.6+14));
-      const height=compact?20:24;
+      const label=displayVehicleRoute(v).slice(0,10);
+      const width=Math.max(44,Math.min(64,label.length*6+27));
       return {icon:L.divIcon({
         className:'web-bus-icon',
-        html:'<div class="web-bus" style="background:'+escapeHtml(bg)+';color:'+escapeHtml(fg)+';width:'+width+'px;height:'+height+'px"><span class="web-bus-label">'+escapeHtml(label)+'</span></div>',
-        iconSize:[width,height],iconAnchor:[width/2,height/2]
+        html:'<div class="web-bus one-delhi-bus" style="background:'+escapeHtml(bg)+';color:'+escapeHtml(fg)+';width:'+width+'px"><span class="bus-glyph">'+busSvg+'</span><span class="web-bus-label">'+escapeHtml(label)+'</span></div>',
+        iconSize:[width,28],iconAnchor:[width/2,14]
       }),bg,fg,label};
     };
 
     const renderVisible=()=>{
       const visible=new Map<string,Vehicle>();
-      const bounds=map.getBounds().pad(.12);
+      const bounds=map.getBounds().pad(.06);
       for(const v of vehiclesRef.current){
         const lat=Number(v.latitude),lon=Number(v.longitude);
-        if(Number.isFinite(lat)&&Number.isFinite(lon)&&bounds.contains([lat,lon]))visible.set(v.id,v);
+        // Ignore malformed positions and vehicles outside the Delhi map bounds.
+        if(Number.isFinite(lat)&&Number.isFinite(lon)&&BOUNDS[0][0]<=lat&&lat<=BOUNDS[1][0]&&BOUNDS[0][1]<=lon&&lon<=BOUNDS[1][1]&&bounds.contains([lat,lon]))visible.set(v.id,v);
       }
       const markers=markersRef.current;
       for(const [id,marker] of markers){
@@ -333,17 +413,25 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
         const spec=makeIcon(v),existing=markers.get(id);
         if(existing&&existing._udBg===spec.bg&&existing._udLabel===spec.label&&existing._udText===spec.fg){
           existing.setLatLng([Number(v.latitude),Number(v.longitude)]);
+          existing.setTooltipContent(popupHtml(v));
           continue;
         }
-        existing?.remove();
+        if(existing){existing.remove();markers.delete(id);}
         const marker=L.marker([Number(v.latitude),Number(v.longitude)],{icon:spec.icon,zIndexOffset:500}) as BusMarker;
-        marker.on('click',()=>onSelect(v));
-        marker._udBg=spec.bg;marker._udLabel=spec.label;marker._udText=spec.fg;
+        marker.bindTooltip(popupHtml(v),{
+          direction:'auto',offset:[0,-18],opacity:1,interactive:true,
+          className:'one-delhi-bus-popup',sticky:false
+        });
+        marker.on('click',()=>marker.openTooltip());
+        marker._udBg=spec.bg;marker._udLabel=spec.label;marker._udText=spec.fg;marker._udTip=marker.getTooltip()||undefined;
         marker.addTo(map);markers.set(id,marker);
       }
     };
 
-    const report=()=>{try{const cc=map.getCenter();storageSet('ud-map-center',JSON.stringify({lat:cc.lat,lon:cc.lng}));}catch{}renderVisible();};
+    const report=()=>{
+      try{const cc=map.getCenter();storageSet('ud-map-center',JSON.stringify({lat:cc.lat,lon:cc.lng}));}catch{}
+      renderVisible();
+    };
     map.on('moveend',report);map.on('zoomend',report);
     window.setTimeout(()=>{map.invalidateSize();renderVisible();},100);
     mapRef.current=map;(map as any)._udRenderVisible=renderVisible;
@@ -356,22 +444,17 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
     const map=mapRef.current;if(!map)return;
     userRef.current?.clearLayers();
     if(location){
-      L.marker([location.lat,location.lon],{icon:L.divIcon({className:'user-marker-icon',html:'<div class="user-marker"></div>',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(userRef.current);
-      if(!focused.current){focused.current=true;window.setTimeout(()=>map.flyTo([location.lat,location.lon],14,{duration:1.1,easeLinearity:.2}),80);}
+      L.marker([location.lat,location.lon],{
+        icon:L.divIcon({className:'user-marker-icon',html:'<div class="user-marker"></div>',iconSize:[16,16],iconAnchor:[8,8]})
+      }).addTo(userRef.current);
+      if(!focused.current){
+        focused.current=true;
+        window.setTimeout(()=>map.flyTo([location.lat,location.lon],14,{duration:1.1,easeLinearity:.2}),80);
+      }
     }
   },[location]);
 
   return <div ref={el} className="dtc-map" aria-label="Live DTC bus map"/>;
-}
-
-function BusPreview({bus,go}:{bus:Vehicle;go:(path:string)=>void}){
-  return <div className="bus-preview">
-    <button className="preview-close" onClick={()=>go('/')}>×</button>
-    <button className="preview-body" onClick={()=>{if(bus.routeShortName&&bus.routeId)go('/routes/'+encodeURIComponent(bus.routeId));}} disabled={!bus.routeShortName||!bus.routeId}>
-      <RouteBadge name={displayVehicleRoute(bus)} color={bus.serviceColor} textColor={'#FFFFFF'}/>
-      <span><small>LIVE BUS</small><b>To {bus.toStop||'Destination'}</b><em>{bus.vehicleLabel||bus.licensePlate||bus.id} · {ageLabel(bus.observedAt)} · View route</em></span><strong>›</strong>
-    </button>
-  </div>;
 }
 
 function RouteMiniMap({stops,buses}:{stops:any[];buses:Vehicle[]}) {
