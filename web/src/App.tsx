@@ -1,7 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import L from 'leaflet';
-import 'leaflet.markercluster';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
 import {api} from './api';
 
 import type {Vehicle} from './api';
@@ -318,7 +316,6 @@ function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Poi
   const mapRef=useRef<any>(null);
   type BusMarker=L.Marker&{_udBg?:string;_udText?:string;_udLabel?:string};
   const markersRef=useRef<Map<string,BusMarker>>(new Map());
-  const clusterRef=useRef<any>(null);
   const userRef=useRef<any>(null);
   const vehiclesRef=useRef<Vehicle[]>([]);
   const locationRef=useRef<Point|null>(location);
@@ -393,39 +390,19 @@ function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Poi
       });
     };
 
-    const cluster:any=(L as any).markerClusterGroup({
-      chunkedLoading:true,
-      chunkInterval:120,
-      chunkDelay:30,
-      showCoverageOnHover:false,
-      spiderfyOnMaxZoom:true,
-      zoomToBoundsOnClick:true,
-      removeOutsideVisibleBounds:true,
-      disableClusteringAtZoom:18,
-      maxClusterRadius:(zoom:number)=>zoom>=17?24:zoom>=15?38:56,
-      iconCreateFunction:(c:any)=>{
-        const n=c.getChildCount();
-        const size=n>=100?'large':n>=20?'medium':'small';
-        return L.divIcon({
-          className:'ud-bus-cluster-wrap',
-          html:'<div class="ud-bus-cluster '+size+'"><b>'+n.toLocaleString('en-IN')+'</b><span>buses</span></div>',
-          iconSize:[58,58],
-          iconAnchor:[29,29]
-        });
-      }
-    });
-    cluster.addTo(map);
-    clusterRef.current=cluster;
+    const busLayer:any=L.layerGroup().addTo(map);
 
     const syncMarkers=()=>{
       const vehiclesNow=vehiclesRef.current;
       const seen=new Set<string>();
       const markers=markersRef.current;
       const addQueue:BusMarker[]=[];
+      const viewport=map.getBounds().pad(.12);
       for(const v of vehiclesNow){
         const lat=Number(v.latitude),lon=Number(v.longitude);
         if(!Number.isFinite(lat)||!Number.isFinite(lon))continue;
         if(lat<BOUNDS[0][0]||lat>BOUNDS[1][0]||lon<BOUNDS[0][1]||lon>BOUNDS[1][1])continue;
+        if(!viewport.contains([lat,lon]))continue;
         const id=String(v.id);
         seen.add(id);
         const bg=busColorFor(v),label=displayVehicleRoute(v),existing=markers.get(id);
@@ -483,21 +460,18 @@ function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Poi
           markers.delete(id);
         }
       }
-      if(removeQueue.length)cluster.removeLayers(removeQueue);
-      if(addQueue.length)cluster.addLayers(addQueue);
-      // Rebuild the cluster index after live positions move. This avoids stale cluster locations.
-      const allMarkers=[...markers.values()];
-      cluster.clearLayers();
-      cluster.addLayers(allMarkers);
+      for(const marker of removeQueue)busLayer.removeLayer(marker);
+      for(const marker of addQueue)marker.addTo(busLayer);
     };
 
     const report=()=>{
       try{const cc=map.getCenter();storageSet('ud-map-center',JSON.stringify({lat:cc.lat,lon:cc.lng}));}catch{}
     };
-    map.on('moveend',report);map.on('zoomend',report);
+    map.on('moveend',()=>{report();syncMarkers();});
+    map.on('zoomend',()=>{report();syncMarkers();});
     window.setTimeout(()=>{map.invalidateSize();syncMarkers();},100);
     mapRef.current=map;(map as any)._udSyncMarkers=syncMarkers;
-    return()=>{map.remove();mapRef.current=null;markersRef.current.clear();userRef.current=null;clusterRef.current=null;selectedRef.current=null;};
+    return()=>{map.remove();mapRef.current=null;markersRef.current.clear();userRef.current=null;selectedRef.current=null;};
   },[]);
 
   useEffect(()=>{vehiclesRef.current=vehicles;(mapRef.current as any)?._udSyncMarkers?.();},[vehicles]);
