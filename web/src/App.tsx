@@ -392,7 +392,7 @@ function DtcMap({vehicles,location,onLegend}:{vehicles:Vehicle[];location:Point|
       const center=map.getCenter();
       const candidates=vehiclesRef.current.map(v=>{
         const lat=Number(v.latitude),lon=Number(v.longitude);
-        if(!Number.isFinite(lat)||!Number.isFinite(lon)||!BOUNDS[0][0]<=lat)return null;
+        if(!Number.isFinite(lat)||!Number.isFinite(lon))return null;
         if(lat<BOUNDS[0][0]||lat>BOUNDS[1][0]||lon<BOUNDS[0][1]||lon>BOUNDS[1][1]||!bounds.contains([lat,lon]))return null;
         const d=(lat-center.lat)**2+(lon-center.lng)**2;
         return {v,d};
