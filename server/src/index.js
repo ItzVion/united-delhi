@@ -74,7 +74,7 @@ async function seed(){
   for(let i=0;i<routes.length;i+=300){const ch=routes.slice(i,i+300),v=[];const p=ch.map((x,j)=>{const b=j*6;v.push(str(x.route_id),str(x.agency_id),str(x.route_short_name),str(x.route_long_name),str(x.route_color),str(x.route_text_color));return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+',$'+(b+5)+',$'+(b+6)+')'}).join(',');await c.query('INSERT INTO routes(route_id,agency_id,short_name,long_name,route_color,route_text_color) VALUES '+p+' ON CONFLICT(route_id) DO UPDATE SET agency_id=EXCLUDED.agency_id,short_name=EXCLUDED.short_name,long_name=EXCLUDED.long_name,route_color=EXCLUDED.route_color,route_text_color=EXCLUDED.route_text_color,updated_at=NOW()',v)}
   for(let i=0;i<stops.length;i+=300){const ch=stops.slice(i,i+300),v=[];const p=ch.map((x,j)=>{const b=j*4;v.push(str(x.stop_id),str(x.stop_name,200),num(x.stop_lat),num(x.stop_lon));return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+')'}).join(',');await c.query('INSERT INTO stops(stop_id,name,latitude,longitude) VALUES '+p+' ON CONFLICT(stop_id) DO UPDATE SET name=EXCLUDED.name,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,updated_at=NOW()',v)}
   const e=[...links.entries()];for(let i=0;i<e.length;i+=500){const ch=e.slice(i,i+500),v=[];const p=ch.map(([k,seq],j)=>{const z=k.indexOf('\0'),b=j*3;v.push(k.slice(0,z),k.slice(z+1),seq);return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+')'}).join(',');await c.query('INSERT INTO route_stops(route_id,stop_id,stop_sequence) VALUES '+p+' ON CONFLICT(route_id,stop_id) DO UPDATE SET stop_sequence=LEAST(route_stops.stop_sequence,EXCLUDED.stop_sequence)',v)}
-  await c.query("UPDATE static_feed_meta SET source_key='bundled-gtfs',source_url='https://database.mobilitydata.org/',imported_at=NOW(),imported_route_count=(SELECT COUNT(*) FROM routes),imported_stop_count=(SELECT COUNT(*) FROM stops),imported_route_stop_count=(SELECT COUNT(*) FROM route_stops) WHERE id=TRUE");
+  await c.query("UPDATE static_feed_meta SET source_key='bundled-gtfs',source_url='https://otd.delhi.gov.in/',imported_at=NOW(),imported_route_count=(SELECT COUNT(*) FROM routes),imported_stop_count=(SELECT COUNT(*) FROM stops),imported_route_stop_count=(SELECT COUNT(*) FROM route_stops) WHERE id=TRUE");
   await c.query('COMMIT');console.log('Static GTFS seed complete: '+routes.length+' routes, '+stops.length+' stops, '+links.size+' links.');
  }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e}finally{await c.query("SELECT pg_advisory_unlock(hashtext('united-delhi-static-seed'))").catch(()=>{});c.release()}
 }
@@ -125,10 +125,14 @@ async function refresh(){
  refreshing=(async()=>{
   try{
    const raw=await fetchLive();
+   // A transient/empty upstream response must never wipe a healthy live cache.
+   // Keep the last good positions and mark the feed stale instead.
+   if(!raw.length)throw new Error('DTC realtime feed returned no valid vehicles');
+   const fetchedAt=new Date().toISOString();
    cache.vehicles=raw.map(v=>({...v,routeShortName:v.routeId||null,routeColor:fallbackColor(v.routeId,v.id),routeTextColor:null,operator:null,...service(v.id,null)}));
-   cache.status='OK'; cache.reason=null; cache.fetchedAt=new Date().toISOString();
+   cache.status='OK'; cache.reason=null; cache.fetchedAt=fetchedAt;
    void persist(cache.vehicles);
-   void enrich(raw).then(enriched=>{if(cache.fetchedAt)cache.vehicles=enriched});
+   void enrich(raw).then(enriched=>{if(cache.fetchedAt===fetchedAt)cache.vehicles=enriched}).catch(()=>{});
    console.log('Realtime feed decoded: '+raw.length+' vehicles.');
   }catch(e){
    cache.status=cache.fetchedAt?'STALE':'UNAVAILABLE';
