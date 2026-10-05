@@ -40,7 +40,7 @@ async function seed(){
  try{
   await c.query("SELECT pg_advisory_lock(hashtext('united-delhi-static-seed'))");
   const q=(await c.query('SELECT (SELECT COUNT(*)::int FROM routes) r,(SELECT COUNT(*)::int FROM stops) s,(SELECT COUNT(*)::int FROM route_stops rs) l')).rows[0];
-  if(q.r>=2000&&q.s>=9000&&q.l>=50000){console.log('Static GTFS already populated: '+q.r+' routes, '+q.s+' stops, '+q.l+' links.');return}
+  if(q.r>=2000&&q.s>=5000&&q.l>=50000){console.log('Static GTFS already populated: '+q.r+' routes, '+q.s+' stops, '+q.l+' links.');return}
   const read=f=>parse(fs.readFileSync(path.join(DATA,f),'utf8'),{columns:true,skip_empty_lines:true,bom:true,relax_column_count:true,trim:true});
   const routes=read('routes.txt'),stops=read('stops.txt'),trips=read('trips.txt'),tripRoute=new Map();
   for(const x of trips){const t=str(x.trip_id),r=str(x.route_id);if(t&&r)tripRoute.set(t,r)}
