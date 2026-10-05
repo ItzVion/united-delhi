@@ -42,6 +42,8 @@ async function ensureRuntimeSchema(){
   await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS route_id TEXT');
   await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS stop_id TEXT');
   await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS bearing DOUBLE PRECISION');
+  await c.query('ALTER TABLE route_stops DROP CONSTRAINT IF EXISTS route_stops_route_fk');
+  await c.query('ALTER TABLE route_stops DROP CONSTRAINT IF EXISTS route_stops_stop_fk');
   console.log('Runtime database schema verified.');
  }finally{c.release()}
 }
