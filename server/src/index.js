@@ -24,7 +24,9 @@ const str=(v,max=160)=>{const x=String(v??'').trim();return x&&x.length<=max?x:n
 const num=v=>{const x=Number(v);return Number.isFinite(x)?x:null};
 const coord=(v,a,b)=>{const x=num(v);return x!==null&&x>=a&&x<=b?x:null};
 const dist=(a,b,c,d)=>{const R=6371000,r=Math.PI/180,la=(c-a)*r,lo=(d-b)*r,x=Math.sin(la/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(lo/2)**2;return 2*R*Math.asin(Math.sqrt(x))};
+const COLOR_PALETTE=['#24C88B','#2FAFBC','#E57D43','#3D82CE','#E35F67','#8B5CF6','#C58B2A','#00897B'];
 const service=(id,agency)=>{const v=String(id||'').toUpperCase(),a=String(agency||'').toUpperCase();if(/^DL51(?:EV|GD)/.test(v))return{serviceType:'electric',serviceColor:'#2FAFBC'};if(a==='DIMTS')return{serviceType:'cluster',serviceColor:'#E57D43'};if(a==='DTC')return{serviceType:'dtc',serviceColor:'#24C88B'};return{serviceType:'unknown',serviceColor:null}};
+const fallbackColor=(routeId,id)=>{const key=String(routeId||id||'BUS');let h=0;for(let i=0;i<key.length;i++)h=(h*31+key.charCodeAt(i))>>>0;return COLOR_PALETTE[h%COLOR_PALETTE.length]};
 
 app.disable('x-powered-by');app.set('trust proxy',1);
 app.use(cors({origin:(o,cb)=>{const allow=String(process.env.APP_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);if(!o||!allow.length||allow.includes(o))return cb(null,true);cb(new Error('Origin not allowed'))},methods:['GET','POST'],optionsSuccessStatus:204}));
@@ -69,9 +71,58 @@ async function fetchLive(){
  const u=new URL(FEED);u.searchParams.set(KEY_PARAM,KEY);const ac=new AbortController(),t=setTimeout(()=>ac.abort(),12000);
  try{const r=await fetch(u,{signal:ac.signal,headers:{accept:'application/x-protobuf, application/octet-stream','user-agent':'United-Delhi/2.0'}});if(!r.ok)throw new Error('DTC realtime HTTP '+r.status);const b=new Uint8Array(await r.arrayBuffer());if(b.length>10*1024*1024)throw new Error('Realtime feed exceeds safety limit');const f=GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(b),m=new Map();for(const e of f.entity||[]){const v=parseVehicle(e,Number(f.header?.timestamp||0));if(v)m.set(v.id,v)}return[...m.values()]}catch(e){if(e?.name==='AbortError')throw new Error('DTC realtime request timed out');throw e}finally{clearTimeout(t)}
 }
-async function enrich(vs){if(!pool||!vs.length)return vs;const ids=[...new Set(vs.map(v=>v.routeId).filter(Boolean))];if(!ids.length)return vs;try{const rows=(await pool.query('SELECT route_id,agency_id,short_name,route_color,route_text_color FROM routes WHERE route_id=ANY($1::text[])',[ids])).rows,m=new Map(rows.map(x=>[String(x.route_id),x]));return vs.map(v=>{const x=m.get(String(v.routeId||''));return{...v,routeShortName:x?.short_name||null,routeColor:x?.route_color||null,routeTextColor:x?.route_text_color||null,operator:x?.agency_id||null,...service(v.id,x?.agency_id)}})}catch{return vs.map(v=>({...v,routeShortName:null,routeColor:null,routeTextColor:null,operator:null,...service(v.id,null)}))}}
-async function persist(vs){if(!pool||!vs.length)return;const c=await pool.connect();try{await c.query('BEGIN');await c.query("SET LOCAL statement_timeout='10000'");for(const v of vs.slice(0,5000))await c.query('INSERT INTO vehicle_positions(vehicle_id,route_id,trip_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW()) ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,trip_id=EXCLUDED.trip_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',[v.id,v.routeId,v.tripId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt]);await c.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '20 minutes'");await c.query('COMMIT')}catch(e){await c.query('ROLLBACK').catch(()=>{});console.error('Vehicle persistence failed:',e.message)}finally{c.release()}}
-async function refresh(){if(refreshing)return refreshing;refreshing=(async()=>{try{const vs=await enrich(await fetchLive());cache.vehicles=vs;cache.status='OK';cache.reason=null;cache.fetchedAt=new Date().toISOString();void persist(vs);console.log('Realtime feed decoded: '+vs.length+' vehicles.')}catch(e){cache.status=cache.fetchedAt?'STALE':'UNAVAILABLE';cache.reason=e?.message||'Realtime request failed';console.error('Realtime poll failed:',cache.reason)}})().finally(()=>{refreshing=null});return refreshing}
+async function enrich(vs){
+ if(!pool||!vs.length)return vs.map(v=>({...v,routeColor:v.routeColor||fallbackColor(v.routeId,v.id),...service(v.id,null)}));
+ const ids=[...new Set(vs.map(v=>v.routeId).filter(Boolean))];
+ if(!ids.length)return vs.map(v=>({...v,routeColor:fallbackColor(v.routeId,v.id),...service(v.id,null)}));
+ try{
+  const rows=(await pool.query('SELECT route_id,agency_id,short_name,route_color,route_text_color FROM routes WHERE route_id=ANY($1::text[])',[ids])).rows;
+  const map=new Map(rows.map(x=>[String(x.route_id),x]));
+  return vs.map(v=>{
+    const x=map.get(String(v.routeId||'')),svc=service(v.id,x?.agency_id);
+    return {...v,routeShortName:x?.short_name||v.routeId||null,routeColor:x?.route_color||svc.serviceColor||fallbackColor(v.routeId,v.id),routeTextColor:x?.route_text_color||null,operator:x?.agency_id||null,...svc};
+  });
+ }catch{
+  return vs.map(v=>({...v,routeShortName:v.routeId||null,routeColor:fallbackColor(v.routeId,v.id),routeTextColor:null,operator:null,...service(v.id,null)}));
+ }
+}
+async function persist(vs){
+ if(!pool||!vs.length)return;
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN'); await c.query("SET LOCAL statement_timeout='10000'");
+  for(let i=0;i<Math.min(vs.length,5000);i+=250){
+   const chunk=vs.slice(i,i+250),values=[];
+   const placeholders=chunk.map((v,j)=>{
+    const b=j*8;
+    values.push(v.id,v.routeId,v.tripId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);
+    return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+',$'+(b+5)+',$'+(b+6)+',$'+(b+7)+',$'+(b+8)+',NOW())';
+   }).join(',');
+   await c.query('INSERT INTO vehicle_positions(vehicle_id,route_id,trip_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+placeholders+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,trip_id=EXCLUDED.trip_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values);
+  }
+  await c.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '20 minutes'");
+  await c.query('COMMIT');
+ }catch(e){await c.query('ROLLBACK').catch(()=>{});console.error('Vehicle persistence failed:',e.message)}
+ finally{c.release()}
+}
+async function refresh(){
+ if(refreshing)return refreshing;
+ refreshing=(async()=>{
+  try{
+   const raw=await fetchLive();
+   cache.vehicles=raw.map(v=>({...v,routeShortName:v.routeId||null,routeColor:fallbackColor(v.routeId,v.id),routeTextColor:null,operator:null,...service(v.id,null)}));
+   cache.status='OK'; cache.reason=null; cache.fetchedAt=new Date().toISOString();
+   void persist(cache.vehicles);
+   void enrich(raw).then(enriched=>{if(cache.fetchedAt)cache.vehicles=enriched});
+   console.log('Realtime feed decoded: '+raw.length+' vehicles.');
+  }catch(e){
+   cache.status=cache.fetchedAt?'STALE':'UNAVAILABLE';
+   cache.reason=e?.message||'Realtime request failed';
+   console.error('Realtime poll failed:',cache.reason);
+  }
+ })().finally(()=>{refreshing=null});
+ return refreshing;
+}
 
 app.get('/health',(_q,r)=>r.json({status:'OK',service:'united-delhi',realtime:cache.status,time:new Date().toISOString()}));
 app.get('/healthz',(_q,r)=>r.json({status:'OK'}));
@@ -79,8 +130,17 @@ app.get('/ready',(_q,r)=>r.json({status:'OK',database:Boolean(pool),realtime:cac
 app.get('/api/status',async(_q,r)=>{let database='NOT_CONFIGURED';if(pool){try{await pool.query('SELECT 1');database='OK'}catch{database='ERROR'}}r.json({status:'OK',database,realtime:cache.status,realtimeVehicles:cache.vehicles.length,fetchedAt:cache.fetchedAt,reason:cache.reason})});
 app.get('/api/realtime/vehicles',(_q,r)=>{const stale=!cache.fetchedAt||Date.now()-Date.parse(cache.fetchedAt)>90000;if(stale&&KEY)void refresh();r.json({status:cache.vehicles.length?'OK':cache.status,count:cache.vehicles.length,vehicles:cache.vehicles,fetchedAt:cache.fetchedAt,stale,reason:cache.reason})});
 app.get('/api/routes/:id',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',reason:'Database is not configured'});try{const id=str(q.params.id),route=(await pool.query('SELECT route_id,agency_id,short_name,long_name,route_color,route_text_color FROM routes WHERE route_id=$1',[id])).rows[0];if(!route)return r.status(404).json({status:'NOT_FOUND',reason:'Route not found'});const stops=(await pool.query('SELECT s.stop_id,s.name,s.latitude,s.longitude,rs.stop_sequence FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=$1 ORDER BY rs.stop_sequence,s.stop_id',[id])).rows;r.json({status:'OK',route,stops,vehicles:cache.vehicles.filter(v=>String(v.routeId||'')===id)})}catch{r.status(500).json({status:'ERROR',reason:'Failed to load route'})}});
-app.get('/api/stops/:id',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',reason:'Database is not configured'});try{const stop=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[str(q.params.id)])).rows[0];if(!stop)return r.status(404).json({status:'NOT_FOUND',reason:'Stop not found'});r.json({status:'OK',stop})}catch{r.status(500).json({status:'ERROR',reason:'Failed to load stop'})}});
-app.get('/api/stops/:id/arrivals',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',arrivals:[],reason:'Database is not configured'});try{const st=(await pool.query('SELECT latitude,longitude FROM stops WHERE stop_id=$1',[str(q.params.id)])).rows[0];if(!st)return r.status(404).json({status:'NOT_FOUND',arrivals:[],reason:'Stop not found'});const a=cache.vehicles.map(v=>({...v,distanceMeters:Math.round(dist(Number(st.latitude),Number(st.longitude),v.latitude,v.longitude))})).filter(v=>v.distanceMeters<=2500).sort((a,b)=>a.distanceMeters-b.distanceMeters).slice(0,20).map(v=>({vehicleId:v.id,routeId:v.routeId,routeName:v.routeShortName||v.routeId||'Bus',distanceMeters:v.distanceMeters,observedAt:v.observedAt}));r.json({status:a.length?'OK':'UNAVAILABLE',arrivals:a,reason:a.length?null:'No nearby live buses are available right now.'})}catch{r.status(500).json({status:'ERROR',arrivals:[],reason:'Failed to load arrivals'})}});
+app.get('/api/stops/:id',async(q,r)=>{
+ if(!pool)return r.status(503).json({status:'UNAVAILABLE',reason:'Database is not configured'});
+ try{
+  const id=str(q.params.id);
+  const stop=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[id])).rows[0];
+  if(!stop)return r.status(404).json({status:'NOT_FOUND',reason:'Stop not found'});
+  const routes=(await pool.query('SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,MIN(rs.stop_sequence) AS stop_sequence FROM route_stops rs JOIN routes r ON r.route_id=rs.route_id WHERE rs.stop_id=$1 GROUP BY r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color ORDER BY MIN(rs.stop_sequence),r.short_name,r.route_id LIMIT 100',[id])).rows;
+  r.json({status:'OK',stop,routes});
+ }catch{r.status(500).json({status:'ERROR',reason:'Failed to load stop'})}
+});
+app.get('/api/stops/:id/arrivals',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',arrivals:[],reason:'Database is not configured'});try{const st=(await pool.query('SELECT latitude,longitude FROM stops WHERE stop_id=$1',[str(q.params.id)])).rows[0];if(!st)return r.status(404).json({status:'NOT_FOUND',arrivals:[],reason:'Stop not found'});const a=cache.vehicles.map(v=>({...v,distanceMeters:Math.round(dist(Number(st.latitude),Number(st.longitude),v.latitude,v.longitude))})).filter(v=>v.distanceMeters<=2500).sort((a,b)=>a.distanceMeters-b.distanceMeters).slice(0,20).map(v=>({vehicleId:v.id,routeId:v.routeId,routeName:v.routeShortName||v.routeId||'Bus',routeColor:v.routeColor,routeTextColor:v.routeTextColor,serviceColor:v.serviceColor,distanceMeters:v.distanceMeters,observedAt:v.observedAt}));r.json({status:a.length?'OK':'UNAVAILABLE',arrivals:a,reason:a.length?null:'No nearby live buses are available right now.'})}catch{r.status(500).json({status:'ERROR',arrivals:[],reason:'Failed to load arrivals'})}});
 app.post('/api/stops/nearby',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',stops:[],reason:'Database is not configured'});const lat=coord(q.body?.lat,-90,90),lon=coord(q.body?.lon,-180,180),limit=Math.min(50,Math.max(1,Number(q.body?.limit)||30));if(lat===null||lon===null)return r.status(400).json({status:'ERROR',stops:[],reason:'Valid latitude and longitude are required'});try{const rows=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE latitude BETWEEN $1 AND $2 AND longitude BETWEEN $3 AND $4 LIMIT 1000',[lat-.15,lat+.15,lon-.15,lon+.15])).rows,stops=rows.map(x=>({...x,distanceMeters:Math.round(dist(lat,lon,Number(x.latitude),Number(x.longitude)))})).filter(x=>x.distanceMeters<=15000).sort((a,b)=>a.distanceMeters-b.distanceMeters).slice(0,limit);r.json({status:'OK',stops})}catch{r.status(500).json({status:'ERROR',stops:[],reason:'Nearby stops are temporarily unavailable'})}});
 app.get('/api/search',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',results:[],reason:'Database is not configured'});const x=String(q.query.q||'').trim().replace(/[%_]/g,'');if(x.length<2)return r.json({status:'OK',results:[]});try{const a=(await pool.query("SELECT route_id AS id,short_name AS label,long_name,route_color AS \"routeColor\",route_text_color AS \"routeTextColor\",NULL::text AS \"fromStop\",NULL::text AS \"toStop\",'route' AS type FROM routes WHERE short_name ILIKE $1 OR long_name ILIKE $1 ORDER BY label LIMIT 30",['%'+x+'%'])).rows,b=(await pool.query("SELECT stop_id AS id,name AS label,NULL::text AS \"fromStop\",NULL::text AS \"toStop\",NULL::text AS \"routeColor\",NULL::text AS \"routeTextColor\",'stop' AS type FROM stops WHERE name ILIKE $1 ORDER BY label LIMIT 30",['%'+x+'%'])).rows;r.json({status:'OK',results:[...a,...b].slice(0,60)})}catch{r.status(500).json({status:'ERROR',results:[],reason:'Search is temporarily unavailable'})}});
 app.get('/api/plan',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',options:[],reason:'Database is not configured'});const a=str(q.query.fromStopId),b=str(q.query.toStopId);if(!a||!b||a===b)return r.status(400).json({status:'ERROR',options:[],reason:'Two different stop IDs are required'});try{const rows=(await pool.query('SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,o.stop_id from_stop_id,o.name from_stop,d.stop_id to_stop_id,d.name to_stop,o.stop_sequence from_sequence,d.stop_sequence to_sequence FROM route_stops o JOIN route_stops d ON d.route_id=o.route_id AND d.stop_sequence>o.stop_sequence JOIN routes r ON r.route_id=o.route_id WHERE o.stop_id=$1 AND d.stop_id=$2 ORDER BY (d.stop_sequence-o.stop_sequence),r.route_id LIMIT 10',[a,b])).rows,options=rows.map(x=>({type:'direct',durationMinutes:Math.max(3,Math.ceil((Number(x.to_sequence)-Number(x.from_sequence))*2.5)),durationIsEstimate:true,walkingMinutes:null,walkingIsEstimated:true,legs:[{routeId:String(x.route_id),routeName:x.short_name||x.long_name||'Bus',routeColor:x.route_color,routeTextColor:x.route_text_color,fromStop:x.from_stop,toStop:x.to_stop,fromStopId:x.from_stop_id,toStopId:x.to_stop_id}]})),origin=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[a])).rows[0]||null,destination=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[b])).rows[0]||null;r.json({status:'OK',origin,destination,options:options.slice(0,5),reason:options.length?null:'No direct bus journey was found'})}catch{r.status(500).json({status:'ERROR',options:[],reason:'Journey planner is temporarily unavailable'})}});
