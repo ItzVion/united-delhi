@@ -19,6 +19,21 @@ const KEY_PARAM=String(process.env.DTC_API_KEY_PARAM||'key').trim()||'key';
 const pool=DB?new Pool({connectionString:DB,max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000,ssl:/localhost|127(?:\.\d+){3}|::1/i.test(DB)?false:{rejectUnauthorized:true}}):null;
 const cache={vehicles:[],status:KEY?'STARTING':'UNAVAILABLE',reason:KEY?null:'DTC_API_KEY is not configured',fetchedAt:null};
 let refreshing=null,poll=null;
+const routeMeta=new Map();
+async function loadRouteMeta(){
+ if(!pool)return;
+ try{
+  const rows=(await pool.query('SELECT route_id,agency_id,short_name,route_color,route_text_color FROM routes')).rows;
+  routeMeta.clear();
+  for(const x of rows)routeMeta.set(String(x.route_id),x);
+  console.log('Loaded route metadata: '+routeMeta.size+' routes.');
+ }catch(e){console.error('Route metadata load failed:',e?.message||e)}
+}
+const applyRouteMeta=(v)=>{
+ const x=routeMeta.get(String(v.routeId||''));
+ const svc=service(v.id,x?.agency_id);
+ return {...v,routeShortName:x?.short_name||null,routeColor:x?.route_color||svc.serviceColor||fallbackColor(v.routeId,v.id),routeTextColor:x?.route_text_color||null,operator:x?.agency_id||null,...svc};
+};
 const DATA=path.join(path.dirname(fileURLToPath(import.meta.url)),'../data/otd_gtfs');
 const str=(v,max=160)=>{const x=String(v??'').trim();return x&&x.length<=max?x:null};
 const num=v=>{const x=Number(v);return Number.isFinite(x)?x:null};
@@ -129,10 +144,10 @@ async function refresh(){
    // Keep the last good positions and mark the feed stale instead.
    if(!raw.length)throw new Error('DTC realtime feed returned no valid vehicles');
    const fetchedAt=new Date().toISOString();
-   cache.vehicles=raw.map(v=>({...v,routeShortName:v.routeId||null,routeColor:fallbackColor(v.routeId,v.id),routeTextColor:null,operator:null,...service(v.id,null)}));
+   cache.vehicles=raw.map(applyRouteMeta);
    cache.status='OK'; cache.reason=null; cache.fetchedAt=fetchedAt;
    void persist(cache.vehicles);
-   void enrich(raw).then(enriched=>{if(cache.fetchedAt===fetchedAt)cache.vehicles=enriched}).catch(()=>{});
+   if(!routeMeta.size)void enrich(raw).then(enriched=>{if(cache.fetchedAt===fetchedAt)cache.vehicles=enriched}).catch(()=>{});
    console.log('Realtime feed decoded: '+raw.length+' vehicles.');
   }catch(e){
    cache.status=cache.fetchedAt?'STALE':'UNAVAILABLE';
@@ -166,7 +181,14 @@ app.get('/api/plan',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNA
 
 app.use((_q,r)=>r.status(404).json({status:'NOT_FOUND',reason:'Endpoint not found'}));
 app.use((e,_q,r,_n)=>{console.error('Unhandled request error:',e?.message||e);if(!r.headersSent)r.status(500).json({status:'ERROR',reason:'Internal server error'})});
-const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(()=>{if(pool)void ensureRuntimeSchema().then(()=>seed()).catch(e=>console.error('Database bootstrap failed:',e.message));if(KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}},5000)});
+const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);
+ setTimeout(async()=>{
+  try{
+   if(pool){await ensureRuntimeSchema();await seed();await loadRouteMeta();}
+  }catch(e){console.error('Database bootstrap failed:',e?.message||e)}
+  if(KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}
+ },1500);
+});
 server.requestTimeout=30000;server.headersTimeout=40000;server.keepAliveTimeout=65000;
 process.on('unhandledRejection',e=>console.error('Unhandled rejection:',e));process.on('uncaughtException',e=>console.error('Uncaught exception:',e));
 for(const sig of ['SIGTERM','SIGINT'])process.on(sig,async()=>{if(poll)clearInterval(poll);server.close();await pool?.end().catch(()=>{});process.exit(0)});
