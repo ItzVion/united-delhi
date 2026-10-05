@@ -56,15 +56,17 @@ button:disabled{cursor:not-allowed}
 .error-box b{font-size:13px}
 .error-box span{font-size:11px;line-height:16px}
 
-.map-card{height:clamp(275px,36vw,380px);position:relative;overflow:hidden;border:1px solid #D4DDE0;background:#E9EFF1}
+.map-card{height:clamp(430px,64vh,620px);position:relative;overflow:hidden;border:1px solid #D4DDE0;background:#E9EFF1}
 .dtc-map{width:100%;height:100%;background:#E9EFF1}
 .map-topbar{position:absolute;left:10px;top:10px;z-index:500;background:rgba(255,255,255,.95);padding:6px 9px;display:flex;align-items:center;gap:6px;font-size:10px}
 .map-topbar i{width:7px;height:7px;background:#2E7D32;display:block}
 .map-attribution{position:absolute;right:7px;bottom:6px;z-index:500;background:rgba(255,255,255,.92);padding:2px 5px;font-size:7px;color:#68757B}
 .map-locate{width:40px;height:40px;border:1px solid #D4DDE0;background:#FFFFFF;color:#00695C;font:900 21px system-ui,sans-serif;line-height:40px;text-align:center;box-shadow:0 3px 14px rgba(31,42,48,.16);cursor:pointer;margin:0 8px 32px 0}
-.web-bus{width:46px;height:24px;background:#00695C;color:#FFFFFF;border:2px solid #FFFFFF;border-radius:0;box-shadow:0 2px 8px rgba(31,42,48,.28);display:flex;align-items:center;justify-content:center;font:900 8px/1 system-ui,sans-serif;text-align:center;overflow:hidden;padding:2px;white-space:nowrap}
-.web-bus-label{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.web-bus.mini{width:46px;height:22px;font-size:7px;border-width:2px}
+.web-bus{height:28px;background:#00695C;color:#FFFFFF;border:2px solid #FFFFFF;border-radius:2px;box-shadow:0 2px 8px rgba(31,42,48,.30);display:flex;align-items:center;justify-content:flex-start;gap:4px;font:900 9px/1 system-ui,sans-serif;text-align:center;overflow:hidden;padding:2px 5px;white-space:nowrap}
+.web-bus-label{display:block;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bus-glyph{width:18px;height:18px;display:grid;place-items:center;flex:0 0 18px}
+.bus-glyph svg{width:17px;height:17px;display:block}
+.web-bus.mini{height:24px;font-size:8px;border-width:2px}
 .route-mini-bus{background:transparent!important}
 .user-marker{width:16px;height:16px;background:#1976D2;border:3px solid #FFFFFF;box-shadow:0 2px 8px rgba(31,42,48,.28)}
 .location-notice{width:100%;margin-top:7px;padding:9px 10px;background:#F5F0D8;border:1px solid #D9C66B;color:#8A6500;display:flex;justify-content:space-between;text-align:left}
@@ -91,14 +93,30 @@ button:disabled{cursor:not-allowed}
 .empty-stop small{font-size:11px;color:#68757B;line-height:16px}
 .legal-link{border:0;background:transparent;width:100%;padding:18px 0;color:#68757B;font-size:10px;font-weight:800}
 
-.bus-preview{position:absolute;left:9px;right:9px;bottom:9px;z-index:700;background:#FFFFFF;border:1px solid #D4DDE0;box-shadow:0 6px 20px rgba(31,42,48,.16)}
-.preview-close{position:absolute;right:6px;top:5px;width:25px;height:25px;border:0;background:#F4F6F7;color:#68757B;font-size:19px}
-.preview-body{width:100%;min-height:72px;padding:11px 28px 11px 11px;border:0;background:#FFFFFF;display:flex;align-items:center;gap:10px;text-align:left}
-.preview-body>span:nth-child(2){flex:1;display:flex;flex-direction:column;min-width:0}
-.preview-body small{font-size:8px;color:#00695C;font-weight:900;letter-spacing:1px}
-.preview-body b{font-size:14px;color:#1F2A30;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.preview-body em{font-size:9px;color:#68757B;font-style:normal;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.preview-body strong{font-size:27px;color:#68757B;font-weight:400}
+.one-delhi-bus-popup{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;pointer-events:auto}
+.one-delhi-bus-popup:before{display:none!important}
+.one-delhi-bus-popup .leaflet-tooltip-content{margin:0!important;padding:0!important}
+.one-delhi-popup{width:min(280px,calc(100vw - 46px));background:#FFFFFF;border:1px solid #C9D1D4;box-shadow:0 8px 24px rgba(20,30,35,.24);padding:11px 12px;color:#1F2A30}
+.one-delhi-popup-route{display:flex;align-items:center;gap:7px;color:#00695C;font-size:16px;line-height:20px}
+.one-delhi-popup-bus{width:25px;height:25px;display:grid;place-items:center}
+.one-delhi-popup-bus svg{width:23px;height:23px;display:block}
+.one-delhi-popup-title{font-size:14px;font-weight:900;margin-top:5px;line-height:18px}
+.one-delhi-popup-title span{font-weight:600;color:#68757B}
+.one-delhi-popup-destination{font-size:12px;font-weight:700;line-height:17px;margin-top:2px;white-space:normal}
+.one-delhi-popup-meta{font-size:10px;color:#68757B;margin-top:5px;line-height:14px}
+
+.transit-sheet{position:relative;z-index:850;margin:-22px -1px 0;background:#FFFFFF;border:1px solid #D4DDE0;border-radius:22px 22px 0 0;box-shadow:0 -5px 20px rgba(31,42,48,.14);padding:5px 10px 18px;min-height:360px;touch-action:none;transition:transform .24s ease;will-change:transform}
+.sheet-handle{width:100%;height:30px;border:0;background:transparent;display:flex;align-items:center;justify-content:center;padding:0;touch-action:none}
+.sheet-handle span{display:block;width:42px;height:4px;background:#AAB4B8;border-radius:99px}
+.sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:4px 5px 9px}
+.sheet-head h2{font-size:18px;line-height:21px;margin:0;color:#1F2A30}
+.sheet-head p{font-size:10px;color:#68757B;margin:3px 0 0}
+.sheet-actions{display:flex;gap:7px;padding:0 5px 9px}
+.sheet-action{flex:1;min-height:48px;border:1px solid #D4DDE0;background:#FFFFFF;display:flex;align-items:center;gap:8px;padding:8px 10px;text-align:left}
+.sheet-action span{font-size:17px;color:#00695C;font-weight:900}
+.sheet-action b{font-size:11px;color:#1F2A30}
+.sheet-stops{max-height:235px;overflow:auto;padding:0 5px}
+.sheet-stops .stop-card{margin-bottom:6px}
 
 .bottom-nav{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:1000;width:min(760px,100%);height:64px;background:#FFFFFF;border-top:1px solid #D4DDE0;display:flex;align-items:center;justify-content:space-around;padding-bottom:4px}
 .bottom-nav button{width:72px;height:54px;border:0;background:transparent;color:#68757B;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
