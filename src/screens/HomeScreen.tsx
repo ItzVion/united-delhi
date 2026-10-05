@@ -126,7 +126,7 @@ export default function HomeScreen(){
   return <SafeAreaView style={styles.safe}>
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <View style={styles.brandRow}><UnitedDelhiMark size={50}/><View style={styles.brandCopy}><Text style={styles.brand}>UNITED DELHI</Text><Text style={styles.tagline}>Delhi transit, made simple</Text></View></View>
+        <View style={styles.brandRow}><UnitedDelhiMark size={50}/><View style={styles.brandCopy}><Text style={styles.brand}>UNITED DELHI</Text><Text style={styles.tagline}>Delhi transit</Text></View></View>
         <StatusPill label={liveLabel} tone={fresh==='ok'?'ok':fresh==='unavailable'?'danger':fresh==='stale'?'muted':'muted'}/>
       </View>
 
@@ -336,12 +336,12 @@ const styles=StyleSheet.create({
  safe:{flex:1,backgroundColor:colors.background},
  scroll:{width:'100%',maxWidth:760,alignSelf:'center',paddingHorizontal:16,paddingTop:7,paddingBottom:24},
  header:{height:64,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
- brandRow:{flexDirection:'row',alignItems:'center'},brandCopy:{marginLeft:9},brand:{fontSize:18,fontWeight:'900',letterSpacing:1,color:colors.text},tagline:{fontSize:9,color:colors.textMuted,marginTop:2},
- search:{height:48,borderRadius:0,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,flexDirection:'row',alignItems:'center',paddingHorizontal:13,marginTop:7},
+ brandRow:{flexDirection:'row',alignItems:'center'},brandCopy:{marginLeft:9},brand:{fontSize:18,fontWeight:'900',letterSpacing:1,color:colors.text},tagline:{fontSize:10,color:colors.textMuted,marginTop:2},
+ search:{height:48,borderRadius:14,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,flexDirection:'row',alignItems:'center',paddingHorizontal:13,marginTop:7},
  searchIcon:{fontSize:23,color:colors.text,marginRight:8},searchInput:{flex:1,fontSize:13,color:colors.text,paddingVertical:0},searchKey:{fontSize:20,fontWeight:'800',color:colors.textMuted,paddingHorizontal:3},
- searchResults:{marginTop:7,borderRadius:0,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,overflow:'hidden'},searchResult:{minHeight:52,paddingHorizontal:12,paddingVertical:9,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderBottomColor:colors.border},searchBadge:{minWidth:48,height:30,borderRadius:0,alignItems:'center',justifyContent:'center',paddingHorizontal:6},searchBadgeText:{fontSize:10,fontWeight:'900'},searchStopIcon:{width:30,height:30,borderRadius:0,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},searchStopDot:{fontSize:9,color:colors.accent},searchCopy:{flex:1,marginLeft:9},searchTitle:{fontSize:11,fontWeight:'900',color:colors.text},searchMeta:{fontSize:9,color:colors.textMuted,marginTop:2},searchArrow:{fontSize:21,color:colors.textMuted},searchEmpty:{padding:13,fontSize:10,color:colors.textMuted},searchError:{padding:13,fontSize:10,color:colors.danger},
+ searchResults:{marginTop:7,borderRadius:14,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,overflow:'hidden'},searchResult:{minHeight:52,paddingHorizontal:12,paddingVertical:9,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderBottomColor:colors.border},searchBadge:{minWidth:48,height:30,borderRadius:14,alignItems:'center',justifyContent:'center',paddingHorizontal:6},searchBadgeText:{fontSize:10,fontWeight:'900'},searchStopIcon:{width:30,height:30,borderRadius:14,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},searchStopDot:{fontSize:9,color:colors.accent},searchCopy:{flex:1,marginLeft:9},searchTitle:{fontSize:11,fontWeight:'900',color:colors.text},searchMeta:{fontSize:9,color:colors.textMuted,marginTop:2},searchArrow:{fontSize:21,color:colors.textMuted},searchEmpty:{padding:13,fontSize:10,color:colors.textMuted},searchError:{padding:13,fontSize:10,color:colors.danger},
  sectionLine:{paddingHorizontal:2,paddingTop:13,paddingBottom:7,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionKicker:{fontSize:10,fontWeight:'900',letterSpacing:1.1,color:colors.textMuted},locationLink:{fontSize:11,fontWeight:'900',color:colors.accent},
- mapCard:{borderRadius:0,overflow:'hidden',borderWidth:1,borderColor:colors.border,backgroundColor:'#eef2f1'},map:{flex:1},
+ mapCard:{borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.border,backgroundColor:'#eef2f1'},map:{flex:1},
  legendOverlay:{flex:1,backgroundColor:'rgba(23,49,47,.42)',alignItems:'center',justifyContent:'center',padding:16},
  legendDialog:{width:'100%',maxWidth:520,maxHeight:'85%',backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,padding:16},
  legendTitle:{fontSize:17,fontWeight:'900',color:colors.text,marginBottom:12},
@@ -349,7 +349,7 @@ const styles=StyleSheet.create({
  legendHeaderText:{fontSize:9,fontWeight:'900',letterSpacing:1,color:colors.textMuted},
  legendRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingVertical:10,borderBottomWidth:1,borderBottomColor:colors.border},
  legendIcons:{flexDirection:'row',gap:7,flex:1},
- legendBus:{width:34,height:24,borderRadius:0,alignItems:'center',justifyContent:'center'},
+ legendBus:{width:34,height:24,borderRadius:14,alignItems:'center',justifyContent:'center'},
  legendBusWindow:{position:'absolute',left:6,right:6,top:5,height:6,backgroundColor:'rgba(255,255,255,.22)'},
  legendBusWindshield:{position:'absolute',left:7,right:7,top:13,height:4,backgroundColor:'rgba(255,255,255,.9)'},
  legendBusLightRow:{position:'absolute',left:6,right:6,bottom:3,flexDirection:'row',justifyContent:'space-between'},
@@ -357,23 +357,23 @@ const styles=StyleSheet.create({
  legendType:{flex:1,fontSize:10,fontWeight:'800',color:colors.text,textAlign:'right'},
  legendClose:{marginTop:14,minHeight:42,alignItems:'center',justifyContent:'center',backgroundColor:colors.accent,paddingHorizontal:16},
  legendCloseText:{fontSize:11,fontWeight:'900',color:'#fff'},
- mapTop:{position:'absolute',left:10,top:10,flexDirection:'row',alignItems:'center',backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:9,paddingVertical:6,borderRadius:0},liveDot:{width:7,height:7,borderRadius:0,backgroundColor:colors.success,marginRight:6},mapTopText:{fontSize:10,fontWeight:'900',color:colors.text},mapAttribution:{position:'absolute',right:7,bottom:6,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:5,paddingVertical:2,borderRadius:0},mapAttributionText:{fontSize:7,color:'#52625f'},mapLegend:{position:'absolute',left:7,bottom:7,flexDirection:'row',gap:7,backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:7,paddingVertical:5,borderRadius:0,borderWidth:1,borderColor:colors.border},legendItem:{flexDirection:'row',alignItems:'center',gap:3},legendDot:{width:7,height:7,borderRadius:0},legendText:{fontSize:8,fontWeight:'800',color:colors.text},
- locationNotice:{position:'absolute',left:10,right:10,bottom:10,padding:9,borderRadius:0,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,flexDirection:'row',justifyContent:'space-between'},
- busPreview:{position:'absolute',left:9,right:9,bottom:9,borderRadius:0,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,shadowColor:'#17312F',shadowOpacity:.14,shadowRadius:12,shadowOffset:{width:0,height:4},elevation:6},
+ mapTop:{position:'absolute',left:10,top:10,flexDirection:'row',alignItems:'center',backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:9,paddingVertical:6,borderRadius:14},liveDot:{width:7,height:7,borderRadius:14,backgroundColor:colors.success,marginRight:6},mapTopText:{fontSize:10,fontWeight:'900',color:colors.text},mapAttribution:{position:'absolute',right:7,bottom:6,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:5,paddingVertical:2,borderRadius:14},mapAttributionText:{fontSize:7,color:'#52625f'},mapLegend:{position:'absolute',left:7,bottom:7,flexDirection:'row',gap:7,backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:7,paddingVertical:5,borderRadius:14,borderWidth:1,borderColor:colors.border},legendItem:{flexDirection:'row',alignItems:'center',gap:3},legendDot:{width:7,height:7,borderRadius:14},legendText:{fontSize:8,fontWeight:'800',color:colors.text},
+ locationNotice:{position:'absolute',left:10,right:10,bottom:10,padding:9,borderRadius:14,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,flexDirection:'row',justifyContent:'space-between'},
+ busPreview:{position:'absolute',left:9,right:9,bottom:9,borderRadius:14,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,shadowColor:'#17312F',shadowOpacity:.14,shadowRadius:12,shadowOffset:{width:0,height:4},elevation:6},
  busPreviewBody:{minHeight:72,padding:11,paddingRight:28,flexDirection:'row',alignItems:'center'},
- busPreviewClose:{position:'absolute',right:6,top:5,zIndex:3,width:25,height:25,borderRadius:0,alignItems:'center',justifyContent:'center',backgroundColor:colors.background},
+ busPreviewClose:{position:'absolute',right:6,top:5,zIndex:3,width:25,height:25,borderRadius:14,alignItems:'center',justifyContent:'center',backgroundColor:colors.background},
  busPreviewCloseText:{fontSize:19,lineHeight:21,color:colors.textMuted},
- busPreviewBadge:{minWidth:58,height:40,borderRadius:0,paddingHorizontal:8,alignItems:'center',justifyContent:'center'},
+ busPreviewBadge:{minWidth:58,height:40,borderRadius:14,paddingHorizontal:8,alignItems:'center',justifyContent:'center'},
  busPreviewBadgeText:{fontSize:13,fontWeight:'900'},
  busPreviewCopy:{flex:1,marginLeft:10},
  busPreviewEyebrow:{fontSize:8,fontWeight:'900',letterSpacing:1,color:colors.accent},
  busPreviewTitle:{fontSize:14,fontWeight:'900',color:colors.text,marginTop:2},
  busPreviewMeta:{fontSize:9,color:colors.textMuted,marginTop:3},
  busPreviewArrow:{fontSize:27,color:colors.textMuted,marginLeft:6},locationNoticeText:{fontSize:11,color:colors.textMuted},retry:{fontSize:11,fontWeight:'900',color:colors.accent},
- quickRow:{flexDirection:'row',gap:8,marginTop:10},quick:{flex:1,minHeight:72,padding:10,borderRadius:0,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},quickIcon:{fontSize:18,fontWeight:'900'},quickTitle:{fontSize:12,fontWeight:'900',color:colors.text,marginTop:4},quickSub:{fontSize:9,color:colors.textMuted,marginTop:1},
+ quickRow:{flexDirection:'row',gap:8,marginTop:10},quick:{flex:1,minHeight:72,padding:10,borderRadius:14,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},quickIcon:{fontSize:18,fontWeight:'900'},quickTitle:{fontSize:12,fontWeight:'900',color:colors.text,marginTop:4},quickSub:{fontSize:9,color:colors.textMuted,marginTop:1},
  sectionHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginTop:18,marginBottom:8},sectionTitle:{fontSize:17,fontWeight:'900',color:colors.text},sectionSub:{fontSize:10,color:colors.textMuted,marginTop:2},seeAll:{fontSize:11,fontWeight:'900',color:colors.accent},
- stopCard:{flexDirection:'row',alignItems:'center',padding:11,borderRadius:0,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,marginBottom:7},stopIcon:{width:34,height:34,borderRadius:0,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},stopIconText:{fontSize:10,color:colors.accent},stopCopy:{flex:1,marginLeft:10},stopName:{fontSize:13,fontWeight:'800',color:colors.text},stopDistance:{fontSize:10,color:colors.textMuted,marginTop:2},arrow:{fontSize:24,color:colors.textMuted,marginLeft:7},
- emptyCard:{padding:18,borderRadius:0,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},emptyTitle:{fontSize:13,fontWeight:'900',color:colors.text},emptyText:{fontSize:11,color:colors.textMuted,marginTop:3},
+ stopCard:{flexDirection:'row',alignItems:'center',padding:11,borderRadius:14,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,marginBottom:7},stopIcon:{width:34,height:34,borderRadius:14,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},stopIconText:{fontSize:10,color:colors.accent},stopCopy:{flex:1,marginLeft:10},stopName:{fontSize:13,fontWeight:'800',color:colors.text},stopDistance:{fontSize:10,color:colors.textMuted,marginTop:2},arrow:{fontSize:24,color:colors.textMuted,marginLeft:7},
+ emptyCard:{padding:18,borderRadius:14,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},emptyTitle:{fontSize:13,fontWeight:'900',color:colors.text},emptyText:{fontSize:11,color:colors.textMuted,marginTop:3},
  legal:{alignItems:'center',paddingVertical:18},legalText:{fontSize:10,fontWeight:'800',color:colors.textMuted},
  bottomNav:{width:'100%',maxWidth:760,alignSelf:'center',height:64,borderTopWidth:1,borderTopColor:colors.border,backgroundColor:colors.surface,flexDirection:'row',alignItems:'center',justifyContent:'space-around',paddingBottom:4},bottomItem:{width:72,alignItems:'center'},bottomIcon:{fontSize:19,fontWeight:'900'},bottomLabel:{fontSize:9,fontWeight:'800',marginTop:3}
 });
