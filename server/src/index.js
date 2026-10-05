@@ -34,6 +34,18 @@ app.use(express.json({limit:'32kb'}));
 app.use((_q,r,n)=>{r.setHeader('X-Content-Type-Options','nosniff');r.setHeader('Referrer-Policy','no-referrer');r.setHeader('X-Frame-Options','DENY');r.setHeader('Cache-Control','no-store');n()});
 app.use('/api',rateLimit({windowMs:60000,limit:180,standardHeaders:'draft-8',legacyHeaders:false}));
 
+async function ensureRuntimeSchema(){
+ if(!pool)return;
+ const c=await pool.connect();
+ try{
+  await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS trip_id TEXT');
+  await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS route_id TEXT');
+  await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS stop_id TEXT');
+  await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS bearing DOUBLE PRECISION');
+  console.log('Runtime database schema verified.');
+ }finally{c.release()}
+}
+
 async function seed(){
  if(!pool)return;
  const c=await pool.connect();
@@ -147,7 +159,7 @@ app.get('/api/plan',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNA
 
 app.use((_q,r)=>r.status(404).json({status:'NOT_FOUND',reason:'Endpoint not found'}));
 app.use((e,_q,r,_n)=>{console.error('Unhandled request error:',e?.message||e);if(!r.headersSent)r.status(500).json({status:'ERROR',reason:'Internal server error'})});
-const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(()=>{if(pool)void seed().catch(e=>console.error('Static GTFS seed failed:',e.message));if(KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}},5000)});
+const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(()=>{if(pool)void ensureRuntimeSchema().then(()=>seed()).catch(e=>console.error('Database bootstrap failed:',e.message));if(KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}},5000)});
 server.requestTimeout=30000;server.headersTimeout=40000;server.keepAliveTimeout=65000;
 process.on('unhandledRejection',e=>console.error('Unhandled rejection:',e));process.on('uncaughtException',e=>console.error('Uncaught exception:',e));
 for(const sig of ['SIGTERM','SIGINT'])process.on(sig,async()=>{if(poll)clearInterval(poll);server.close();await pool?.end().catch(()=>{});process.exit(0)});
