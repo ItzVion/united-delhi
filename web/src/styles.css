@@ -1,16 +1,19 @@
 :root{
   font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  color:#1F2A30;background:#F4F6F7;font-synthesis:none;text-rendering:optimizeLegibility;
+  color:#16312B;background:#F2F6F4;font-synthesis:none;text-rendering:optimizeLegibility;
+  --ud-bg:#F2F6F4;--ud-surface:#FFFFFF;--ud-text:#16312B;--ud-muted:#64736E;
+  --ud-border:#D5E0DC;--ud-green:#00695C;--ud-green-dark:#004D40;--ud-mint:#E0F1EC;
+  --ud-blue:#1976D2;--ud-radius-sm:10px;--ud-radius-md:14px;--ud-radius-lg:20px;--ud-radius-xl:26px;
 }
 *{box-sizing:border-box}
-html,body,#root{margin:0;min-height:100%;background:#F4F6F7}
+html,body,#root{margin:0;min-height:100%;background:var(--ud-bg)}
 body{margin:0}
 button,input{font:inherit}
 button{cursor:pointer}
 button:disabled{cursor:not-allowed}
 
-.app-shell{min-height:100vh;background:#F4F6F7;display:flex;flex-direction:column}
-.mobile-header{width:min(760px,100%);margin:0 auto;padding:12px 18px 10px;min-height:70px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#F4F6F7}
+.app-shell{min-height:100vh;background:var(--ud-bg);display:flex;flex-direction:column}
+.mobile-header{width:min(1180px,100%);margin:0 auto;padding:14px 22px 12px;min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--ud-bg)}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
 .brand-button{border:0;background:transparent;padding:0;color:inherit;text-align:left}
 .brand-mark{width:50px;height:50px;object-fit:contain;display:block;background:transparent}
@@ -23,8 +26,8 @@ button:disabled{cursor:not-allowed}
 .status.ok{color:#2E7D32}
 .status.muted{color:#68757B}
 
-.app-main{width:min(760px,100%);margin:0 auto;padding:0 18px 88px}
-.search-box{height:48px;background:#FFFFFF;border:1px solid #D4DDE0;display:flex;align-items:center;padding:0 12px;gap:8px}
+.app-main{width:min(1180px,100%);margin:0 auto;padding:0 22px 92px}
+.search-box{height:50px;background:var(--ud-surface);border:1px solid var(--ud-border);border-radius:var(--ud-radius-md);display:flex;align-items:center;padding:0 14px;gap:9px;box-shadow:0 2px 12px rgba(22,49,43,.035)}
 .search-box:focus-within{border-color:#00695C}
 .search-icon{font-size:22px;color:#1F2A30;line-height:1}
 .search-box input{flex:1;min-width:0;border:0;outline:0;background:transparent;height:46px;font-size:13px;color:#1F2A30}
@@ -56,7 +59,7 @@ button:disabled{cursor:not-allowed}
 .error-box b{font-size:13px}
 .error-box span{font-size:11px;line-height:16px}
 
-.map-card{height:clamp(430px,64vh,620px);position:relative;overflow:hidden;border:1px solid #D4DDE0;background:#E9EFF1}
+.map-card{height:clamp(430px,64vh,650px);position:relative;overflow:hidden;border:1px solid var(--ud-border);background:#E9EFF1;border-radius:var(--ud-radius-xl);box-shadow:0 8px 28px rgba(22,49,43,.08)}
 .dtc-map{width:100%;height:100%;background:#E9EFF1}
 .map-topbar{position:absolute;left:10px;top:10px;z-index:500;background:rgba(255,255,255,.95);padding:6px 9px;display:flex;align-items:center;gap:6px;font-size:10px}
 .map-topbar i{width:7px;height:7px;background:#2E7D32;display:block}
@@ -344,4 +347,24 @@ body{background:var(--ud-bg);color:var(--ud-ink)}
 @media(max-width:560px){
   .map-card{height:clamp(440px,70vh,680px)}
   .web-bus{height:27px}
+}
+
+/* Shared responsive composition: mobile app and web use the same component language. */
+@media (min-width: 920px){
+  .mobile-header{border-bottom:1px solid rgba(213,224,220,.72)}
+  .app-main{display:grid;grid-template-columns:minmax(0,1fr) 360px;grid-template-areas:"search search" "error error" "home side";column-gap:20px;align-items:start}
+  .app-main>.search-box{grid-area:search}
+  .app-main>.search-results,.app-main>.error-box{grid-column:1/-1}
+  .app-main>.bottom-nav{width:100%}
+  .live-section{grid-area:home}
+  .home-layout{grid-area:home}
+  .home-side{grid-area:side}
+  .desktop-only{display:block}
+  .bottom-nav{width:min(1180px,100%);height:68px;border:1px solid var(--ud-border);border-bottom:0;border-radius:20px 20px 0 0;box-shadow:0 -6px 24px rgba(22,49,43,.06)}
+}
+@media (max-width: 919px){
+  .desktop-only{display:none}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
 }
