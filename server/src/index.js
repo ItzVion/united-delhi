@@ -143,7 +143,7 @@ function observedAtFromTimestamp(value){
   const milliseconds=seconds===null?NaN:seconds*1000;
   const now=Date.now();
   if(!Number.isFinite(milliseconds)||milliseconds<0||Math.abs(milliseconds)>8640000000000000)return null;
-  if(milliseconds>now+300000||milliseconds<now-5*60*1000)return null;
+  if(milliseconds>now+300000||milliseconds<now-15*60*1000)return null;
   return new Date(milliseconds).toISOString();
 }
 function entityToVehicle(entity,feedTimestamp){
@@ -258,43 +258,9 @@ async function getRealtimeVehicles(){
       if(operational){v.operator=operational.agencyId;if(operational.routeId)v.routeId=operational.routeId;}
     }
 
-    if(pool&&vehicles.length){
-      const routeIds=[...new Set(vehicles.flatMap(v=>{
-        const ids=[];
-        if(v.routeId)ids.push(String(v.routeId));
-        const operational=operationalByVehicle.get(v.id);
-        if(operational?.routeId)ids.push(String(operational.routeId));
-        return ids;
-      }))];
-      if(routeIds.length){
-        try{
-          const result=await pool.query(`SELECT r.route_id,r.short_name,r.route_color,r.route_text_color,start_stop.name AS from_stop,end_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.name,s.stop_id LIMIT 1) start_stop ON TRUE LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.name,s.stop_id LIMIT 1) end_stop ON TRUE WHERE r.route_id=ANY($1::text[])`,[routeIds]);
-          const map=new Map(result.rows.map(row=>[String(row.route_id),row]));
-          for(const v of vehicles){
-            const operational=operationalByVehicle.get(v.id);
-            const row=(v.routeId?map.get(String(v.routeId)):null)||(operational?.routeId?map.get(String(operational.routeId)):null);
-            if(row){
-              if(row.short_name)v.routeShortName=String(row.short_name).trim();
-              if(row.route_color)v.routeColor='#'+String(row.route_color).replace(/^#/,'');
-              if(row.route_text_color)v.routeTextColor='#'+String(row.route_text_color).replace(/^#/,'');
-              if(row.from_stop)v.fromStop=String(row.from_stop).trim();
-              if(row.to_stop)v.toStop=String(row.to_stop).trim();
-              if(row.route_id&&operational&&String(row.route_id)===String(operational.routeId))v.operator=operational.agencyId;
-            }else if(operational){
-              // Fallback only when the verified static DB has no matching route.
-              v.routeShortName=operational.shortName;
-              v.routeColor=operational.routeColor ? '#'+String(operational.routeColor).replace(/^#/,'') : null;
-            }
-          }
-        }catch(error){
-          console.error('Realtime route enrichment failed:',error.message);
-          for(const v of vehicles){
-            const operational=operationalByVehicle.get(v.id);
-            if(operational)v.routeShortName=operational.shortName;
-          }
-        }
-      }
-    }
+    // Static route metadata is enrichment only. Never put a Neon query in the
+    // realtime refresh path: the live feed must remain available even when
+    // Neon is cold, slow, or rebuilding GTFS data.
     return vehicles;
   }catch(error){
     if(error?.name==='AbortError')throw new Error('Realtime feed timed out after 15 seconds');
@@ -727,10 +693,10 @@ app.use((error,_req,res,_next)=>{
   const status=Number(error?.status);
   res.status(Number.isInteger(status)&&status>=400&&status<500?status:500).json({status:'ERROR',reason:status===400?'Invalid request':'Internal server error'});
 });
-const server=app.listen({port,host},()=>{
+const server=app.listen(port,'0.0.0.0',()=>{
   const address=server.address();
   const boundPort=typeof address==='object'&&address?address.port:port;
-  console.log('United Delhi API listening on '+host+':'+boundPort);
+  console.log('United Delhi API listening on 0.0.0.0:'+boundPort);
   // IMPORTANT: let Render see a completely idle, responsive HTTP server before
   // starting any database/realtime work. This avoids the recurring "No open
   // HTTP ports detected" / 502 cycle when background startup work is slow.
@@ -746,9 +712,9 @@ const server=app.listen({port,host},()=>{
     });
   },15000);
 });
-server.requestTimeout=120000;
-server.headersTimeout=120000;
-server.keepAliveTimeout=120000;
+server.requestTimeout=30000;
+server.headersTimeout=40000;
+server.keepAliveTimeout=65000;
 server.maxHeadersCount=100;
 process.on('uncaughtException',error=>console.error('Uncaught exception:',error instanceof Error?error.stack:String(error)));
 process.on('unhandledRejection',reason=>console.error('Unhandled rejection:',reason instanceof Error?reason.stack:String(reason)));
