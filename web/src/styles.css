@@ -95,16 +95,20 @@ button:disabled{cursor:not-allowed}
 
 .one-delhi-bus-popup{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;pointer-events:auto}
 .one-delhi-bus-popup:before{display:none!important}
-.one-delhi-bus-popup .leaflet-tooltip-content{margin:0!important;padding:0!important}
-.one-delhi-popup{width:min(280px,calc(100vw - 46px));background:#FFFFFF;border:1px solid #C9D1D4;box-shadow:0 8px 24px rgba(20,30,35,.24);padding:11px 12px;color:#1F2A30}
-.one-delhi-popup-route{display:flex;align-items:center;gap:7px;color:#00695C;font-size:16px;line-height:20px}
-.one-delhi-popup-bus{width:25px;height:25px;display:grid;place-items:center}
-.one-delhi-popup-bus svg{width:23px;height:23px;display:block}
-.one-delhi-popup-title{font-size:14px;font-weight:900;margin-top:5px;line-height:18px}
-.one-delhi-popup-title span{font-weight:600;color:#68757B}
-.one-delhi-popup-destination{font-size:12px;font-weight:700;line-height:17px;margin-top:2px;white-space:normal}
-.one-delhi-popup-meta{font-size:10px;color:#68757B;margin-top:5px;line-height:14px}
-
+.one-delhi-bus-popup .leaflet-popup-content-wrapper{padding:0!important;background:transparent!important;border:0!important;border-radius:12px!important;box-shadow:0 8px 24px rgba(20,55,38,.24)!important;overflow:hidden}
+.one-delhi-bus-popup .leaflet-popup-content{width:auto!important;min-width:0!important;margin:0!important;padding:0!important}
+.one-delhi-bus-popup .leaflet-popup-tip{background:#FFFFFF!important;box-shadow:2px 2px 3px rgba(20,55,38,.08)}
+.bus-popup-card{width:min(286px,calc(100vw - 54px));box-sizing:border-box;background:#FFFFFF;border:1px solid #C9D9CF;border-radius:12px;padding:12px;color:#1F2A30}
+.bus-popup-top{display:flex;align-items:center;gap:9px}
+.bus-popup-icon{width:32px;height:32px;display:grid;place-items:center;background:var(--ud-mint);color:var(--ud-green);border-radius:8px;flex:0 0 32px}
+.bus-popup-icon svg{width:21px;height:21px;display:block}
+.bus-popup-top>div{min-width:0;display:flex;flex-direction:column}
+.bus-popup-top b{font-size:20px;line-height:22px;color:var(--ud-green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bus-popup-top small{font-size:10px;line-height:14px;color:var(--ud-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bus-popup-destination{margin-top:10px;font-size:13px;font-weight:800;line-height:18px;white-space:normal;overflow-wrap:anywhere}
+.bus-popup-meta{display:flex;justify-content:space-between;gap:10px;margin-top:7px;font-size:10px;line-height:14px;color:var(--ud-muted)}
+.bus-popup-route{width:100%;margin-top:10px;padding:9px 10px;border:1px solid #B9CBBF;border-radius:8px;background:var(--ud-mint);color:var(--ud-green);font-size:11px;font-weight:900;text-align:center;cursor:pointer}
+.leaflet-popup-close-button{display:none!important}
 .transit-sheet{position:relative;z-index:850;margin:-22px -1px 0;background:#FFFFFF;border:1px solid #D4DDE0;border-radius:22px 22px 0 0;box-shadow:0 -5px 20px rgba(31,42,48,.14);padding:5px 10px 18px;min-height:360px;touch-action:none;transition:transform .24s ease;will-change:transform}
 .sheet-handle{width:100%;height:30px;border:0;background:transparent;display:flex;align-items:center;justify-content:center;padding:0;touch-action:none}
 .sheet-handle span{display:block;width:42px;height:4px;background:#AAB4B8;border-radius:99px}
