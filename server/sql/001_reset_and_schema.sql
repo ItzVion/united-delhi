@@ -31,8 +31,8 @@ CREATE TABLE stops (
 );
 
 CREATE TABLE route_stops (
-  route_id TEXT NOT NULL REFERENCES routes(route_id) ON DELETE CASCADE,
-  stop_id TEXT NOT NULL REFERENCES stops(stop_id) ON DELETE CASCADE,
+  route_id TEXT NOT NULL,
+  stop_id TEXT NOT NULL,
   stop_sequence INTEGER NOT NULL CHECK(stop_sequence>=0),
   PRIMARY KEY(route_id,stop_id)
 );
