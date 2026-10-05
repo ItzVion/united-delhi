@@ -250,7 +250,7 @@ function Home({vehicles,location,locationStatus,liveStatus,locate,go,onLegend}:{
     </section>
 
     <div className="map-card">
-      <DtcMap vehicles={vehicles} location={location} onLegend={onLegend}/>
+      <DtcMap vehicles={vehicles} location={location} onLegend={onLegend} go={go}/>
       <div className="map-topbar"><i/><b>{liveStatus==='loading'?'Checking live buses':vehicles.length?(liveStatus==='stale'?vehicles.length+' buses · updating':vehicles.length+' buses live'):'Live data unavailable'}</b></div>
       <div className="map-attribution">© OpenStreetMap contributors</div>
       <div className="map-legend">
@@ -307,7 +307,7 @@ function BusLegend({open,onClose}:{open:boolean;onClose:()=>void}){
   </div>;
 }
 
-function DtcMap({vehicles,location,onLegend}:{vehicles:Vehicle[];location:Point|null;onLegend:()=>void}){
+function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Point|null;onLegend:()=>void;go:(path:string)=>void}){
   const el=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<any>(null);
   type BusMarker=L.Marker&{_udBg?:string;_udText?:string;_udLabel?:string;_udTip?:L.Tooltip};
@@ -365,11 +365,12 @@ function DtcMap({vehicles,location,onLegend}:{vehicles:Vehicle[];location:Point|
       const vehicle=escapeHtml(v.vehicleLabel||v.licensePlate||v.id||'Vehicle');
       const age=escapeHtml(ageLabel(v.observedAt));
       const routeId=escapeHtml(v.routeId||route);
-      return '<div class="one-delhi-popup">'+
-        '<div class="one-delhi-popup-route"><span class="one-delhi-popup-bus">'+busSvg+'</span><b>'+escapeHtml(route)+'</b></div>'+
-        '<div class="one-delhi-popup-title">'+escapeHtml(route)+' <span>('+routeId+')</span></div>'+
-        '<div class="one-delhi-popup-destination">'+destination+'</div>'+
-        '<div class="one-delhi-popup-meta">'+vehicle+' · '+age+'</div>'+
+      const routePath=v.routeId?'/routes/'+encodeURIComponent(v.routeId):'';
+      return '<div class="bus-popup-card">'+
+        '<div class="bus-popup-top"><span class="bus-popup-icon">'+busSvg+'</span><div><b>'+escapeHtml(route)+'</b><small>'+routeId+'</small></div></div>'+
+        '<div class="bus-popup-destination">'+destination+'</div>'+
+        '<div class="bus-popup-meta"><span>'+vehicle+'</span><span>'+age+'</span></div>'+
+        (routePath?'<button type="button" class="bus-popup-route" data-route="'+escapeHtml(routePath)+'">View route</button>':'')+
       '</div>';
     };
 
@@ -413,9 +414,22 @@ function DtcMap({vehicles,location,onLegend}:{vehicles:Vehicle[];location:Point|
         const marker=L.marker([Number(v.latitude),Number(v.longitude)],{icon:spec.icon,zIndexOffset:500}) as BusMarker;
         marker.bindPopup(popupHtml(v),{
           closeButton:false,autoClose:true,closeOnClick:true,autoPan:true,keepInView:true,
-          className:'one-delhi-bus-popup',maxWidth:280,minWidth:190,offset:[0,-12]
+          autoPanPaddingTopLeft:[24,80],autoPanPaddingBottomRight:[24,100],
+          className:'one-delhi-bus-popup',maxWidth:290,minWidth:220,offset:[0,-16]
         });
-        marker.on('click',()=>marker.openPopup());
+        marker.on('click',()=>{
+          const ll=marker.getLatLng();
+          const targetZoom=Math.max(15,Math.min(17,map.getZoom()));
+          map.stop();
+          map.setView(ll,targetZoom,{animate:true,duration:.3,easeLinearity:.25});
+          window.setTimeout(()=>marker.openPopup(),320);
+        });
+        marker.on('popupopen',(event:any)=>{
+          const button=event.popup?.getElement?.()?.querySelector?.('.bus-popup-route') as HTMLButtonElement|null;
+          if(button){
+            button.onclick=()=>go(button.dataset.route||'/');
+          }
+        });
         marker._udBg=spec.bg;marker._udLabel=spec.label;marker._udText=spec.fg;marker._udTip=marker.getTooltip()||undefined;
         marker.addTo(map);markers.set(id,marker);
       }
