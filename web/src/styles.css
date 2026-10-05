@@ -284,3 +284,52 @@ body{background:var(--od-bg);color:var(--od-ink)}
 .screen{padding-top:4px}.page-top{background:#fff;margin:0 -16px 10px;padding:12px 16px;border-bottom:1px solid var(--od-line)}.page-top h1{font-size:22px}.planner-form{border-radius:0;border-left:0;border-right:0}.error-box{border-radius:6px;background:#fff3f3;border-color:#d36a70;color:#a02c35}.empty-panel{border-radius:8px}
 .simple-tab-hero{display:flex;align-items:center;gap:14px;padding:18px 4px}.simple-tab-hero>span{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#f4d9dc;color:var(--od-red);font-size:22px;font-weight:900}.simple-tab-hero h1{margin:2px 0;font-size:24px}.simple-tab-hero p{margin:2px 0;color:var(--od-muted);font-size:12px}.simple-tab-card{padding:18px;border-radius:10px;display:flex;flex-direction:column;gap:7px}.simple-tab-card b{font-size:14px;line-height:20px}.simple-tab-card small{font-size:10px;line-height:15px;color:var(--od-muted)}
 @media(max-width:560px){.mobile-header.one-delhi-header{padding-left:12px;padding-right:12px}.app-main>.search-box{margin-left:10px;margin-right:10px}.status{max-width:105px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+
+/* Final United Delhi organic-leaf green theme */
+:root{
+  --ud-green:#0B6B57;
+  --ud-green-dark:#075445;
+  --ud-green-mid:#2E8B68;
+  --ud-leaf:#49A66D;
+  --ud-mint:#E8F3EC;
+  --ud-bg:#F4F7F4;
+  --ud-ink:#1E2A25;
+  --ud-muted:#64736B;
+  --ud-line:#D5E0D9;
+}
+body{background:var(--ud-bg);color:var(--ud-ink)}
+.app-shell{background:var(--ud-bg)}
+.mobile-header.one-delhi-header{background:linear-gradient(180deg,var(--ud-green),var(--ud-green-dark))}
+.one-delhi-header .status i{background:#8BE28F}
+.one-brand .brand-copy b{letter-spacing:.8px}
+.app-main>.search-box{box-shadow:0 3px 12px rgba(11,107,87,.14)}
+.search-icon{color:var(--ud-green)}
+.search-results{border-color:var(--ud-line)}
+.map-card{background:#EAF1EC}
+.map-topbar i{background:var(--ud-leaf)}
+.map-locate{color:var(--ud-green);border-color:var(--ud-line)}
+.web-bus{border-color:#fff;box-shadow:0 2px 8px rgba(20,70,45,.30)}
+.one-delhi-popup-route{color:var(--ud-green)}
+.one-delhi-popup{border-color:#C9D9CF;color:var(--ud-ink)}
+.transit-sheet.one-delhi-sheet{border-color:var(--ud-line)}
+.sheet-tabs button.active{background:var(--ud-mint);color:var(--ud-green)}
+.sheet-stop-head button{border-color:#B9CBBF;color:var(--ud-green)}
+.sheet-mini-icon{background:var(--ud-mint);color:var(--ud-green)}
+.sheet-stop-row>button{color:var(--ud-green);background:#F0F6F2}
+.one-delhi-actions .sheet-action span{color:var(--ud-green)}
+.bottom-nav.one-delhi-nav button.active{color:var(--ud-green)}
+.error-box{background:#F7ECE9;border-color:#C56C5B;color:#8C3F34}
+.primary-button{background:var(--ud-green);border-color:var(--ud-green)}
+.primary-button:hover{background:var(--ud-green-dark)}
+.route-badge{box-shadow:none}
+.route-map{border-color:var(--ud-line)}
+.simple-tab-hero>span{background:var(--ud-mint);color:var(--ud-green)}
+.one-delhi-bus-popup .leaflet-popup-content-wrapper{padding:0;border:1px solid #C9D9CF;border-radius:10px;box-shadow:0 8px 24px rgba(20,55,38,.22)}
+.one-delhi-bus-popup .leaflet-popup-content{margin:0;padding:0}
+.one-delhi-bus-popup .leaflet-popup-tip{background:#fff;box-shadow:2px 2px 3px rgba(20,55,38,.08)}
+.leaflet-popup-pane{z-index:1000}
+.leaflet-popup-close-button{display:none}
+@media(max-width:560px){
+  .map-card{height:clamp(440px,70vh,680px)}
+  .web-bus{height:27px}
+}
