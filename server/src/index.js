@@ -146,7 +146,7 @@ function observedAtFromTimestamp(value){
   if(milliseconds>now+300000||milliseconds<now-5*60*1000)return null;
   return new Date(milliseconds).toISOString();
 }
-function entityToVehicle(entity){
+function entityToVehicle(entity,feedTimestamp){
   const vehicle=entity.vehicle;
   if(!vehicle?.position)return null;
   const position=vehicle.position,trip=vehicle.trip||{},descriptor=vehicle.vehicle||{};
@@ -157,7 +157,7 @@ function entityToVehicle(entity){
   const routeId=ok(trip.routeId)?boundedText(trip.routeId,120):null;
   const tripId=ok(trip.tripId)?boundedText(trip.tripId,120):null;
   const stopId=ok(vehicle.stopId)?boundedText(vehicle.stopId,120):null;
-  const timestamp=Number(vehicle.timestamp||0);
+  const timestamp=Number(vehicle.timestamp||feedTimestamp||Math.floor(Date.now()/1000));
   if(!(timestamp>0))return null;
   const observedAt=observedAtFromTimestamp(timestamp);
   if(!observedAt)return null;
@@ -238,15 +238,16 @@ async function getRealtimeVehicles(){
     if(!Array.isArray(feed.entity)||feed.entity.length>20000)throw new Error('OTD realtime feed contains too many entities');
     const vehicleMap=new Map();
     for(const entity of feed.entity){
-      const vehicle=entityToVehicle(entity);
+      const vehicle=entityToVehicle(entity,Number(feed.header?.timestamp||0));
       if(vehicle?.id)vehicleMap.set(vehicle.id,vehicle);
     }
     const rawVehicles=[...vehicleMap.values()];
+    console.log('Realtime feed decoded: '+rawVehicles.length+' vehicle positions from '+feed.entity.length+' entities.');
     // Keep every fresh, valid OTD vehicle. Static GTFS data is enrichment only:
     // a route or stop mismatch must never make a realtime vehicle disappear.
     const vehicles=rawVehicles.filter(v=>{
       const observed=Date.parse(v.observedAt);
-      return Number.isFinite(observed)&&Date.now()-observed<=5*60*1000;
+      return Number.isFinite(observed)&&Date.now()-observed<=15*60*1000;
     });
     const operationalByVehicle=new Map(vehicles.map(v=>[v.id,resolveOperationalRoute(v)]));
     for(const v of vehicles){
