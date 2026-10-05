@@ -1,15 +1,13 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Intentionally manual-only.
+# Do not run CI/builds automatically on push or pull request.
 jobs:
   frontend:
     runs-on: ubuntu-latest
@@ -23,9 +21,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: # Expo SDK 57 currently inherits high-severity build-toolchain advisories with no patched upstream versions.
-          # Keep CI honest about app/runtime code without forcing an unsafe SDK downgrade.
-          npm audit --audit-level=critical
+      - run: npm audit --audit-level=critical
 
   web:
     runs-on: ubuntu-latest
