@@ -1,6 +1,12 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import L from 'leaflet';
+import {maplibreGL} from '@maplibre/maplibre-gl-leaflet';
+import {setWorkerUrl} from 'maplibre-gl';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import {api} from './api';
+
+setWorkerUrl(workerUrl);
 import type {Vehicle} from './api';
 
 declare module 'leaflet' {
@@ -310,18 +316,17 @@ function BusLegend({open,onClose}:{open:boolean;onClose:()=>void}){
 function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Point|null;onLegend:()=>void;go:(path:string)=>void}){
   const el=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<any>(null);
-  type BusMarker=L.Marker&{_udBg?:string;_udText?:string;_udLabel?:string;_udTip?:L.Tooltip};
-  const markersRef=useRef<Map<string,BusMarker>>(new Map());
+  type BusCircle=L.CircleMarker&{_udBg?:string;_udSelected?:boolean};
+  const markersRef=useRef<Map<string,BusCircle>>(new Map());
   const userRef=useRef<any>(null);
   const vehiclesRef=useRef<Vehicle[]>([]);
   const locationRef=useRef<Point|null>(location);
   const legendRef=useRef<()=>void>(onLegend);
   const focused=useRef(false);
+  const selectedRef=useRef<BusCircle|null>(null);
 
   useEffect(()=>{locationRef.current=location;},[location]);
   useEffect(()=>{legendRef.current=onLegend;},[onLegend]);
-
-  const busSvg='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   useEffect(()=>{
     if(!el.current||mapRef.current)return;
@@ -335,10 +340,8 @@ function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Poi
       center:initial,zoom:initialZoom,scrollWheelZoom:true,zoomControl:true,minZoom:9,maxBounds:BOUNDS,
       maxBoundsViscosity:.18,attributionControl:true,preferCanvas:true,inertia:false,bounceAtZoomLimits:false
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-      subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true,
-      attribution:'© OpenStreetMap contributors'
-    }).addTo(map);
+
+    maplibreGL({style:'https://tiles.openfreemap.org/styles/liberty'}).addTo(map);
     userRef.current=L.layerGroup().addTo(map);
 
     const locate=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
@@ -367,71 +370,97 @@ function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Poi
       const routeId=escapeHtml(v.routeId||route);
       const routePath=v.routeId?'/routes/'+encodeURIComponent(v.routeId):'';
       return '<div class="bus-popup-card">'+
-        '<div class="bus-popup-top"><span class="bus-popup-icon">'+busSvg+'</span><div><b>'+escapeHtml(route)+'</b><small>'+routeId+'</small></div></div>'+
+        '<div class="bus-popup-top"><span class="bus-popup-icon">'+
+        '<span class="bus-popup-dot" style="background:'+escapeHtml(busColorFor(v))+'"></span>'+
+        '</span><div><b>'+escapeHtml(route)+'</b><small>'+routeId+'</small></div></div>'+
         '<div class="bus-popup-destination">'+destination+'</div>'+
         '<div class="bus-popup-meta"><span>'+vehicle+'</span><span>'+age+'</span></div>'+
         (routePath?'<button type="button" class="bus-popup-route" data-route="'+escapeHtml(routePath)+'">View route</button>':'')+
       '</div>';
     };
 
-    const makeIcon=(v:Vehicle)=>{
-      const bg=busColorFor(v),fg=isHex(v.routeTextColor)?String(v.routeTextColor):textFor(bg);
-      const label=displayVehicleRoute(v).slice(0,10);
-      const width=Math.max(44,Math.min(64,label.length*6+27));
-      return {icon:L.divIcon({
-        className:'web-bus-icon',
-        html:'<div class="web-bus one-delhi-bus" style="background:'+escapeHtml(bg)+';color:'+escapeHtml(fg)+';width:'+width+'px"><span class="bus-glyph">'+busSvg+'</span><span class="web-bus-label">'+escapeHtml(label)+'</span></div>',
-        iconSize:[width,28],iconAnchor:[width/2,14]
-      }),bg,fg,label};
-    };
-
     const renderVisible=()=>{
       const visible=new Map<string,Vehicle>();
-      const bounds=map.getBounds().pad(.06);
-      const center=map.getCenter();
-      const candidates=vehiclesRef.current.map(v=>{
+      const bounds=map.getBounds().pad(.08);
+      for(const v of vehiclesRef.current){
         const lat=Number(v.latitude),lon=Number(v.longitude);
-        if(!Number.isFinite(lat)||!Number.isFinite(lon))return null;
-        if(lat<BOUNDS[0][0]||lat>BOUNDS[1][0]||lon<BOUNDS[0][1]||lon>BOUNDS[1][1]||!bounds.contains([lat,lon]))return null;
-        const d=(lat-center.lat)**2+(lon-center.lng)**2;
-        return {v,d};
-      }).filter(Boolean) as {v:Vehicle;d:number}[];
-      candidates.sort((a,b)=>a.d-b.d);
-      const limit=map.getZoom()>=13?1600:900;
-      for(const item of candidates.slice(0,limit))visible.set(item.v.id,item.v);
+        if(!Number.isFinite(lat)||!Number.isFinite(lon))continue;
+        if(lat<BOUNDS[0][0]||lat>BOUNDS[1][0]||lon<BOUNDS[0][1]||lon>BOUNDS[1][1])continue;
+        if(!bounds.contains([lat,lon]))continue;
+        visible.set(v.id,v);
+      }
+
       const markers=markersRef.current;
       for(const [id,marker] of markers){
-        if(!visible.has(id)){marker.remove();markers.delete(id);}
+        if(!visible.has(id)){
+          if(selectedRef.current===marker)selectedRef.current=null;
+          marker.remove();
+          markers.delete(id);
+        }
       }
+
+      const renderer=(map as any)._udBusRenderer||(map as any)._udBusRenderer=L.canvas({padding:.35});
       for(const [id,v] of visible){
-        const spec=makeIcon(v),existing=markers.get(id);
-        if(existing&&existing._udBg===spec.bg&&existing._udLabel===spec.label&&existing._udText===spec.fg){
-          existing.setLatLng([Number(v.latitude),Number(v.longitude)]);
-          existing.setTooltipContent(popupHtml(v));
+        const lat=Number(v.latitude),lon=Number(v.longitude);
+        const bg=busColorFor(v);
+        const existing=markers.get(id);
+        if(existing){
+          existing.setLatLng([lat,lon]);
+          existing.setStyle({fillColor:bg,color:'#FFFFFF',radius:existing._udSelected?9:5,weight:existing._udSelected?3:1.5});
+          existing.setPopupContent(popupHtml(v));
+          existing._udBg=bg;
           continue;
         }
-        if(existing){existing.remove();markers.delete(id);}
-        const marker=L.marker([Number(v.latitude),Number(v.longitude)],{icon:spec.icon,zIndexOffset:500}) as BusMarker;
+
+        const marker=L.circleMarker([lat,lon],{
+          renderer,
+          radius:5,
+          color:'#FFFFFF',
+          weight:1.5,
+          opacity:.95,
+          fillColor:bg,
+          fillOpacity:.95,
+          bubblingMouseEvents:false
+        }) as BusCircle;
+
         marker.bindPopup(popupHtml(v),{
           closeButton:false,autoClose:true,closeOnClick:true,autoPan:true,keepInView:true,
           autoPanPaddingTopLeft:[24,80],autoPanPaddingBottomRight:[24,100],
           className:'one-delhi-bus-popup',maxWidth:290,minWidth:220,offset:[0,-16]
         });
+
         marker.on('click',()=>{
+          if(selectedRef.current&&selectedRef.current!==marker){
+            selectedRef.current._udSelected=false;
+            selectedRef.current.setStyle({radius:5,weight:1.5});
+          }
+          selectedRef.current=marker;
+          marker._udSelected=true;
+          marker.setStyle({radius:9,weight:3});
           const ll=marker.getLatLng();
-          const targetZoom=Math.max(15,Math.min(17,map.getZoom()));
+          const targetZoom=Math.max(15,Math.min(17,map.getZoom()+2));
           map.stop();
           map.setView(ll,targetZoom,{animate:true,duration:.3,easeLinearity:.25});
           window.setTimeout(()=>marker.openPopup(),320);
         });
-        marker.on('popupopen',(event:any)=>{
-          const button=event.popup?.getElement?.()?.querySelector?.('.bus-popup-route') as HTMLButtonElement|null;
-          if(button){
-            button.onclick=()=>go(button.dataset.route||'/');
+
+        marker.on('popupclose',()=>{
+          if(selectedRef.current===marker){
+            marker._udSelected=false;
+            marker.setStyle({radius:5,weight:1.5});
+            selectedRef.current=null;
           }
         });
-        marker._udBg=spec.bg;marker._udLabel=spec.label;marker._udText=spec.fg;marker._udTip=marker.getTooltip()||undefined;
-        marker.addTo(map);markers.set(id,marker);
+
+        marker.on('popupopen',(event:any)=>{
+          const button=event.popup?.getElement?.()?.querySelector?.('.bus-popup-route') as HTMLButtonElement|null;
+          if(button)button.onclick=()=>go(button.dataset.route||'/');
+        });
+
+        marker._udBg=bg;
+        marker._udSelected=false;
+        marker.addTo(map);
+        markers.set(id,marker);
       }
     };
 
@@ -442,7 +471,7 @@ function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Poi
     map.on('moveend',report);map.on('zoomend',report);
     window.setTimeout(()=>{map.invalidateSize();renderVisible();},100);
     mapRef.current=map;(map as any)._udRenderVisible=renderVisible;
-    return()=>{map.remove();mapRef.current=null;markersRef.current.clear();userRef.current=null;};
+    return()=>{map.remove();mapRef.current=null;markersRef.current.clear();userRef.current=null;selectedRef.current=null;};
   },[]);
 
   useEffect(()=>{vehiclesRef.current=vehicles;(mapRef.current as any)?._udRenderVisible?.();},[vehicles]);
@@ -471,7 +500,7 @@ function RouteMiniMap({stops,buses}:{stops:any[];buses:Vehicle[]}) {
     const validStops=stops.filter((s:any)=>Number.isFinite(Number(s.latitude))&&Number.isFinite(Number(s.longitude)));
     if(!validStops.length)return;
     const map:any=L.map(el.current,{zoomControl:true,attributionControl:true,preferCanvas:true,scrollWheelZoom:false,dragging:true}).setView([Number(validStops[0].latitude),Number(validStops[0].longitude)],13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,updateWhenIdle:true,keepBuffer:1,attribution:'© OpenStreetMap contributors'}).addTo(map);
+    maplibreGL({style:'https://tiles.openfreemap.org/styles/liberty'}).addTo(map);
     const linePoints=validStops.map((s:any)=>[Number(s.latitude),Number(s.longitude)] as [number,number]);
     L.polyline(linePoints,{color:'#00695C',weight:4,opacity:.78}).addTo(map);
     const stopLayer=L.layerGroup().addTo(map);
