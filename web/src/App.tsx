@@ -268,15 +268,17 @@ function Home({vehicles,location,locationStatus,liveStatus,locate,go,onLegend}:{
 }
 
 function TransitSheet({stops,go}:{stops:any[];go:(path:string)=>void}){
-  const[drag,setDrag]=useState(0);const[startY,setStartY]=useState<number|null>(null);const[startDrag,setStartDrag]=useState(0);const stop=stops[0];const collapsed=180;
-  const onDown=(e:any)=>{e.currentTarget.setPointerCapture?.(e.pointerId);setStartY(e.clientY);setStartDrag(drag);};
-  const onMove=(e:any)=>{if(startY===null)return;setDrag(Math.max(0,Math.min(collapsed,startDrag+(e.clientY-startY))));};
-  const onUp=()=>{if(startY===null)return;setDrag(drag>90?collapsed:0);setStartY(null);};
-  return <section className="transit-sheet one-delhi-sheet" style={{transform:'translateY('+drag+'px)'}}>
+  const[drag,setDrag]=useState(0);const[dragging,setDragging]=useState(false);
+  const dragRef=useRef(0),startYRef=useRef<number|null>(null),startDragRef=useRef(0);
+  const stop=stops[0],collapsed=180;
+  const onDown=(e:any)=>{e.currentTarget.setPointerCapture?.(e.pointerId);startYRef.current=e.clientY;startDragRef.current=dragRef.current;setDragging(true);};
+  const onMove=(e:any)=>{if(startYRef.current===null)return;const next=Math.max(0,Math.min(collapsed,startDragRef.current+(e.clientY-startYRef.current)));dragRef.current=next;setDrag(next);};
+  const onUp=()=>{if(startYRef.current===null)return;const next=dragRef.current>90?collapsed:0;dragRef.current=next;setDrag(next);startYRef.current=null;setDragging(false);};
+  return <section className="transit-sheet one-delhi-sheet" style={{transform:'translateY('+drag+'px)',transition:dragging?'none':undefined}}>
     <button className="sheet-handle" type="button" aria-label="Drag stop panel" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}><span/></button>
     <div className="sheet-tabs"><button className="active">Bus Stop</button><button>Metro Stop</button></div>
     <div className="sheet-stop-head"><div><b>{stop?.name||'Select a bus stop'}</b><small>{stop?'towards nearby stops':'Use your location to find nearby DTC stops'}</small></div><button onClick={()=>stop&&go('/stops/'+encodeURIComponent(stop.stop_id))}>View Buses</button></div>
-    <div className="sheet-stop-row"><div className="sheet-mini-icon">▣</div><div><b>{stop?.name||'Nearby DTC bus stop'}</b><small>{stop?.distanceMeters!=null?Math.round(stop.distanceMeters)+' m away':'Live stop information'}</small></div><button onClick={locate}>⌖</button></div>
+    <div className="sheet-stop-row"><div className="sheet-mini-icon">▣</div><div><b>{stop?.name||'Nearby DTC bus stop'}</b><small>{stop?.distanceMeters!=null?Math.round(stop.distanceMeters)+' m away':'Live stop information'}</small></div></div>
     <div className="sheet-actions one-delhi-actions"><button className="sheet-action" onClick={()=>go('/plan')}><span>↗</span><b>Trip Plan</b></button></div>
     {!stop?<div className="flat-card empty-stop"><b>Find stops around you</b><small>Allow location or use the map to explore Delhi transit.</small></div>:null}
   </section>;
