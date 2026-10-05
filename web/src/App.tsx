@@ -17,16 +17,13 @@ const storageGet=(key:string)=>{try{return window.localStorage.getItem(key);}cat
 const storageSet=(key:string,value:string)=>{try{window.localStorage.setItem(key,value);return true;}catch{return false;}};
 
 const routeName=(value:any)=>{const text=String(value||'').trim();if(!text)return null;return text.replace(/(?:UP|DOWN|DWN)$/i,'').replace(/^AIR-0+/i,'AIR-')||null;};
-const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||'LIVE';
+const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||routeName(v.routeId)||'BUS';
 const isHex=(v:any)=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 const textFor=(bg:string)=>{const h=bg.replace('#','');const rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.55?'#17313B':'#FFFFFF';};
 const BUS_COLORS:any={evAc:'#2FAFBC',evDeviOrange:'#E57D43',evDeviGreen:'#168F49',cngAcBlue:'#3D82CE',cngAcRed:'#E35F67',cngNonAcPeach:'#E5A16E',cngNonAcGreen:'#24C88B'};
-const SERVICE_COLORS:any={dtc:BUS_COLORS.cngNonAcGreen,cluster:BUS_COLORS.evDeviOrange,electric:BUS_COLORS.evAc,unknown:BUS_COLORS.cngAcBlue};
-const busColorFor=(v:any)=>isHex(v.serviceColor)?String(v.serviceColor):
-  v.serviceType==='electric'?BUS_COLORS.evAc:
-  v.serviceType==='cluster'?BUS_COLORS.evDeviOrange:
-  v.serviceType==='dtc'?BUS_COLORS.cngNonAcGreen:
-  BUS_COLORS.cngAcBlue;
+const FALLBACK_ROUTE_COLORS=['#24C88B','#2FAFBC','#E57D43','#3D82CE','#E35F67','#8B5CF6','#C58B2A','#00897B'];
+const routeFallbackColor=(routeId:any,vehicleId:any)=>{const key=String(routeId||vehicleId||'BUS');let h=0;for(let i=0;i<key.length;i++)h=(h*31+key.charCodeAt(i))>>>0;return FALLBACK_ROUTE_COLORS[h%FALLBACK_ROUTE_COLORS.length];};
+const busColorFor=(v:any)=>isHex(v.routeColor)?String(v.routeColor):isHex(v.serviceColor)?String(v.serviceColor):routeFallbackColor(v.routeId,v.id);
 const ageLabel=(value?:string)=>{const t=Date.parse(String(value||''));if(!Number.isFinite(t))return'Live';const s=Math.max(0,Math.round((Date.now()-t)/1000));return s<60?'Just now':Math.floor(s/60)+' min ago';};
 const escapeHtml=(value:any)=>String(value??'').replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]||ch));
 
@@ -242,7 +239,7 @@ function Home({vehicles,location,locationStatus,liveStatus,locate,go,onLegend}:{
     </div>
 
     <section className="section-head"><div><h2>Nearby stops</h2><p>Tap a stop for routes and live arrivals</p></div><button className="text-button" onClick={locate}>{location?'Recenter':'Use location'}</button></section>
-    {stops.length?stops.slice(0,4).map((s:any)=><button className="stop-card" key={s.stop_id} onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}><span className="stop-icon">●</span><span className="stop-copy"><b>{s.name}</b><small>{s.distance_m!=null?Math.round(s.distance_m)+' m away':'Nearby stop'}</small></span><span className="chevron">›</span></button>):<div className="flat-card empty-stop"><b>No nearby stops yet</b><small>Location is optional; use the map or enable location to find nearby stops.</small></div>}
+    {stops.length?stops.slice(0,4).map((s:any)=><button className="stop-card" key={s.stop_id} onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}><span className="stop-icon">●</span><span className="stop-copy"><b>{s.name}</b><small>{s.distanceMeters!=null?Math.round(s.distanceMeters)+' m away':'Nearby stop'}</small></span><span className="chevron">›</span></button>):<div className="flat-card empty-stop"><b>No nearby stops yet</b><small>Location is optional; use the map or enable location to find nearby stops.</small></div>}
     <button className="legal-link" onClick={()=>go('/legal')}>Legal & privacy</button>
   </>;
 }
@@ -274,35 +271,52 @@ function BusLegend({open,onClose}:{open:boolean;onClose:()=>void}){
 function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];location:Point|null;onSelect:(v:Vehicle)=>void;onLegend:()=>void}){
   const el=useRef<HTMLDivElement|null>(null);
   const mapRef=useRef<any>(null);
-  type BusMarker=(L.Marker|L.CircleMarker)&{_udBg?:string;_udKind?:'label'|'dot'};
+  type BusMarker=L.Marker&{_udBg?:string;_udText?:string;_udLabel?:string};
   const markersRef=useRef<Map<string,BusMarker>>(new Map());
   const userRef=useRef<any>(null);
   const vehiclesRef=useRef<Vehicle[]>([]);
-  const animationsRef=useRef<Map<string,number>>(new Map());
-  const focused=useRef(false);
   const locationRef=useRef<Point|null>(location);
   const legendRef=useRef<()=>void>(onLegend);
+  const focused=useRef(false);
   useEffect(()=>{locationRef.current=location;},[location]);
   useEffect(()=>{legendRef.current=onLegend;},[onLegend]);
 
   useEffect(()=>{
     if(!el.current||mapRef.current)return;
-    let initial:[number,number]=[CENTER[0],CENTER[1]];
-    let initialZoom=10.5;
+    let initial:[number,number]=[CENTER[0],CENTER[1]],initialZoom=10.5;
     try{
-      const saved=storageGet('ud-map-center');
-      if(saved){
-        const p=JSON.parse(saved);
-        if(Number.isFinite(p.lat)&&Number.isFinite(p.lon)){initial=[p.lat,p.lon];initialZoom=14;}
-      }
+      const saved=storageGet('ud-map-center'),p=saved?JSON.parse(saved):null;
+      if(Number.isFinite(p?.lat)&&Number.isFinite(p?.lon)){initial=[p.lat,p.lon];initialZoom=14;}
     }catch{}
     const map:any=L.map(el.current,{center:initial,zoom:initialZoom,scrollWheelZoom:true,zoomControl:true,minZoom:9,maxBounds:BOUNDS,maxBoundsViscosity:.18,attributionControl:true,preferCanvas:true,inertia:true,inertiaDeceleration:1800,inertiaMaxSpeed:1800,bounceAtZoomLimits:false});
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true,attribution:'© OpenStreetMap contributors'}).addTo(map);
     userRef.current=L.layerGroup().addTo(map);
-    const locate=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const b:any=L.DomUtil.create('button','map-locate');b.type='button';b.innerHTML='◎';b.title='Center on my location';L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',()=>{const current=locationRef.current;if(current)map.flyTo([current.lat,current.lon],14,{duration:1.0,easeLinearity:.2});});return b;}});
+
+    const locate=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
+      const b:any=L.DomUtil.create('button','map-locate');b.type='button';b.innerHTML='◎';b.title='Center on my location';
+      L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',()=>{const current=locationRef.current;if(current)map.flyTo([current.lat,current.lon],14,{duration:1,easeLinearity:.2});});return b;
+    }});
     map.addControl(new locate());
-    const legendControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const b:any=L.DomUtil.create('button','map-legend-control');b.type='button';b.title='Bus color legend';b.setAttribute('aria-label','Bus color legend');b.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',()=>legendRef.current());return b;}});
+
+    const legendControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
+      const b:any=L.DomUtil.create('button','map-legend-control');b.type='button';b.title='Bus color legend';b.setAttribute('aria-label','Bus color legend');
+      b.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      L.DomEvent.disableClickPropagation(b);L.DomEvent.on(b,'click',()=>legendRef.current());return b;
+    }});
     map.addControl(new legendControl());
+
+    const makeIcon=(v:Vehicle)=>{
+      const bg=busColorFor(v),fg=isHex(v.routeTextColor)?String(v.routeTextColor):textFor(bg);
+      const label=displayVehicleRoute(v).slice(0,14);
+      const compact=map.getZoom()<12;
+      const width=Math.max(34,Math.min(58,label.length*4.6+14));
+      const height=compact?20:24;
+      return {icon:L.divIcon({
+        className:'web-bus-icon',
+        html:'<div class="web-bus" style="background:'+escapeHtml(bg)+';color:'+escapeHtml(fg)+';width:'+width+'px;height:'+height+'px"><span class="web-bus-label">'+escapeHtml(label)+'</span></div>',
+        iconSize:[width,height],iconAnchor:[width/2,height/2]
+      }),bg,fg,label};
+    };
 
     const renderVisible=()=>{
       const visible=new Map<string,Vehicle>();
@@ -312,66 +326,34 @@ function DtcMap({vehicles,location,onSelect,onLegend}:{vehicles:Vehicle[];locati
         if(Number.isFinite(lat)&&Number.isFinite(lon)&&bounds.contains([lat,lon]))visible.set(v.id,v);
       }
       const markers=markersRef.current;
-      for(const [id,marker] of markers){if(!visible.has(id)){const frame=animationsRef.current.get(id);if(frame)cancelAnimationFrame(frame);animationsRef.current.delete(id);marker.remove();markers.delete(id);}}
+      for(const [id,marker] of markers){
+        if(!visible.has(id)){marker.remove();markers.delete(id);}
+      }
       for(const [id,v] of visible){
-        const lat=Number(v.latitude),lon=Number(v.longitude);
-        const bg=busColorFor(v);
-        const name=displayVehicleRoute(v);
-        const label=map.getZoom()>=12&&name!=='LIVE'?name.slice(0,12):'';
-        const existing=markers.get(id);
-        const wantedKind=map.getZoom()>=12&&name!=='LIVE'?'label':'dot';
-        if(existing){
-          const current=existing.getLatLng();
-          const frame=animationsRef.current.get(id);
-          if(frame)cancelAnimationFrame(frame);
-          const fromLat=Number(current.lat),fromLon=Number(current.lng),dLat=lat-fromLat,dLon=lon-fromLon;
-          if(Math.abs(dLat)+Math.abs(dLon)<0.0000002){existing.setLatLng([lat,lon]);animationsRef.current.delete(id);}
-          else{
-            const start=performance.now();
-            const ease=(t:number)=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
-            const step=(now:number)=>{
-              const p=Math.min(1,(now-start)/1100),e=ease(p);
-              existing.setLatLng([fromLat+dLat*e,fromLon+dLon*e]);
-              if(p<1)animationsRef.current.set(id,requestAnimationFrame(step));else animationsRef.current.delete(id);
-            };
-            animationsRef.current.set(id,requestAnimationFrame(step));
-          }
-          if(existing._udBg!==bg||existing._udKind!==wantedKind){
-            existing.remove();
-            markers.delete(id);
-            const next=wantedKind==='label'
-              ? L.marker([lat,lon],{icon:L.divIcon({className:'web-bus-icon',html:'<div class="web-bus" style="background:'+escapeHtml(bg)+'"><span class="web-bus-label">'+escapeHtml(label)+'</span></div>',iconSize:[38,38],iconAnchor:[19,19]}),zIndexOffset:1000})
-              : L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:2,fillColor:bg,fillOpacity:1});
-            next.on('click',()=>onSelect(v));next._udBg=bg;next._udKind=wantedKind;next.addTo(map);markers.set(id,next);
-          }
-        }else{
-          if(wantedKind==='label'){
-            const icon=L.divIcon({className:'web-bus-icon',html:'<div class="web-bus" style="background:'+escapeHtml(bg)+'"><span class="web-bus-label">'+escapeHtml(label)+'</span></div>',iconSize:[38,38],iconAnchor:[19,19]});
-            const marker=L.marker([lat,lon],{icon,zIndexOffset:1000});marker.on('click',()=>onSelect(v));marker._udBg=bg;marker._udKind='label';marker.addTo(map);markers.set(id,marker);
-          }else{
-            const marker=L.circleMarker([lat,lon],{radius:6,color:'#fff',weight:2,fillColor:bg,fillOpacity:1});marker.on('click',()=>onSelect(v));marker._udBg=bg;marker._udKind='dot';marker.addTo(map);markers.set(id,marker);
-          }
+        const spec=makeIcon(v),existing=markers.get(id);
+        if(existing&&existing._udBg===spec.bg&&existing._udLabel===spec.label&&existing._udText===spec.fg){
+          existing.setLatLng([Number(v.latitude),Number(v.longitude)]);
+          continue;
         }
+        existing?.remove();
+        const marker=L.marker([Number(v.latitude),Number(v.longitude)],{icon:spec.icon,zIndexOffset:500}) as BusMarker;
+        marker.on('click',()=>onSelect(v));
+        marker._udBg=spec.bg;marker._udLabel=spec.label;marker._udText=spec.fg;
+        marker.addTo(map);markers.set(id,marker);
       }
     };
 
-    const report=()=>{try{const c=map.getCenter();storageSet('ud-map-center',JSON.stringify({lat:c.lat,lon:c.lng}));}catch{}renderVisible();};
-    map.on('moveend',report);
-    map.on('zoomend',report);
+    const report=()=>{try{const cc=map.getCenter();storageSet('ud-map-center',JSON.stringify({lat:cc.lat,lon:cc.lng}));}catch{}renderVisible();};
+    map.on('moveend',report);map.on('zoomend',report);
     window.setTimeout(()=>{map.invalidateSize();renderVisible();},100);
-    mapRef.current=map;
-    (map as any)._udRenderVisible=renderVisible;
-    return()=>{for(const frame of animationsRef.current.values())cancelAnimationFrame(frame);animationsRef.current.clear();map.remove();mapRef.current=null;markersRef.current.clear();userRef.current=null;};
+    mapRef.current=map;(map as any)._udRenderVisible=renderVisible;
+    return()=>{map.remove();mapRef.current=null;markersRef.current.clear();userRef.current=null;};
   },[]);
 
-  useEffect(()=>{
-    vehiclesRef.current=vehicles;
-    (mapRef.current as any)?._udRenderVisible?.();
-  },[vehicles]);
+  useEffect(()=>{vehiclesRef.current=vehicles;(mapRef.current as any)?._udRenderVisible?.();},[vehicles]);
 
   useEffect(()=>{
-    const map=mapRef.current;
-    if(!map)return;
+    const map=mapRef.current;if(!map)return;
     userRef.current?.clearLayers();
     if(location){
       L.marker([location.lat,location.lon],{icon:L.divIcon({className:'user-marker-icon',html:'<div class="user-marker"></div>',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(userRef.current);
@@ -412,8 +394,8 @@ function RouteMiniMap({stops,buses}:{stops:any[];buses:Vehicle[]}) {
     buses.forEach((bus:any)=>{
       const lat=Number(bus.latitude),lon=Number(bus.longitude);
       if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
-      const color=busColorFor(bus);
-      L.circleMarker([lat,lon],{radius:7,color:'#fff',weight:2,fillColor:color,fillOpacity:1})
+      const color=busColorFor(bus),label=displayVehicleRoute(bus).slice(0,14),fg=isHex(bus.routeTextColor)?String(bus.routeTextColor):textFor(color);
+      L.marker([lat,lon],{icon:L.divIcon({className:'web-bus-icon route-mini-bus',html:'<div class="web-bus mini" style="background:'+escapeHtml(color)+';color:'+escapeHtml(fg)+'"><span class="web-bus-label">'+escapeHtml(label)+'</span></div>',iconSize:[46,22],iconAnchor:[23,11]})})
         .bindTooltip(displayVehicleRoute(bus),{direction:'top',offset:[0,-6]})
         .addTo(busLayer);
     });
