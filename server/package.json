@@ -1,25 +1,9 @@
 {
-  "name": "united-delhi-server",
-  "version": "1.1.0",
-  "private": true,
-  "type": "module",
-  "engines": {
-    "node": ">=22 <23"
-  },
-  "scripts": {
-    "start": "node src/index.js",
-    "check": "node --check src/index.js",
-    "import:gtfs": "node scripts/import-gtfs.js"
-  },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "csv-parse": "^7.0.2",
-    "dotenv": "^16.4.7",
-    "express": "^5.1.0",
-    "gtfs-realtime-bindings": "^2.2.0",
-    "pg": "^8.16.3",
-    "express-rate-limit": "^8.7.0",
-    "ip-address": "^10.7.3",
-    "fflate": "^0.8.3"
-  }
+  "name":"united-delhi-server",
+  "version":"2.0.0",
+  "private":true,
+  "type":"module",
+  "engines":{"node":">=22 <23"},
+  "scripts":{"start":"node src/index.js","check":"node --check src/index.js"},
+  "dependencies":{"cors":"^2.8.5","csv-parse":"^7.0.2","dotenv":"^16.4.7","express":"^5.1.0","gtfs-realtime-bindings":"^2.2.0","express-rate-limit":"^8.7.0","ip-address":"^10.7.3","fflate":"^0.8.3"}
 }
