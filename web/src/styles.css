@@ -62,7 +62,10 @@ button:disabled{cursor:not-allowed}
 .map-topbar i{width:7px;height:7px;background:#2E7D32;display:block}
 .map-attribution{position:absolute;right:7px;bottom:6px;z-index:500;background:rgba(255,255,255,.92);padding:2px 5px;font-size:7px;color:#68757B}
 .map-locate{width:40px;height:40px;border:1px solid #D4DDE0;background:#FFFFFF;color:#00695C;font:900 21px system-ui,sans-serif;line-height:40px;text-align:center;box-shadow:0 3px 14px rgba(31,42,48,.16);cursor:pointer;margin:0 8px 32px 0}
-.web-bus{width:38px;height:38px;background:#00695C;color:#FFFFFF;border:3px solid #FFFFFF;box-shadow:0 2px 8px rgba(31,42,48,.28);display:flex;align-items:center;justify-content:center;font:900 8px/1 system-ui,sans-serif;text-align:center;overflow:hidden;padding:2px}
+.web-bus{width:46px;height:24px;background:#00695C;color:#FFFFFF;border:2px solid #FFFFFF;border-radius:0;box-shadow:0 2px 8px rgba(31,42,48,.28);display:flex;align-items:center;justify-content:center;font:900 8px/1 system-ui,sans-serif;text-align:center;overflow:hidden;padding:2px;white-space:nowrap}
+.web-bus-label{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.web-bus.mini{width:46px;height:22px;font-size:7px;border-width:2px}
+.route-mini-bus{background:transparent!important}
 .user-marker{width:16px;height:16px;background:#1976D2;border:3px solid #FFFFFF;box-shadow:0 2px 8px rgba(31,42,48,.28)}
 .location-notice{width:100%;margin-top:7px;padding:9px 10px;background:#F5F0D8;border:1px solid #D9C66B;color:#8A6500;display:flex;justify-content:space-between;text-align:left}
 
@@ -237,3 +240,7 @@ button:disabled{cursor:not-allowed}
 .legend-type{font-size:15px;color:#1F2A30}
 .legend-close{width:100%;height:48px;margin-top:20px;border:0;background:#D95C5C;color:#FFFFFF;font-size:15px;font-weight:800}
 @media(max-width:560px){.legend-dialog{padding:22px 18px 18px}.legend-title{font-size:22px}.legend-type{font-size:13px}}
+
+/* Live buses are route badges, not anonymous dots. Keep them crisp and readable at every zoom. */
+.web-bus-icon{background:transparent!important;border:0!important;border-radius:0!important}
+.leaflet-marker-icon.web-bus-icon{margin:0!important}
