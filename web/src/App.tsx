@@ -16,7 +16,16 @@ const BOUNDS:any=[[28.40,76.84],[28.88,77.35]];
 const storageGet=(key:string)=>{try{return window.localStorage.getItem(key);}catch{return null;}};
 const storageSet=(key:string,value:string)=>{try{window.localStorage.setItem(key,value);return true;}catch{return false;}};
 
-const routeName=(value:any)=>{const text=String(value||'').trim();if(!text)return null;return text.replace(/(?:UP|DOWN|DWN)$/i,'').replace(/^AIR-0+/i,'AIR-')||null;};
+const routeName=(value:any)=>{
+  let text=String(value??'').trim().replace(/\\s+/g,' ');
+  if(!text)return null;
+  text=text.replace(/^route\\s*[:#-]?\\s*/i,'').trim();
+  text=text.split(/\\s*[|:–—]\\s*/)[0].trim();
+  text=text.replace(/\\s+(?:UP|DOWN|DWN)$/i,'').trim();
+  const air=text.match(/^AIR[- ]*0*(\\d+[A-Z]?)/i);if(air)return 'AIR-'+air[1].toUpperCase();
+  const numbered=text.match(/^(\\d{1,5}[A-Z]?)(?:\\s|$)/i);if(numbered)return numbered[1].toUpperCase();
+  return text.length<=14?text:null;
+};
 const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||routeName(v.routeId)||'BUS';
 const isHex=(v:any)=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 const textFor=(bg:string)=>{const h=bg.replace('#','');const rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.55?'#17313B':'#FFFFFF';};
@@ -380,11 +389,17 @@ function DtcMap({vehicles,location,onLegend}:{vehicles:Vehicle[];location:Point|
     const renderVisible=()=>{
       const visible=new Map<string,Vehicle>();
       const bounds=map.getBounds().pad(.06);
-      for(const v of vehiclesRef.current){
+      const center=map.getCenter();
+      const candidates=vehiclesRef.current.map(v=>{
         const lat=Number(v.latitude),lon=Number(v.longitude);
-        // Ignore malformed positions and vehicles outside the Delhi map bounds.
-        if(Number.isFinite(lat)&&Number.isFinite(lon)&&BOUNDS[0][0]<=lat&&lat<=BOUNDS[1][0]&&BOUNDS[0][1]<=lon&&lon<=BOUNDS[1][1]&&bounds.contains([lat,lon]))visible.set(v.id,v);
-      }
+        if(!Number.isFinite(lat)||!Number.isFinite(lon)||!BOUNDS[0][0]<=lat)return null;
+        if(lat<BOUNDS[0][0]||lat>BOUNDS[1][0]||lon<BOUNDS[0][1]||lon>BOUNDS[1][1]||!bounds.contains([lat,lon]))return null;
+        const d=(lat-center.lat)**2+(lon-center.lng)**2;
+        return {v,d};
+      }).filter(Boolean) as {v:Vehicle;d:number}[];
+      candidates.sort((a,b)=>a.d-b.d);
+      const limit=map.getZoom()>=13?1600:900;
+      for(const item of candidates.slice(0,limit))visible.set(item.v.id,item.v);
       const markers=markersRef.current;
       for(const [id,marker] of markers){
         if(!visible.has(id)){marker.remove();markers.delete(id);}
@@ -398,11 +413,11 @@ function DtcMap({vehicles,location,onLegend}:{vehicles:Vehicle[];location:Point|
         }
         if(existing){existing.remove();markers.delete(id);}
         const marker=L.marker([Number(v.latitude),Number(v.longitude)],{icon:spec.icon,zIndexOffset:500}) as BusMarker;
-        marker.bindTooltip(popupHtml(v),{
-          direction:'auto',offset:[0,-18],opacity:1,interactive:true,
-          className:'one-delhi-bus-popup',sticky:false
+        marker.bindPopup(popupHtml(v),{
+          closeButton:false,autoClose:true,closeOnClick:true,autoPan:true,keepInView:true,
+          className:'one-delhi-bus-popup',maxWidth:280,minWidth:190,offset:[0,-12]
         });
-        marker.on('click',()=>marker.openTooltip());
+        marker.on('click',()=>marker.openPopup());
         marker._udBg=spec.bg;marker._udLabel=spec.label;marker._udText=spec.fg;marker._udTip=marker.getTooltip()||undefined;
         marker.addTo(map);markers.set(id,marker);
       }
