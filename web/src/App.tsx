@@ -8,7 +8,7 @@ declare module 'leaflet' {
   interface CircleMarker { _udBg?: string; _udKind?: 'label' | 'dot'; }
 }
 
-type Page={kind:'home'|'plan'|'tickets'|'hub'|'help'|'legal'|'privacy'|'terms'|'route'|'stop';id?:string};
+type Page={kind:'home'|'plan'|'hub'|'help'|'legal'|'privacy'|'terms'|'route'|'stop';id?:string};
 type Point={lat:number;lon:number};
 
 const CENTER:[number,number]=[28.6139,77.209];
@@ -40,7 +40,6 @@ function parsePath(path:string=window.location.pathname):Page{
   const p=path.replace(/\/+$/,'')||'/';
   if(p==='/')return{kind:'home'};
   if(p==='/plan')return{kind:'plan'};
-  if(p==='/tickets')return{kind:'tickets'};
   if(p==='/hub')return{kind:'hub'};
   if(p==='/help')return{kind:'help'};
   if(p==='/legal')return{kind:'legal'};
@@ -196,7 +195,6 @@ export default function App(){
 
       {page.kind==='home'?<Home vehicles={vehicles} location={location} locationStatus={locationStatus} liveStatus={liveStatus} locate={locate} go={go} onLegend={()=>setLegendOpen(true)}/>
        :page.kind==='plan'?<Planner go={go}/>
-       :page.kind==='tickets'?<SimpleTab title="Tickets" subtitle="Tickets and passes" icon="▣" body="Ticketing is not connected to United Delhi yet."/>
        :page.kind==='hub'?<SimpleTab title="Hub" subtitle="Delhi transit tools" icon="⌂" body="Transit tools and nearby services will appear here."/>
        :page.kind==='help'?<SimpleTab title="Help" subtitle="Need a hand?" icon="?" body="Use the map, search routes, or open a stop to see live buses."/>
        :page.kind==='legal'?<Legal go={go}/>
@@ -209,7 +207,6 @@ export default function App(){
     <BusLegend open={legendOpen} onClose={()=>setLegendOpen(false)}/>
     <nav className="bottom-nav one-delhi-nav">
       <button className={page.kind==='home'?'active':''} onClick={()=>go('/')}><span>▣</span><small>Bus</small></button>
-      <button className={page.kind==='tickets'?'active':''} onClick={()=>go('/tickets')}><span>▤</span><small>Tickets</small></button>
       <button className={page.kind==='hub'?'active':''} onClick={()=>go('/hub')}><span>⌂</span><small>Hub</small></button>
       <button className={page.kind==='plan'?'active':''} onClick={()=>go('/plan')}><span>↗</span><small>Trip Plan</small></button>
       <button className={page.kind==='help'?'active':''} onClick={()=>go('/help')}><span>?</span><small>Help</small></button>
@@ -265,12 +262,12 @@ function Home({vehicles,location,locationStatus,liveStatus,locate,go,onLegend}:{
 
     {locationStatus?<button className="location-notice" onClick={locate}><span>{locationStatus}</span><b>Retry</b></button>:null}
 
-    <TransitSheet stops={stops} location={location} locate={locate} go={go}/>
+    <TransitSheet stops={stops} go={go}/>
     <button className="legal-link" onClick={()=>go('/legal')}>Legal & privacy</button>
   </>;
 }
 
-function TransitSheet({stops,location,locate,go}:{stops:any[];location:Point|null;locate:()=>void;go:(path:string)=>void}){
+function TransitSheet({stops,go}:{stops:any[];go:(path:string)=>void}){
   const[drag,setDrag]=useState(0);const[startY,setStartY]=useState<number|null>(null);const[startDrag,setStartDrag]=useState(0);const stop=stops[0];const collapsed=180;
   const onDown=(e:any)=>{e.currentTarget.setPointerCapture?.(e.pointerId);setStartY(e.clientY);setStartDrag(drag);};
   const onMove=(e:any)=>{if(startY===null)return;setDrag(Math.max(0,Math.min(collapsed,startDrag+(e.clientY-startY))));};
@@ -280,7 +277,7 @@ function TransitSheet({stops,location,locate,go}:{stops:any[];location:Point|nul
     <div className="sheet-tabs"><button className="active">Bus Stop</button><button>Metro Stop</button></div>
     <div className="sheet-stop-head"><div><b>{stop?.name||'Select a bus stop'}</b><small>{stop?'towards nearby stops':'Use your location to find nearby DTC stops'}</small></div><button onClick={()=>stop&&go('/stops/'+encodeURIComponent(stop.stop_id))}>View Buses</button></div>
     <div className="sheet-stop-row"><div className="sheet-mini-icon">▣</div><div><b>{stop?.name||'Nearby DTC bus stop'}</b><small>{stop?.distanceMeters!=null?Math.round(stop.distanceMeters)+' m away':'Live stop information'}</small></div><button onClick={locate}>⌖</button></div>
-    <div className="sheet-actions one-delhi-actions"><button className="sheet-action" onClick={()=>go('/plan')}><span>↗</span><b>Trip Plan</b></button><button className="sheet-action" onClick={locate}><span>⌖</span><b>My Location</b></button></div>
+    <div className="sheet-actions one-delhi-actions"><button className="sheet-action" onClick={()=>go('/plan')}><span>↗</span><b>Trip Plan</b></button></div>
     {!stop?<div className="flat-card empty-stop"><b>Find stops around you</b><small>Allow location or use the map to explore Delhi transit.</small></div>:null}
   </section>;
 }
@@ -334,8 +331,7 @@ function DtcMap({vehicles,location,onLegend}:{vehicles:Vehicle[];location:Point|
 
     const map:any=L.map(el.current,{
       center:initial,zoom:initialZoom,scrollWheelZoom:true,zoomControl:true,minZoom:9,maxBounds:BOUNDS,
-      maxBoundsViscosity:.18,attributionControl:true,preferCanvas:true,inertia:true,inertiaDeceleration:1800,
-      inertiaMaxSpeed:1800,bounceAtZoomLimits:false
+      maxBoundsViscosity:.18,attributionControl:true,preferCanvas:true,inertia:false,bounceAtZoomLimits:false
     });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true,
@@ -348,7 +344,7 @@ function DtcMap({vehicles,location,onLegend}:{vehicles:Vehicle[];location:Point|
       L.DomEvent.disableClickPropagation(b);
       L.DomEvent.on(b,'click',()=>{
         const current=locationRef.current;
-        if(current)map.flyTo([current.lat,current.lon],14,{duration:1,easeLinearity:.2});
+        if(current){map.stop();map.setView([current.lat,current.lon],14,{animate:false});}
       });
       return b;
     }});
@@ -444,7 +440,7 @@ function DtcMap({vehicles,location,onLegend}:{vehicles:Vehicle[];location:Point|
       }).addTo(userRef.current);
       if(!focused.current){
         focused.current=true;
-        window.setTimeout(()=>map.flyTo([location.lat,location.lon],14,{duration:1.1,easeLinearity:.2}),80);
+        window.setTimeout(()=>{map.stop();map.setView([location.lat,location.lon],14,{animate:false});},40);
       }
     }
   },[location]);
