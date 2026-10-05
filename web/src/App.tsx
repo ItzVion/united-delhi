@@ -247,26 +247,29 @@ function Home({vehicles,location,locationStatus,liveStatus,locate,go,onLegend}:{
   },[location]);
 
   return <>
-    <section className="section-line live-section">
-      <span className="eyebrow">LIVE TRANSIT</span>
-      <button className="text-button" onClick={locate}>{location?'Recenter':'Use my location'}</button>
-    </section>
-
-    <div className="map-card">
-      <DtcMap vehicles={vehicles} location={location} onLegend={onLegend} go={go}/>
-      <div className="map-topbar"><i/><b>{liveStatus==='loading'?'Checking live buses':vehicles.length?(liveStatus==='stale'?vehicles.length+' buses · updating':vehicles.length+' buses live'):'Live data unavailable'}</b></div>
-      <div className="map-attribution">© OpenStreetMap contributors</div>
-      <div className="map-legend">
-        <span><i style={{background:BUS_COLORS.cngNonAcGreen}}/>DTC</span>
-        <span><i style={{background:BUS_COLORS.evDeviOrange}}/>Cluster</span>
-        <span><i style={{background:BUS_COLORS.evAc}}/>Electric</span>
-      </div>
+    <div className="home-layout">
+      <section className="home-map">
+        <section className="section-line live-section">
+          <div><span className="eyebrow">LIVE TRANSIT</span><p className="live-subtitle">Real-time DTC positions across Delhi</p></div>
+          <button className="text-button" onClick={locate}>{location?'Recenter':'Use my location'}</button>
+        </section>
+        <div className="map-card">
+          <DtcMap vehicles={vehicles} location={location} onLegend={onLegend} go={go}/>
+          <div className="map-topbar"><i/><b>{liveStatus==='loading'?'Checking live buses':vehicles.length?(liveStatus==='stale'?vehicles.length+' buses · updating':vehicles.length+' buses live'):'Live data unavailable'}</b></div>
+          <div className="map-attribution">© OpenStreetMap contributors</div>
+          <div className="map-legend">
+            <span><i style={{background:BUS_COLORS.cngNonAcGreen}}/>DTC</span>
+            <span><i style={{background:BUS_COLORS.evDeviOrange}}/>Cluster</span>
+            <span><i style={{background:BUS_COLORS.evAc}}/>Electric</span>
+          </div>
+        </div>
+        {locationStatus?<button className="location-notice" onClick={locate}><span>{locationStatus}</span><b>Retry</b></button>:null}
+      </section>
+      <aside className="home-side">
+        <TransitSheet stops={stops} go={go}/>
+        <button className="legal-link" onClick={()=>go('/legal')}>Legal & privacy</button>
+      </aside>
     </div>
-
-    {locationStatus?<button className="location-notice" onClick={locate}><span>{locationStatus}</span><b>Retry</b></button>:null}
-
-    <TransitSheet stops={stops} go={go}/>
-    <button className="legal-link" onClick={()=>go('/legal')}>Legal & privacy</button>
   </>;
 }
 
@@ -523,7 +526,7 @@ function RouteMiniMap({stops,buses}:{stops:any[];buses:Vehicle[]}) {
     const validStops=stops.filter((s:any)=>Number.isFinite(Number(s.latitude))&&Number.isFinite(Number(s.longitude)));
     if(!validStops.length)return;
     const map:any=L.map(el.current,{zoomControl:true,attributionControl:true,preferCanvas:true,scrollWheelZoom:false,dragging:true}).setView([Number(validStops[0].latitude),Number(validStops[0].longitude)],13);
-    maplibreGL({style:'https://tiles.openfreemap.org/styles/liberty'}).addTo(map);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true,attribution:'© OpenStreetMap contributors'}).addTo(map);
     const linePoints=validStops.map((s:any)=>[Number(s.latitude),Number(s.longitude)] as [number,number]);
     L.polyline(linePoints,{color:'#00695C',weight:4,opacity:.78}).addTo(map);
     const stopLayer=L.layerGroup().addTo(map);
