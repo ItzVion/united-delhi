@@ -734,9 +734,11 @@ const server=app.listen({port,host},()=>{
   // IMPORTANT: let Render see a completely idle, responsive HTTP server before
   // starting any database/realtime work. This avoids the recurring "No open
   // HTTP ports detected" / 502 cycle when background startup work is slow.
+  // The HTTP listener is already active here, so realtime can start immediately.
+  // Only the heavier static DB bootstrap is delayed to keep Render startup cheap.
+  loadOperationalMappings();
+  startRealtimePolling();
   setTimeout(()=>{
-    loadOperationalMappings();
-    startRealtimePolling();
     void ensureStaticData().catch(error=>{
       staticDataCache.status='ERROR';
       staticDataCache.reason=error instanceof Error?error.message:'Static GTFS bootstrap failed';
