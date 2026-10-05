@@ -222,7 +222,7 @@ function SearchResults({loading,error,results,go}:{loading:boolean;error:string;
       const name=x.type==='route'?(routeName(x.label||x.short_name)||'Route'):x.label;
       return <button className="search-result" key={String(x.type)+String(x.id)+i} onClick={()=>go(x.type==='route'?'/routes/'+encodeURIComponent(x.id):'/stops/'+encodeURIComponent(x.id))}>
         {x.type==='route'?<RouteBadge name={name} color={x.routeColor} textColor={x.routeTextColor}/>:<span className="stop-square">●</span>}
-        <span className="result-copy"><b>{x.type==='route'?'Bus route':x.label}</b><small>{x.type==='route'?(x.fromStop||'Start')+' → '+(x.toStop||'Destination'):'Bus stop'}</small></span>
+        <span className="result-copy"><b>{x.type==='route'?'Bus route':x.label}</b><small>{x.type==='route'?(x.fromStop||'Start')+' → '+(x.toStop||'Destination'):(x.stopContext||'Bus stop')}</small></span>
         <span className="chevron">›</span>
       </button>;
     }):<div className="empty-line">No matching routes or stops found.</div>}
@@ -404,6 +404,11 @@ function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Poi
         if(lat<BOUNDS[0][0]||lat>BOUNDS[1][0]||lon<BOUNDS[0][1]||lon>BOUNDS[1][1])continue;
         if(!viewport.contains([lat,lon]))continue;
         const id=String(v.id);
+        const labelForViewport=displayVehicleRoute(v).trim();
+        const markerWidth=Math.max(62,labelForViewport.length*9+43);
+        const point=map.latLngToContainerPoint([lat,lon]);
+        const size=map.getSize();
+        if(point.x<markerWidth/2+4||point.x>size.x-markerWidth/2-4||point.y<18||point.y>size.y-18)continue;
         seen.add(id);
         const bg=busColorFor(v),label=displayVehicleRoute(v),existing=markers.get(id);
         if(existing){
@@ -542,7 +547,7 @@ function Planner({go}:{go:(path:string)=>void}){
   useEffect(()=>{const id=window.setTimeout(()=>void loadSuggestions(from,setFromSuggestions),180);return()=>window.clearTimeout(id);},[from]);
   useEffect(()=>{const id=window.setTimeout(()=>void loadSuggestions(to,setToSuggestions),180);return()=>window.clearTimeout(id);},[to]);
   const plan=async()=>{if(from.trim().length<2||to.trim().length<2){setError('Select a starting stop and destination.');return;}setBusy(true);setError('');setOptions([]);setFromFocus(false);setToFocus(false);try{const r=await api.plan(from.trim(),to.trim(),fromStopId||undefined,toStopId||undefined);if(r.status==='OK')setOptions(r.options||[]);else setError(r.reason||'No journey could be planned.');}catch(e){setError((e as Error).message||'Journey planner is unavailable.');}finally{setBusy(false);}};
-  const suggestions=(items:any[],active:boolean,setter:(v:string)=>void,setId:(v:string)=>void)=><>{active&&items.length?<div className="planner-suggestions">{items.map((x:any)=><button type="button" className="planner-suggestion" key={x.id} onMouseDown={e=>e.preventDefault()} onClick={()=>{setter(x.label);setId(String(x.id));setFromFocus(false);setToFocus(false);}}><span className="stop-square">●</span><span><b>{x.label}</b><small>Bus stop · {x.id}</small></span><span>›</span></button>)}</div>:null}</>;
+  const suggestions=(items:any[],active:boolean,setter:(v:string)=>void,setId:(v:string)=>void)=><>{active&&items.length?<div className="planner-suggestions">{items.map((x:any)=><button type="button" className="planner-suggestion" key={x.id} onMouseDown={e=>e.preventDefault()} onClick={()=>{setter(x.label);setId(String(x.id));setFromFocus(false);setToFocus(false);}}><span className="stop-square">●</span><span><b>{x.label}</b><small>{x.stopContext||('Bus stop · '+x.id)}</small></span><span>›</span></button>)}</div>:null}</>;
   return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">JOURNEY PLANNER</span><h1>Plan your ride</h1><p>Bus journeys across Delhi</p></div></div><div className="flat-card planner-form"><div className="planner-row"><div className="route-rail"><i/><b/><i/></div><div className="planner-fields"><label>FROM<div className="planner-input-wrap"><input value={from} onFocus={()=>setFromFocus(true)} onChange={e=>{setFrom(e.target.value);setFromStopId(null);setFromFocus(true);}} placeholder="Starting stop or place"/>{suggestions(fromSuggestions,fromFocus,setFrom,setFromStopId)}</div></label><label>TO<div className="planner-input-wrap"><input value={to} onFocus={()=>setToFocus(true)} onChange={e=>{setTo(e.target.value);setToStopId(null);setToFocus(true);}} placeholder="Where do you want to go?"/>{suggestions(toSuggestions,toFocus,setTo,setToStopId)}</div></label></div><button className="swap-button" onClick={()=>{const v=from;const id=fromStopId;setFrom(to);setTo(v);setFromStopId(toStopId);setToStopId(id);}}>↕</button></div><button className="primary-button" onClick={plan} disabled={busy}>{busy?'Finding buses…':'Find buses'}</button></div>{error?<div className="error-box"><b>Couldn't plan this trip</b><span>{error}</span></div>:null}{options.map((o:any,i:number)=><div className="flat-card journey" key={i}><div className="journey-top"><div><span className="eyebrow">{o.type==='direct'?'DIRECT BUS':'ONE CHANGE'}</span><strong>{o.durationMinutes} min</strong></div><span className="walk-tag">Walking time not estimated</span></div>{(o.legs||[]).map((l:any,j:number)=><div className="journey-leg" key={String(l.routeId)+j}><RouteBadge name={routeName(l.routeName)} color={l.routeColor} textColor={l.routeTextColor}/><div><b>Bus {routeName(l.routeName)}</b><small>{l.fromStop} → {l.toStop}</small></div></div>)}</div>)}{!busy&&!error&&!options.length?<div className="empty-panel"><span className="empty-icon">↗</span><b>Where are you going?</b><p>Start typing a Delhi bus stop in either field to choose it from the list.</p></div>:null}</section>;
 }
 
