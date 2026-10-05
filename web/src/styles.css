@@ -65,11 +65,11 @@ button:disabled{cursor:not-allowed}
 .map-topbar i{width:7px;height:7px;background:#2E7D32;display:block}
 .map-attribution{position:absolute;right:7px;bottom:6px;z-index:500;background:rgba(255,255,255,.92);padding:2px 5px;font-size:7px;color:#68757B}
 .map-locate{width:40px;height:40px;border:1px solid #D4DDE0;background:#FFFFFF;color:#00695C;font:900 21px system-ui,sans-serif;line-height:40px;text-align:center;box-shadow:0 3px 14px rgba(31,42,48,.16);cursor:pointer;margin:0 8px 32px 0}
-.web-bus{height:28px;background:#00695C;color:#FFFFFF;border:2px solid #FFFFFF;border-radius:2px;box-shadow:0 2px 8px rgba(31,42,48,.30);display:flex;align-items:center;justify-content:flex-start;gap:4px;font:900 9px/1 system-ui,sans-serif;text-align:center;overflow:hidden;padding:2px 5px;white-space:nowrap}
-.web-bus-label{display:block;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bus-glyph{width:18px;height:18px;display:grid;place-items:center;flex:0 0 18px}
-.bus-glyph svg{width:17px;height:17px;display:block}
-.web-bus.mini{height:24px;font-size:8px;border-width:2px}
+.web-bus{height:30px;background:#00695C;color:#FFFFFF;border:0;border-radius:5px;box-shadow:0 2px 8px rgba(31,42,48,.30);display:flex;align-items:center;justify-content:flex-start;gap:5px;font:900 10px/1 system-ui,sans-serif;text-align:left;overflow:hidden;padding:4px 8px;white-space:nowrap}
+.web-bus-label{display:block;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:900;letter-spacing:.1px}
+.bus-glyph{width:19px;height:19px;display:grid;place-items:center;flex:0 0 19px}
+.bus-glyph svg{width:18px;height:18px;display:block}
+.web-bus.mini{height:24px;font-size:8px;border:0}
 .route-mini-bus{background:transparent!important}
 .user-marker{width:16px;height:16px;background:#1976D2;border:3px solid #FFFFFF;box-shadow:0 2px 8px rgba(31,42,48,.28)}
 .location-notice{width:100%;margin-top:7px;padding:9px 10px;background:#F5F0D8;border:1px solid #D9C66B;color:#8A6500;display:flex;justify-content:space-between;text-align:left}
@@ -323,7 +323,7 @@ body{background:var(--ud-bg);color:var(--ud-ink)}
 .map-card{background:#EAF1EC}
 .map-topbar i{background:var(--ud-leaf)}
 .map-locate{color:var(--ud-green);border-color:var(--ud-line)}
-.web-bus{border-color:#fff;box-shadow:0 2px 8px rgba(20,70,45,.30)}
+.web-bus{border:0;box-shadow:0 2px 8px rgba(20,70,45,.30)}
 .one-delhi-popup-route{color:var(--ud-green)}
 .one-delhi-popup{border-color:#C9D9CF;color:var(--ud-ink)}
 .transit-sheet.one-delhi-sheet{border-color:var(--ud-line)}
@@ -346,7 +346,7 @@ body{background:var(--ud-bg);color:var(--ud-ink)}
 .leaflet-popup-close-button{display:none}
 @media(max-width:560px){
   .map-card{height:clamp(440px,70vh,680px)}
-  .web-bus{height:27px}
+  .web-bus{height:30px}
 }
 
 /* Shared responsive composition: mobile app and web use the same component language. */
