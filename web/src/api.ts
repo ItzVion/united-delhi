@@ -1,7 +1,7 @@
 export const API=String(import.meta.env.VITE_API_BASE_URL || 'https://united-delhi.onrender.com').trim().replace(/\/+$/,'');
-async function request<T>(path:string,init:RequestInit={},timeoutMs=10000):Promise<T>{
+async function request<T>(path:string,init:RequestInit={},timeoutMs=10000,retries=2):Promise<T>{
   let lastError:Error|null=null;
-  for(let attempt=0;attempt<3;attempt++){
+  for(let attempt=0;attempt<=retries;attempt++){
     const controller=new AbortController();
     const timer=window.setTimeout(()=>controller.abort(),timeoutMs);
     try{
@@ -21,10 +21,10 @@ async function request<T>(path:string,init:RequestInit={},timeoutMs=10000):Promi
 }
 export type Vehicle={id:string;routeId:string|null;routeShortName:string|null;routeColor?:string|null;routeTextColor?:string|null;fromStop?:string|null;toStop?:string|null;serviceType?:'dtc'|'cluster'|'electric'|'unknown';serviceColor?:string|null;vehicleLabel?:string|null;licensePlate?:string|null;latitude:number;longitude:number;observedAt?:string};
 export const api={
-  vehicles:()=>request<{status:string;count:number;vehicles:Vehicle[];reason?:string;fetchedAt?:string;stale?:boolean}>('/api/realtime/vehicles',{},20000),
-  search:(q:string)=>request<{status:string;results:any[]}>(`/api/search?q=${encodeURIComponent(q)}`),
-  route:(id:string)=>request<any>(`/api/routes/${encodeURIComponent(id)}`),
+  vehicles:()=>request<{status:string;count:number;vehicles:Vehicle[];reason?:string;fetchedAt?:string;stale?:boolean}>('/api/realtime/vehicles',{},7000,0),
+  search:(q:string)=>request<{status:string;results:any[]}>(`/api/search?q=${encodeURIComponent(q)}`,{},8000,1),
+  route:(id:string)=>request<any>(`/api/routes/${encodeURIComponent(id)}`,{},8000,1),
   stop:async(id:string)=>{const stopResult=await request<any>(`/api/stops/${encodeURIComponent(id)}`);let arrivals:any={status:'UNAVAILABLE',arrivals:[],reason:'Live arrival data is unavailable.'};try{arrivals=await request<any>(`/api/stops/${encodeURIComponent(id)}/arrivals`);}catch(error){arrivals={status:'UNAVAILABLE',arrivals:[],reason:error instanceof Error?error.message:'Live arrival data is unavailable.'};}return [stopResult,arrivals] as const;},
-  nearby:(lat:number,lon:number)=>request<any>('/api/stops/nearby',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat,lon,limit:30})}),
+  nearby:(lat:number,lon:number)=>request<any>('/api/stops/nearby',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat,lon,limit:30})},8000,1),
   plan:(from:string,to:string,fromStopId?:string,toStopId?:string)=>{const params=new URLSearchParams({from,to});if(fromStopId)params.set('fromStopId',fromStopId);if(toStopId)params.set('toStopId',toStopId);return request<any>('/api/plan?'+params.toString(),{},15000);}
 };
