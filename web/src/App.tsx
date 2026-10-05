@@ -447,11 +447,11 @@ function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Poi
           if(selectedRef.current&&selectedRef.current!==marker){
             const old=selectedRef.current;
             old.setZIndexOffset(500);
-            old.getElement()?.classList.remove('ud-bus-selected');
+            old.getElement()?.querySelector('.web-bus')?.classList.remove('ud-bus-selected');
           }
           selectedRef.current=marker;
           marker.setZIndexOffset(1500);
-          marker.getElement()?.classList.add('ud-bus-selected');
+          marker.getElement()?.querySelector('.web-bus')?.classList.add('ud-bus-selected');
           const ll=marker.getLatLng();
           map.stop();
           map.setView(ll,18,{animate:true,duration:.35,easeLinearity:.25});
@@ -460,7 +460,7 @@ function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Poi
         marker.on('popupclose',()=>{
           if(selectedRef.current===marker){
             marker.setZIndexOffset(500);
-            marker.getElement()?.classList.remove('ud-bus-selected');
+            marker.getElement()?.querySelector('.web-bus')?.classList.remove('ud-bus-selected');
             selectedRef.current=null;
           }
         });
@@ -482,7 +482,10 @@ function DtcMap({vehicles,location,onLegend,go}:{vehicles:Vehicle[];location:Poi
       }
       if(removeQueue.length)cluster.removeLayers(removeQueue);
       if(addQueue.length)cluster.addLayers(addQueue);
-      cluster.refreshClusters?.();
+      // Rebuild the cluster index after live positions move. This avoids stale cluster locations.
+      const allMarkers=[...markers.values()];
+      cluster.clearLayers();
+      cluster.addLayers(allMarkers);
     };
 
     const report=()=>{
