@@ -8,7 +8,7 @@ declare module 'leaflet' {
   interface CircleMarker { _udBg?: string; _udKind?: 'label' | 'dot'; }
 }
 
-type Page={kind:'home'|'plan'|'legal'|'privacy'|'terms'|'route'|'stop';id?:string};
+type Page={kind:'home'|'plan'|'tickets'|'hub'|'help'|'legal'|'privacy'|'terms'|'route'|'stop';id?:string};
 type Point={lat:number;lon:number};
 
 const CENTER:[number,number]=[28.6139,77.209];
@@ -31,6 +31,9 @@ function parsePath(path:string=window.location.pathname):Page{
   const p=path.replace(/\/+$/,'')||'/';
   if(p==='/')return{kind:'home'};
   if(p==='/plan')return{kind:'plan'};
+  if(p==='/tickets')return{kind:'tickets'};
+  if(p==='/hub')return{kind:'hub'};
+  if(p==='/help')return{kind:'help'};
   if(p==='/legal')return{kind:'legal'};
   if(p==='/legal/privacy')return{kind:'privacy'};
   if(p==='/legal/terms')return{kind:'terms'};
@@ -161,18 +164,20 @@ export default function App(){
   }
 
   return <div className="app-shell">
-    <header className="mobile-header">
-      <button className="brand brand-button" onClick={()=>go('/')}>
-        <img className="brand-mark" src="/icon.svg" alt="United Delhi logo"/>
-        <span className="brand-copy"><b>UNITED DELHI</b><small>Delhi transit, made simple</small></span>
-      </button>
-      <span className={'status '+(liveStatus==='ok'?'ok':'muted')}><i/>{liveStatus==='loading'?'Checking live buses':vehicles.length?(liveStatus==='stale'?vehicles.length+' buses · updating':vehicles.length+' live buses'):'Live data unavailable'}</span>
+    <header className="mobile-header one-delhi-header">
+      <div className="one-header-row">
+        <button className="brand brand-button one-brand" onClick={()=>go('/')}>
+          <img className="brand-mark" src="/icon.svg" alt="United Delhi logo"/>
+          <span className="brand-copy"><b>UNITED DELHI</b><small>Delhi transit</small></span>
+        </button>
+        <span className={'status '+(liveStatus==='ok'?'ok':'muted')}><i/>{liveStatus==='loading'?'…':vehicles.length?(liveStatus==='stale'?vehicles.length+' updating':vehicles.length+' live'):'Offline'}</span>
+      </div>
     </header>
 
     <main className="app-main">
       <div className="search-box">
         <span className="search-icon">⌕</span>
-        <input value={q} onChange={e=>{setQ(e.target.value);setSearchOpen(true);}} onFocus={()=>setSearchOpen(true)} placeholder="Search routes, stops or places"/>
+        <input value={q} onChange={e=>{setQ(e.target.value);setSearchOpen(true);}} onFocus={()=>setSearchOpen(true)} placeholder="Search 500+ routes, stops or places"/>
         {searchBusy?<span className="spinner"/>:null}
         {q?<button className="clear" onClick={()=>{setQ('');setSearchOpen(false);}}>×</button>:null}
       </div>
@@ -182,6 +187,9 @@ export default function App(){
 
       {page.kind==='home'?<Home vehicles={vehicles} location={location} locationStatus={locationStatus} liveStatus={liveStatus} locate={locate} go={go} onLegend={()=>setLegendOpen(true)}/>
        :page.kind==='plan'?<Planner go={go}/>
+       :page.kind==='tickets'?<SimpleTab title="Tickets" subtitle="Tickets and passes" icon="▣" body="Ticketing is not connected to United Delhi yet."/>
+       :page.kind==='hub'?<SimpleTab title="Hub" subtitle="Delhi transit tools" icon="⌂" body="Transit tools and nearby services will appear here."/>
+       :page.kind==='help'?<SimpleTab title="Help" subtitle="Need a hand?" icon="?" body="Use the map, search routes, or open a stop to see live buses."/>
        :page.kind==='legal'?<Legal go={go}/>
        :page.kind==='privacy'?<Privacy go={go}/>
        :page.kind==='terms'?<Terms go={go}/>
@@ -190,10 +198,12 @@ export default function App(){
     </main>
 
     <BusLegend open={legendOpen} onClose={()=>setLegendOpen(false)}/>
-    <nav className="bottom-nav">
-      <button className={page.kind==='home'?'active':''} onClick={()=>go('/')}><span>⌂</span><small>Home</small></button>
-      <button className={page.kind==='plan'?'active':''} onClick={()=>go('/plan')}><span>↗</span><small>Plan</small></button>
-      <button className={['legal','privacy','terms'].includes(page.kind)?'active':''} onClick={()=>go('/legal')}><span>§</span><small>Legal</small></button>
+    <nav className="bottom-nav one-delhi-nav">
+      <button className={page.kind==='home'?'active':''} onClick={()=>go('/')}><span>▣</span><small>Bus</small></button>
+      <button className={page.kind==='tickets'?'active':''} onClick={()=>go('/tickets')}><span>▤</span><small>Tickets</small></button>
+      <button className={page.kind==='hub'?'active':''} onClick={()=>go('/hub')}><span>⌂</span><small>Hub</small></button>
+      <button className={page.kind==='plan'?'active':''} onClick={()=>go('/plan')}><span>↗</span><small>Trip Plan</small></button>
+      <button className={page.kind==='help'?'active':''} onClick={()=>go('/help')}><span>?</span><small>Help</small></button>
     </nav>
   </div>;
 }
@@ -252,47 +262,17 @@ function Home({vehicles,location,locationStatus,liveStatus,locate,go,onLegend}:{
 }
 
 function TransitSheet({stops,location,locate,go}:{stops:any[];location:Point|null;locate:()=>void;go:(path:string)=>void}){
-  const[drag,setDrag]=useState(0);
-  const[startY,setStartY]=useState<number|null>(null);
-  const[startDrag,setStartDrag]=useState(0);
-  const collapsed=150;
-  const expanded=0;
-  const onDown=(e:any)=>{
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    setStartY(e.clientY);setStartDrag(drag);
-  };
-  const onMove=(e:any)=>{
-    if(startY===null)return;
-    const next=Math.max(expanded,Math.min(collapsed,startDrag+(e.clientY-startY)));
-    setDrag(next);
-  };
-  const onUp=()=>{
-    if(startY===null)return;
-    setDrag(drag>75?collapsed:expanded);
-    setStartY(null);
-  };
-
-  return <section className="transit-sheet" style={{transform:'translateY('+drag+'px)'}}>
-    <button className="sheet-handle" type="button" aria-label="Drag nearby stops panel" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
-      <span/>
-    </button>
-    <div className="sheet-head">
-      <div><h2>Nearby stops</h2><p>{location?'Stops around your location':'Enable location to find nearby stops'}</p></div>
-      <button className="text-button" onClick={locate}>{location?'Recenter':'Use location'}</button>
-    </div>
-    <div className="sheet-actions">
-      <button className="sheet-action" onClick={()=>go('/plan')}><span>↗</span><b>Plan trip</b></button>
-      <button className="sheet-action" onClick={locate}><span>◎</span><b>My location</b></button>
-    </div>
-    <div className="sheet-stops">
-      {stops.length?stops.slice(0,6).map((s:any)=>
-        <button className="stop-card" key={s.stop_id} onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}>
-          <span className="stop-icon">●</span>
-          <span className="stop-copy"><b>{s.name}</b><small>{s.distanceMeters!=null?Math.round(s.distanceMeters)+' m away':'Nearby stop'}</small></span>
-          <span className="chevron">›</span>
-        </button>
-      ):<div className="flat-card empty-stop"><b>{location?'No nearby stops found':'No nearby stops yet'}</b><small>{location?'Try moving the map or refreshing your location.':'Location is optional; use the button above to find nearby DTC stops.'}</small></div>}
-    </div>
+  const[drag,setDrag]=useState(0);const[startY,setStartY]=useState<number|null>(null);const[startDrag,setStartDrag]=useState(0);const stop=stops[0];const collapsed=180;
+  const onDown=(e:any)=>{e.currentTarget.setPointerCapture?.(e.pointerId);setStartY(e.clientY);setStartDrag(drag);};
+  const onMove=(e:any)=>{if(startY===null)return;setDrag(Math.max(0,Math.min(collapsed,startDrag+(e.clientY-startY))));};
+  const onUp=()=>{if(startY===null)return;setDrag(drag>90?collapsed:0);setStartY(null);};
+  return <section className="transit-sheet one-delhi-sheet" style={{transform:'translateY('+drag+'px)'}}>
+    <button className="sheet-handle" type="button" aria-label="Drag stop panel" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}><span/></button>
+    <div className="sheet-tabs"><button className="active">Bus Stop</button><button>Metro Stop</button></div>
+    <div className="sheet-stop-head"><div><b>{stop?.name||'Select a bus stop'}</b><small>{stop?'towards nearby stops':'Use your location to find nearby DTC stops'}</small></div><button onClick={()=>stop&&go('/stops/'+encodeURIComponent(stop.stop_id))}>View Buses</button></div>
+    <div className="sheet-stop-row"><div className="sheet-mini-icon">▣</div><div><b>{stop?.name||'Nearby DTC bus stop'}</b><small>{stop?.distanceMeters!=null?Math.round(stop.distanceMeters)+' m away':'Live stop information'}</small></div><button onClick={locate}>⌖</button></div>
+    <div className="sheet-actions one-delhi-actions"><button className="sheet-action" onClick={()=>go('/plan')}><span>↗</span><b>Trip Plan</b></button><button className="sheet-action" onClick={locate}><span>⌖</span><b>My Location</b></button></div>
+    {!stop?<div className="flat-card empty-stop"><b>Find stops around you</b><small>Allow location or use the map to explore Delhi transit.</small></div>:null}
   </section>;
 }
 
@@ -510,6 +490,10 @@ function Planner({go}:{go:(path:string)=>void}){
   return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">JOURNEY PLANNER</span><h1>Plan your ride</h1><p>Bus journeys across Delhi</p></div></div><div className="flat-card planner-form"><div className="planner-row"><div className="route-rail"><i/><b/><i/></div><div className="planner-fields"><label>FROM<div className="planner-input-wrap"><input value={from} onFocus={()=>setFromFocus(true)} onChange={e=>{setFrom(e.target.value);setFromStopId(null);setFromFocus(true);}} placeholder="Starting stop or place"/>{suggestions(fromSuggestions,fromFocus,setFrom,setFromStopId)}</div></label><label>TO<div className="planner-input-wrap"><input value={to} onFocus={()=>setToFocus(true)} onChange={e=>{setTo(e.target.value);setToStopId(null);setToFocus(true);}} placeholder="Where do you want to go?"/>{suggestions(toSuggestions,toFocus,setTo,setToStopId)}</div></label></div><button className="swap-button" onClick={()=>{const v=from;const id=fromStopId;setFrom(to);setTo(v);setFromStopId(toStopId);setToStopId(id);}}>↕</button></div><button className="primary-button" onClick={plan} disabled={busy}>{busy?'Finding buses…':'Find buses'}</button></div>{error?<div className="error-box"><b>Couldn't plan this trip</b><span>{error}</span></div>:null}{options.map((o:any,i:number)=><div className="flat-card journey" key={i}><div className="journey-top"><div><span className="eyebrow">{o.type==='direct'?'DIRECT BUS':'ONE CHANGE'}</span><strong>{o.durationMinutes} min</strong></div><span className="walk-tag">Walking time not estimated</span></div>{(o.legs||[]).map((l:any,j:number)=><div className="journey-leg" key={String(l.routeId)+j}><RouteBadge name={routeName(l.routeName)} color={l.routeColor} textColor={l.routeTextColor}/><div><b>Bus {routeName(l.routeName)}</b><small>{l.fromStop} → {l.toStop}</small></div></div>)}</div>)}{!busy&&!error&&!options.length?<div className="empty-panel"><span className="empty-icon">↗</span><b>Where are you going?</b><p>Start typing a Delhi bus stop in either field to choose it from the list.</p></div>:null}</section>;
 }
 
+
+function SimpleTab({title,subtitle,icon,body}:{title:string;subtitle:string;icon:string;body:string}){
+  return <section className="screen simple-tab"><div className="simple-tab-hero"><span>{icon}</span><div><span className="eyebrow">UNITED DELHI</span><h1>{title}</h1><p>{subtitle}</p></div></div><div className="flat-card simple-tab-card"><b>{body}</b><small>United Delhi is still focused on live DTC bus information while these sections are being connected.</small></div></section>;
+}
 
 function Legal({go}:{go:(path:string)=>void}){
   return <section className="screen">
