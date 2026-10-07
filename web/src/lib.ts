@@ -1,7 +1,7 @@
 import type {Vehicle} from './api';
 
 export type Point={lat:number;lon:number};
-export type Page={kind:'home'|'plan'|'metro'|'settings'|'hub'|'help'|'legal'|'privacy'|'terms'|'about'|'route'|'stop';id?:string};
+export type Page={kind:'home'|'plan'|'metro'|'settings'|'hub'|'help'|'legal'|'privacy'|'terms'|'about'|'route'|'stop'|'metroRoute';id?:string};
 
 export const CENTER:[number,number]=[28.6139,77.209];
 export const BOUNDS:[[number,number],[number,number]]=[[28.40,76.84],[28.88,77.35]];
@@ -66,6 +66,7 @@ export function parsePath(path:string=window.location.pathname):Page{
   if(p==='/')return{kind:'home'};
   if(p==='/plan')return{kind:'plan'};
   if(p==='/metro')return{kind:'metro'};
+  try{if(p.startsWith('/metro/routes/'))return{kind:'metroRoute',id:decodeURIComponent(p.slice(14))};}catch{}
   if(p==='/settings')return{kind:'settings'};
   if(p==='/hub')return{kind:'hub'};
   if(p==='/help')return{kind:'help'};
