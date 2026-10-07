@@ -72,6 +72,7 @@ export function parsePath(path:string=window.location.pathname):Page{
   if(p==='/legal')return{kind:'legal'};
   if(p==='/legal/privacy')return{kind:'privacy'};
   if(p==='/legal/terms')return{kind:'terms'};
+  if(p==='/about')return{kind:'about'};
   try{
     if(p.startsWith('/routes/'))return{kind:'route',id:decodeURIComponent(p.slice(8))};
     if(p.startsWith('/stops/'))return{kind:'stop',id:decodeURIComponent(p.slice(7))};
