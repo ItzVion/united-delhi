@@ -10,9 +10,14 @@ export const storageGet=(k:string)=>{try{return window.localStorage.getItem(k)}c
 export const storageSet=(k:string,v:string)=>{try{window.localStorage.setItem(k,v);return true}catch{return false}};
 
 export const SERVICE_COLORS:Record<string,string>={cluster:'#E57D43',dtc:'#24C88B',electric:'#2FAFBC',unknown:'#6B7280'};
+export const ROUTE_COLORS:Record<string,string>={'772':'#2F80ED'};
 export const isHex=(v:unknown):v is string=>/^#[0-9a-f]{6}$/i.test(String(v||''));
-export const busColor=(v:{serviceColor?:string|null;serviceType?:string|null}|null|undefined)=>
-  isHex(v?.serviceColor)?String(v!.serviceColor):SERVICE_COLORS[String(v?.serviceType||'')]||SERVICE_COLORS.unknown;
+export const busColor=(v:{serviceColor?:string|null;serviceType?:string|null;routeShortName?:string|null;routeId?:string|null;routeName?:string|null}|null|undefined,route?:unknown)=>{
+  const rawRoute=route??v?.routeShortName??v?.routeName??v?.routeId;
+  const normalized=routeName(rawRoute);
+  if(normalized&&ROUTE_COLORS[normalized])return ROUTE_COLORS[normalized];
+  return isHex(v?.serviceColor)?String(v!.serviceColor):SERVICE_COLORS[String(v?.serviceType||'')]||SERVICE_COLORS.unknown;
+};
 export const textOn=(bg:string)=>{const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.6?'#14211B':'#FFFFFF'};
 
 export const routeName=(value:unknown)=>{
@@ -20,7 +25,7 @@ export const routeName=(value:unknown)=>{
   if(!t)return null;
   t=t.replace(/^route\s*[:#-]?\s*/i,'').trim();
   t=t.split(/\s*[|:–—]\s*/)[0].trim();
-  t=t.replace(/\s*(?:UP|DOWN|DWN)$/i,'').trim();
+  t=t.replace(/\b(?:UP|DOWN|DWN)\b/gi,'').replace(/\s+/g,' ').trim();
   const air=t.match(/^AIR[- ]*0*(\d+[A-Z]?)/i);if(air)return 'AIR-'+air[1].toUpperCase();
   const num=t.match(/^(\d{1,5}[A-Z]?)(?:\s|$)/i);if(num)return num[1].toUpperCase();
   return t.length<=14?t:null;
