@@ -21,7 +21,7 @@ const BUS_COLORS={
   evAc:'#2FAFBC', evDeviOrange:'#E57D43', evDeviGreen:'#168F49',
   cngAcBlue:'#3D82CE', cngAcRed:'#E35F67', cngNonAcPeach:'#E5A16E', cngNonAcGreen:'#24C88B'
 } as const;
-const SERVICE_COLORS={dtc:BUS_COLORS.cngNonAcGreen,cluster:BUS_COLORS.evDeviOrange,electric:BUS_COLORS.evAc,unknown:BUS_COLORS.cngAcBlue} as const;
+const SERVICE_COLORS={dtc:BUS_COLORS.evDeviOrange,cluster:BUS_COLORS.evDeviOrange,electric:BUS_COLORS.evAc,unknown:BUS_COLORS.evDeviOrange} as const;
 
 export default function HomeScreen(){
   const navigation=useNavigation<Nav>();
