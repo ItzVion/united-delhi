@@ -41,7 +41,13 @@ export const fullRouteName=(value:unknown)=>{
 export const vehicleRoute=(v:Partial<Vehicle>)=>routeName(v.routeShortName)||routeName(v.routeId)||'BUS';
 export const vehicleRouteFullName=(v:Partial<Vehicle>)=>{
   const n=routeName(v.routeShortName)||routeName(v.routeId);
-  if(n==='801')return 'Inderlok Metro - IGI Airport';
+  const raw=String(v.routeShortName||v.routeId||'').toUpperCase();
+  if(n==='801'){
+    if(raw.includes('IGI-IND'))return 'IGI Airport - Inderlok Metro';
+    if(raw.includes('IND-IGI')||raw==='801')return 'Inderlok Metro - IGI Airport';
+    if(raw.includes('KAP-UTT'))return 'Kapashera Border - Uttam Nagar Terminal';
+    if(raw.includes('UTT-KAP'))return 'Uttam Nagar Terminal - Kapashera Border';
+  }
   const full=fullRouteName(v.routeLongName);
   if(!full||full===n)return null;
   return full;
