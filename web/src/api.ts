@@ -1,30 +1,15 @@
-export const API=String(import.meta.env.VITE_API_BASE_URL || 'https://united-delhi.onrender.com').trim().replace(/\/+$/,'');
-async function request<T>(path:string,init:RequestInit={},timeoutMs=10000,retries=2):Promise<T>{
-  let lastError:Error|null=null;
-  for(let attempt=0;attempt<=retries;attempt++){
-    const controller=new AbortController();
-    const timer=window.setTimeout(()=>controller.abort(),timeoutMs);
-    try{
-      const r=await fetch(API+path,{...init,signal:controller.signal,headers:{Accept:'application/json',...(init.headers??{})}});
-      const text=await r.text();
-      let d:any={};
-      try{d=text?JSON.parse(text):{};}catch{d={reason:text.slice(0,160)};}
-      if(!r.ok)throw new Error(d.reason||'Request failed with '+r.status);
-      return d as T;
-    }catch(error){
-      lastError=error instanceof Error?error:new Error('Network error');
-      if((error as Error)?.name==='AbortError')lastError=new Error('Request timed out');
-      if(attempt<2)await new Promise(resolve=>window.setTimeout(resolve,350*(attempt+1)));
-    }finally{window.clearTimeout(timer);}
-  }
-  throw lastError||new Error('Network error');
-}
+export const API=String(import.meta.env.VITE_API_BASE_URL || '/api').trim().replace(/\/+$/,'');
+const LIVE_CACHE_KEY='ud-live-vehicles-v3';
+async function request<T>(path:string,init:RequestInit={},timeoutMs=10000,retries=2):Promise<T>{let lastError:Error|null=null;for(let attempt=0;attempt<=retries;attempt++){const controller=new AbortController();const timer=window.setTimeout(()=>controller.abort(),timeoutMs);try{const r=await fetch(API+path,{...init,signal:controller.signal,headers:{Accept:'application/json',...(init.headers??{})}});const text=await r.text();let d:any={};try{d=text?JSON.parse(text):{}}catch{d={reason:text.slice(0,160)}}if(!r.ok)throw new Error(d.reason||'Request failed with '+r.status);return d as T}catch(error){lastError=error instanceof Error?error:new Error('Network error');if((error as Error)?.name==='AbortError')lastError=new Error('Request timed out');if(attempt<retries)await new Promise(resolve=>window.setTimeout(resolve,350*(attempt+1)))}finally{window.clearTimeout(timer)}}throw lastError||new Error('Network error')}
 export type Vehicle={id:string;routeId:string|null;routeShortName:string|null;routeColor?:string|null;routeTextColor?:string|null;fromStop?:string|null;toStop?:string|null;serviceType?:'dtc'|'cluster'|'electric'|'unknown';serviceColor?:string|null;vehicleLabel?:string|null;licensePlate?:string|null;latitude:number;longitude:number;observedAt?:string};
+type VehicleResponse={status:string;count:number;vehicles:Vehicle[];reason?:string;fetchedAt?:string;stale?:boolean;source?:string;cacheAgeSeconds?:number|null};
+const readVehicleCache=():VehicleResponse|null=>{try{const raw=window.localStorage.getItem(LIVE_CACHE_KEY);if(!raw)return null;const d=JSON.parse(raw);return Array.isArray(d?.vehicles)&&d.vehicles.length?d:null}catch{return null}};
+const writeVehicleCache=(d:VehicleResponse)=>{try{window.localStorage.setItem(LIVE_CACHE_KEY,JSON.stringify({...d,storedAt:new Date().toISOString()}))}catch{}};
 export const api={
-  vehicles:()=>request<{status:string;count:number;vehicles:Vehicle[];reason?:string;fetchedAt?:string;stale?:boolean}>('/api/realtime/vehicles',{},7000,0),
-  search:(q:string)=>request<{status:string;results:any[]}>(`/api/search?q=${encodeURIComponent(q)}`,{},8000,1),
-  route:(id:string)=>request<any>(`/api/routes/${encodeURIComponent(id)}`,{},8000,1),
-  stop:async(id:string)=>{const stopResult=await request<any>(`/api/stops/${encodeURIComponent(id)}`);let arrivals:any={status:'UNAVAILABLE',arrivals:[],reason:'Live arrival data is unavailable.'};try{arrivals=await request<any>(`/api/stops/${encodeURIComponent(id)}/arrivals`);}catch(error){arrivals={status:'UNAVAILABLE',arrivals:[],reason:error instanceof Error?error.message:'Live arrival data is unavailable.'};}return [stopResult,arrivals] as const;},
-  nearby:(lat:number,lon:number)=>request<any>('/api/stops/nearby',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat,lon,limit:30})},8000,1),
-  plan:(from:string,to:string,fromStopId?:string,toStopId?:string)=>{const params=new URLSearchParams({from,to});if(fromStopId)params.set('fromStopId',fromStopId);if(toStopId)params.set('toStopId',toStopId);return request<any>('/api/plan?'+params.toString(),{},15000);}
+ vehicles:async()=>{try{const d=await request<VehicleResponse>('/realtime/vehicles',{},7000,0);if(Array.isArray(d.vehicles)&&d.vehicles.length)writeVehicleCache(d);return d}catch(error){const c=readVehicleCache();if(c)return{...c,status:'STALE',stale:true,source:'client-cache',reason:'Showing the last known bus positions while live data reconnects.'};throw error}},
+ search:(q:string)=>request<{status:string;results:any[]}>(`/search?q=${encodeURIComponent(q)}`,{},8000,1),
+ route:(id:string)=>request<any>(`/routes/${encodeURIComponent(id)}`,{},8000,1),
+ stop:async(id:string)=>{const stopResult=await request<any>(`/stops/${encodeURIComponent(id)}`);let arrivals:any={status:'UNAVAILABLE',arrivals:[],reason:'Live arrival data is unavailable.'};try{arrivals=await request<any>(`/stops/${encodeURIComponent(id)}/arrivals`,{},8000,1)}catch{}return [stopResult,arrivals] as const},
+ nearby:(lat:number,lon:number)=>request<any>('/stops/nearby',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat,lon,limit:30})},8000,1),
+ plan:(from:string,to:string,fromStopId?:string,toStopId?:string)=>{const params=new URLSearchParams({from,to});if(fromStopId)params.set('fromStopId',fromStopId);if(toStopId)params.set('toStopId',toStopId);return request<any>('/plan?'+params.toString(),{},15000,1)}
 };
