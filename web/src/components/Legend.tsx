@@ -19,7 +19,7 @@ export default function Legend({open,onClose}:{open:boolean;onClose:()=>void}){
         <div className="legend-exact-icons">{row.colors.map((color,j)=><span className="legend-exact-bus" key={j} style={{backgroundColor:color}}><Icon n="bus" size={26}/></span>)}</div>
         <span className="legend-exact-type">{row.label}</span>
       </div>)}
-      <button className="legend-understood" onClick={onClose}>Got it</button>
+      <button className="legend-understood" onClick={onClose}>Understood</button>
     </div>
   </div>;
 }
