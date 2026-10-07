@@ -122,7 +122,7 @@ export default function HomeScreen(){
       stops:nearbyStops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
       buses:visible.map(v=>{
         const route=displayRouteName(v.routeShortName) || 'LIVE';
-        const fallback=v.serviceColor||SERVICE_COLORS[v.serviceType||'unknown'];
+        const fallback=SERVICE_COLORS[v.serviceType||'unknown'];
         const c={background:fallback,text:v.serviceType==='electric'?'#17313B':'#FFFFFF'};
         return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];
       }).flat(),
@@ -190,12 +190,12 @@ export default function HomeScreen(){
           <View style={styles.liveDot}/>
           <Text style={styles.mapTopText}>{fresh==='ok'?(`${vehicles.length} buses live`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='unavailable'?'Live data unavailable':'Checking live buses'}</Text>
         </View>
-        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.dtc}]}/><Text style={styles.legendText}>DTC</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.cluster}]}/><Text style={styles.legendText}>Cluster</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.electric}]}/><Text style={styles.legendText}>Electric</Text></View></View>
+        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.cluster}]}/><Text style={styles.legendText}>Non-AC CNG</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.electric}]}/><Text style={styles.legendText}>Electric</Text></View></View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
           const name=displayRouteName(selectedBus.routeShortName) || 'Live bus';
           if(!selectedBus.routeId) return null;
-          const c={background:selectedBus.serviceColor||SERVICE_COLORS[selectedBus.serviceType||'unknown'],text:selectedBus.serviceType==='electric'?'#17313B':'#FFFFFF'};
+          const c={background:SERVICE_COLORS[selectedBus.serviceType||'unknown'],text:selectedBus.serviceType==='electric'?'#17313B':'#FFFFFF'};
           const ageSeconds=Math.max(0,Math.round((Date.now()-Date.parse(selectedBus.observedAt))/1000));
           const freshness=Number.isFinite(ageSeconds)?(ageSeconds<60?'Updated just now':`Updated ${Math.floor(ageSeconds/60)} min ago`):'Live position';
           return <View style={styles.busPreview}>
@@ -220,10 +220,8 @@ export default function HomeScreen(){
               <Text style={styles.legendTitle}>Bus Color Legend</Text>
               <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Type</Text></View>
               {[
-                [['#2FAFBC','EV AC (12 mtr)']],
-                [['#E57D43','EV DEVI AC (9 mtr)'],['#168F49','EV DEVI AC (9 mtr)']],
-                [['#3D82CE','CNG AC (12 mtr)'],['#E35F67','CNG AC (12 mtr)']],
-                [['#E5A16E','CNG NonAC (12 mtr)'],['#24C88B','CNG NonAC (12 mtr)']]
+                [['#E57D43','Non-AC CNG']],
+                [['#2FAFBC','Electric']]
               ].map((row,index)=><View key={index} style={styles.legendRow}><View style={styles.legendIcons}>{row.map(([color],j)=><View key={j} style={[styles.legendBus,{backgroundColor:color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View>)}</View><Text style={styles.legendType}>{row[0][1]}</Text></View>)}
               <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Got it</Text></Pressable>
             </Pressable>
