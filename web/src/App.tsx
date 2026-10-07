@@ -41,13 +41,36 @@ export default function App(){
     navigator.geolocation.getCurrentPosition(p=>{
       const next={lat:p.coords.latitude,lon:p.coords.longitude};
       setLocation(next);setLocState('idle');storageSet('ud-last-location',JSON.stringify(next));
-    },err=>{
-      try{const c=JSON.parse(storageGet('ud-last-location')||'null');
-        if(Number.isFinite(c?.lat)&&Number.isFinite(c?.lon)){setLocation({lat:c.lat,lon:c.lon});setLocState('cached');return}}catch{}
-      setLocState(err?.code===1?'denied':'unavailable');
-    },{enableHighAccuracy:true,maximumAge:300000,timeout:15000});
+    },err=>{setLocState(err?.code===1?'denied':'unavailable');},{enableHighAccuracy:true,maximumAge:10000,timeout:15000});
   },[]);
-  useEffect(()=>{if(!accepted)return;try{const saved=JSON.parse(storageGet('ud-last-location')||'null');if(Number.isFinite(saved?.lat)&&Number.isFinite(saved?.lon))setLocation({lat:saved.lat,lon:saved.lon})}catch{}},[accepted]);
+  useEffect(()=>{
+    if(!accepted||!navigator.geolocation)return;
+    let watch:number|undefined;
+    let cancelled=false;
+    const start=()=>{
+      if(cancelled)return;
+      watch=navigator.geolocation.watchPosition(p=>{
+        const next={lat:p.coords.latitude,lon:p.coords.longitude};
+        setLocation(next);
+        setLocState('idle');
+        storageSet('ud-last-location',JSON.stringify(next));
+      },err=>{
+        if(err?.code===1)setLocState('denied');
+        else if(!location)setLocState('unavailable');
+      },{enableHighAccuracy:true,maximumAge:10000,timeout:15000});
+    };
+    try{
+      const permissions=(navigator as any).permissions;
+      if(permissions?.query){
+        permissions.query({name:'geolocation'}).then((status:any)=>{
+          if(cancelled)return;
+          if(status.state==='granted')start();
+          status.onchange=()=>{if(status.state==='granted')start();};
+        }).catch(start);
+      }else start();
+    }catch{start()}
+    return()=>{cancelled=true;if(watch!==undefined)navigator.geolocation.clearWatch(watch)};
+  },[accepted]);
 
   const load=useCallback(async()=>{
     if(busy.current)return;busy.current=true;
