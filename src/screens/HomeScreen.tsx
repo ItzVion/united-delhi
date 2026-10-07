@@ -262,7 +262,7 @@ function QuickAction({icon,title,sub,onPress,accent=colors.accent}:{icon:string;
   return <Pressable style={styles.quick} onPress={onPress}><Text style={[styles.quickIcon,{color:accent}]}>{icon}</Text><Text style={styles.quickTitle}>{title}</Text><Text style={styles.quickSub}>{sub}</Text></Pressable>;
 }
 function BottomItem({icon,label,onPress,active=false}:{icon:string;label:string;onPress:()=>void;active?:boolean}){
-  return <Pressable style={styles.bottomItem} onPress={onPress}><Text style={[styles.bottomIcon,{color:active?colors.accent:colors.textMuted}]}>{icon}</Text><Text style={[styles.bottomLabel,{color:active?colors.accent:colors.textMuted}]}>{label}</Text></Pressable>;
+  return <Pressable style={styles.bottomItem} onPress={onPress}><Text style={[styles.bottomIcon,{color:active?colors.secondary:'#AAB7BF'}]}>{icon}</Text><Text style={[styles.bottomLabel,{color:active?colors.accent:colors.textMuted}]}>{label}</Text></Pressable>;
 }
 
 function buildMapHtml(){
