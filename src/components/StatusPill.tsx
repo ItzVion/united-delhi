@@ -21,7 +21,7 @@ export function StatusPill({ label, tone = 'muted' }: { label: string; tone?: To
 }
 
 const styles = StyleSheet.create({
-  pill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 10, gap: 6 },
-  dot: { width: 7, height: 7, borderRadius: 14 },
+  pill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderWidth: 1, borderRadius: 0, paddingVertical: 6, paddingHorizontal: 10, gap: 6 },
+  dot: { width: 7, height: 7, borderRadius: 0 },
   text: { fontSize: 12, fontWeight: '700' }
 });
