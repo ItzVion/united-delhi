@@ -6,7 +6,7 @@ import type {Go,LiveStatus,Page,Point} from './lib';
 import {Icon} from './components/ui';
 import Home from './components/Home';
 import Legend from './components/Legend';
-import {Planner,RoutePage,StopPage,Hub,Help,Legal,Privacy,Terms} from './components/pages';
+import {Planner,RoutePage,StopPage,Hub,Help,Legal,Privacy,Terms,About} from './components/pages';
 
 const CACHE_KEY='ud-live-vehicles-v3';
 const readCache=():Vehicle[]=>{try{const d=JSON.parse(storageGet(CACHE_KEY)||'null');return Array.isArray(d?.vehicles)?d.vehicles:[]}catch{return[]}};
@@ -110,7 +110,7 @@ export default function App(){
     return <Consent go={go} onAccept={()=>{storageSet('ud-consent-v1','1');setAccepted(true)}}/>;
   }
 
-  const tab=page.kind==='home'||page.kind==='route'||page.kind==='stop'?'home':page.kind==='plan'?'plan':page.kind==='metro'?'metro':page.kind==='settings'||page.kind==='hub'||page.kind==='legal'||page.kind==='privacy'||page.kind==='terms'||page.kind==='help'?'settings':'home';
+  const tab=page.kind==='home'||page.kind==='route'||page.kind==='stop'?'home':page.kind==='plan'?'plan':page.kind==='metro'?'metro':page.kind==='settings'||page.kind==='hub'||page.kind==='legal'||page.kind==='privacy'||page.kind==='terms'||page.kind==='help'||page.kind==='about'?'settings':'home';
   const nav:[string,string,'bus'|'plan'|'metro'|'hub'|'help',string][]=[['home','/','bus','Bus'],['plan','/plan','plan','Trip Plan'],['metro','/metro','hub','Metro'],['settings','/settings','help','Settings']];
 
   return <div className="app">
@@ -125,6 +125,7 @@ export default function App(){
       :page.kind==='legal'?<Legal go={go}/>
       :page.kind==='privacy'?<Privacy go={go}/>
       :page.kind==='terms'?<Terms go={go}/>
+      :page.kind==='about'?<About go={go}/>
       :page.kind==='route'?<RoutePage id={page.id||''} go={go} services={services}/>
       :<StopPage id={page.id||''} go={go} services={services}/>}
     </main>
