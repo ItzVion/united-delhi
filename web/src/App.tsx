@@ -197,13 +197,13 @@ export default function App(){
     <main className="app-main">
       <div className="search-box">
         <span className="search-icon">⌕</span>
-        <input value={q} onChange={e=>{setQ(e.target.value);setSearchOpen(true);}} onFocus={()=>setSearchOpen(true)} placeholder="Search 500+ routes, stops or places"/>
+        <input value={q} onChange={e=>{setQ(e.target.value);setSearchOpen(true);}} onFocus={()=>setSearchOpen(true)} placeholder="Search routes, stops or places"/>
         {searchBusy?<span className="spinner"/>:null}
         {q?<button className="clear" onClick={()=>{setQ('');setSearchOpen(false);}}>×</button>:null}
       </div>
 
       {searchOpen&&q.trim().length>=2?<SearchResults loading={searchBusy} error={searchError} results={searchResults} go={go}/>:null}
-      {error?<div className="error-box"><b>Live data issue</b><span>{error}</span></div>:null}
+      {error?<div className="error-box"><b>Transit data issue</b><span>{error}</span></div>:null}
 
       {page.kind==='home'?<Home vehicles={vehicles} location={location} locationStatus={locationStatus} liveStatus={liveStatus} locate={locate} go={go} onLegend={()=>setLegendOpen(true)}/>
        :page.kind==='plan'?<Planner go={go}/>
