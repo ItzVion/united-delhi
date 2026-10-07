@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useState} from 'react';
 import {api} from '../api';
 import type {Vehicle} from '../api';
-import {busColor,dist,routeName,secText,storageGet,storageSet} from '../lib';
+import {busColor,dist,routeName,fullRouteName,secText,storageGet,storageSet} from '../lib';
 import type {Go} from '../lib';
 import {Empty,ErrorState,Icon,Loading,RouteBadge,TopBar} from './ui';
 import RouteMap from './RouteMap';
@@ -20,7 +20,7 @@ export function RoutePage({id,go,services}:{id:string;go:Go;services:Svc}){
  const{data,err,busy,reload}=useLoad(()=>api.route(id),[id],15000);
  if(busy&&!data)return <div className="page"><TopBar title="Route" go={go}/><Loading text="Loading route…"/></div>;
  if(err&&!data)return <div className="page"><TopBar title="Route" go={go}/><ErrorState text={err} onRetry={reload}/></div>;
- const route=data?.route||{},stops:any[]=Array.isArray(data?.stops)?data.stops:[],buses:Vehicle[]=Array.isArray(data?.vehicles)?data.vehicles:[],name=routeName(route.short_name)||routeName(route.long_name)||route.short_name||'Bus route',svc=buses[0]||services.get(id)||null,from=route.fromStop||stops[0]?.name,to=route.toStop||stops[stops.length-1]?.name;
+ const route=data?.route||{},stops:any[]=Array.isArray(data?.stops)?data.stops:[],buses:Vehicle[]=Array.isArray(data?.vehicles)?data.vehicles:[],name=fullRouteName(route.long_name)||routeName(route.short_name)||route.short_name||'Bus route',svc=buses[0]||services.get(id)||null,from=route.fromStop||stops[0]?.name,to=route.toStop||stops[stops.length-1]?.name;
  return <div className="page route-page"><TopBar title={String(route.short_name||name)} sub={from&&to?from+' → '+to:undefined} go={go}/><div className="route-top"><RouteMap stops={stops} buses={buses} onStop={sid=>go('/stops/'+encodeURIComponent(sid))}/></div><div className="stats"><div><b>{stops.length}</b><small>stops</small></div><div><b>{buses.length}</b><small>live buses</small></div><div><b className="svc"><i style={{background:svc?busColor(svc):'#6B7280'}}/>{svc?.serviceType==='cluster'?'Cluster':svc?.serviceType==='dtc'?'DTC':svc?.serviceType==='electric'?'Electric':'—'}</b><small>service</small></div></div><h2 className="sec">{stops.length} stops</h2>{stops.length?<ol className="timeline">{stops.map((s,i)=><li key={String(s.stop_id)+i}><button onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}><span className={'tl'+(i===0?' first':i===stops.length-1?' last':'')}><i/></span><b>{s.name}</b><Icon n="chev" size={16}/></button></li>)}</ol>:<Empty title="No stops listed" text="This route has no stops in the schedule data."/>}</div>;
 }
 export function StopPage({id,go,services}:{id:string;go:Go;services:Svc}){
