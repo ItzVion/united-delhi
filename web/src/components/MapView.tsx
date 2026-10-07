@@ -4,7 +4,7 @@ import type {Vehicle} from '../api';
 import {BOUNDS,CENTER,busColor,textOn,vehicleRoute,ageText,esc,storageGet,storageSet} from '../lib';
 import type {Go,Point} from '../lib';
 import {Icon} from './ui';
-const BUS_SVG='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="14" rx="2.5"/><path d="M4.5 11h15M8 20.5v-3M16 20.5v-3"/></svg>';
+const BUS_SVG='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"><rect x="4.5" y="3.5" width="15" height="14" rx="0"/><path d="M4.5 11h15M8 20.5v-3M16 20.5v-3"/></svg>';
 const PILL_ZOOM=14,MAX_PILLS=120,MAX_DOTS=3000;
 export const TILE='https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 export const busIcon=(v:Vehicle,small=false)=>{const bg=busColor(v),label=vehicleRoute(v),w=Math.max(small?40:52,label.length*8+(small?16:30)),h=small?20:24;return L.divIcon({className:'bus-icon',iconSize:[w,h],iconAnchor:[w/2,h/2],html:'<div class="bus-pill" style="background:'+esc(bg)+';color:'+textOn(bg)+'">'+(small?'':BUS_SVG)+'<span>'+esc(label)+'</span></div>'})};
