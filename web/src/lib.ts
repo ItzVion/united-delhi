@@ -31,10 +31,16 @@ export const routeName=(value:unknown)=>{
   return t.length<=14?t:null;
 };
 export const fullRouteName=(value:unknown)=>{
-  const t=String(value??'').trim().replace(/\s+/g,' ').replace(/^route\s*[:#-]?\s*/i,'');
+  let t=String(value??'').trim().replace(/\s+/g,' ').replace(/^route\s*[:#-]?\s*/i,'');
+  t=t.replace(/\b(?:UP|DOWN|DWN)\b/gi,'').replace(/\s*[-–—|:]+\s*$/,'').replace(/\s+/g,' ').trim();
   return t||null;
 };
 export const vehicleRoute=(v:Partial<Vehicle>)=>routeName(v.routeShortName)||routeName(v.routeId)||'BUS';
+export const vehicleRouteFullName=(v:Partial<Vehicle>)=>{
+  const n=routeName(v.routeShortName)||routeName(v.routeId);
+  if(n==='801')return 'Inderlok Metro - IGI Airport';
+  return fullRouteName((v as any).routeLongName)||null;
+};
 
 export const ageText=(iso?:string|null)=>{
   const t=Date.parse(String(iso||''));if(!Number.isFinite(t))return 'Live';
