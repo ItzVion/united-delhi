@@ -110,14 +110,16 @@ export default function App(){
     return <Consent go={go} onAccept={()=>{storageSet('ud-consent-v1','1');setAccepted(true)}}/>;
   }
 
-  const tab=page.kind==='home'||page.kind==='route'||page.kind==='stop'?'home':page.kind==='plan'?'plan':page.kind==='hub'||page.kind==='legal'||page.kind==='privacy'||page.kind==='terms'?'hub':'help';
-  const nav:[string,string,'bus'|'plan'|'hub'|'help',string][]=[['home','/','bus','Bus'],['plan','/plan','plan','Trip Plan'],['hub','/hub','hub','Hub'],['help','/help','help','Help']];
+  const tab=page.kind==='home'||page.kind==='route'||page.kind==='stop'?'home':page.kind==='plan'?'plan':page.kind==='metro'?'metro':page.kind==='settings'||page.kind==='hub'||page.kind==='legal'||page.kind==='privacy'||page.kind==='terms'||page.kind==='help'?'settings':'home';
+  const nav:[string,string,'bus'|'plan'|'hub'|'help',string][]=[['home','/','bus','Bus'],['plan','/plan','plan','Trip Plan'],['metro','/metro','hub','Metro'],['settings','/settings','help','Settings']];
 
   return <div className="app">
     {!online?<div className="banner off" role="status">You're offline. Showing the last saved data.</div>:null}
     <main className={'view'+(page.kind==='home'?' view-home':'')}>
       {page.kind==='home'?<Home vehicles={vehicles} live={live} liveNote={liveNote} onRetry={()=>void load()} location={location} locState={locState} onLocate={locate} onLegend={()=>setLegend(true)} go={go} services={services}/>
       :page.kind==='plan'?<Planner go={go}/>
+      :page.kind==='metro'?<div className="page"><div className="card"><h1>Delhi Metro</h1><p className="muted">Metro route data is not connected to United Delhi yet.</p><p className="muted">We will only show metro routes here once a reliable metro data source is available.</p></div></div>
+      :page.kind==='settings'?<Hub go={go} onLegend={()=>setLegend(true)}/>
       :page.kind==='hub'?<Hub go={go} onLegend={()=>setLegend(true)}/>
       :page.kind==='help'?<Help go={go}/>
       :page.kind==='legal'?<Legal go={go}/>
