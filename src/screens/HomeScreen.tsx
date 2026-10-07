@@ -220,8 +220,10 @@ export default function HomeScreen(){
               <Text style={styles.legendTitle}>Bus Color Legend</Text>
               <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Type</Text></View>
               {[
-                [['#E57D43','Non-AC CNG']],
-                [['#2FAFBC','Electric']]
+                [['#58B8C7','EV AC (12 mtr)']],
+                [['#E7A05F','EV DEVI AC (9 mtr)'],['#42A968','EV DEVI AC (9 mtr)']],
+                [['#4D8FD0','CNG AC (12 mtr)'],['#DE737B','CNG AC (12 mtr)']],
+                [['#E8B083','CNG NonAC (12 mtr)'],['#55B98E','CNG NonAC (12 mtr)']]
               ].map((row,index)=><View key={index} style={styles.legendRow}><View style={styles.legendIcons}>{row.map(([color],j)=><View key={j} style={[styles.legendBus,{backgroundColor:color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View>)}</View><Text style={styles.legendType}>{row[0][1]}</Text></View>)}
               <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Got it</Text></Pressable>
             </Pressable>
@@ -249,9 +251,10 @@ export default function HomeScreen(){
     </ScrollView>
 
     <View style={styles.bottomNav}>
-      <BottomItem icon="⌂" label="Home" active onPress={()=>{}}/>
-      <BottomItem icon="↗" label="Plan" onPress={()=>navigation.navigate('Planner')}/>
-      <BottomItem icon="§" label="Legal" onPress={()=>navigation.navigate('Legal')}/>
+      <BottomItem icon="⌂" label="Bus" active onPress={()=>{}}/>
+      <BottomItem icon="↗" label="Trip Plan" onPress={()=>navigation.navigate('Planner')}/>
+      <BottomItem icon="◎" label="Metro" onPress={()=>navigation.navigate('Metro')}/>
+      <BottomItem icon="☰" label="Settings" onPress={()=>navigation.navigate('Settings')}/>
     </View>
   </SafeAreaView>;
 }
@@ -363,19 +366,19 @@ const styles=StyleSheet.create({
  mapCard:{borderRadius:0,overflow:'hidden',borderWidth:1,borderColor:colors.border,backgroundColor:'#DDE4E5',marginTop:12,marginHorizontal:0},map:{flex:1},
  legendOverlay:{flex:1,backgroundColor:'rgba(23,49,47,.42)',alignItems:'center',justifyContent:'center',padding:16},
  legendDialog:{width:'100%',maxWidth:520,maxHeight:'85%',backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,padding:16},
- legendTitle:{fontSize:17,fontWeight:'900',color:colors.text,marginBottom:12},
+ legendTitle:{fontSize:28,fontWeight:'900',color:colors.text,marginBottom:20},
  legendHeader:{flexDirection:'row',justifyContent:'space-between',paddingBottom:7,borderBottomWidth:1,borderBottomColor:colors.border},
- legendHeaderText:{fontSize:9,fontWeight:'900',letterSpacing:1,color:colors.textMuted},
- legendRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingVertical:10,borderBottomWidth:1,borderBottomColor:colors.border},
+ legendHeaderText:{fontSize:15,fontWeight:'500',color:colors.textMuted},
+ legendRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingVertical:12,borderBottomWidth:0},
  legendIcons:{flexDirection:'row',gap:7,flex:1},
- legendBus:{width:34,height:24,borderRadius:0,alignItems:'center',justifyContent:'center'},
+ legendBus:{width:54,height:38,borderRadius:0,alignItems:'center',justifyContent:'center'},
  legendBusWindow:{position:'absolute',left:6,right:6,top:5,height:6,backgroundColor:'rgba(255,255,255,.22)'},
  legendBusWindshield:{position:'absolute',left:7,right:7,top:13,height:4,backgroundColor:'rgba(255,255,255,.9)'},
  legendBusLightRow:{position:'absolute',left:6,right:6,bottom:3,flexDirection:'row',justifyContent:'space-between'},
  legendBusLight:{width:4,height:3,borderRadius:0,backgroundColor:'#fff'},
- legendType:{flex:1,fontSize:10,fontWeight:'800',color:colors.text,textAlign:'right'},
- legendClose:{marginTop:14,minHeight:42,alignItems:'center',justifyContent:'center',backgroundColor:colors.accent,paddingHorizontal:16},
- legendCloseText:{fontSize:11,fontWeight:'900',color:'#fff'},
+ legendType:{flex:1,fontSize:15,fontWeight:'500',color:colors.text,textAlign:'right'},
+ legendClose:{marginTop:14,minHeight:52,alignItems:'center',justifyContent:'center',backgroundColor:colors.accent,paddingHorizontal:16},
+ legendCloseText:{fontSize:15,fontWeight:'900',color:'#fff'},
  mapTop:{position:'absolute',left:10,top:10,flexDirection:'row',alignItems:'center',backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:9,paddingVertical:6,borderRadius:0},liveDot:{width:7,height:7,borderRadius:0,backgroundColor:colors.success,marginRight:6},mapTopText:{fontSize:10,fontWeight:'900',color:colors.text},mapAttribution:{position:'absolute',right:7,bottom:6,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:5,paddingVertical:2,borderRadius:0},mapAttributionText:{fontSize:7,color:'#52625f'},mapLegend:{position:'absolute',left:7,bottom:7,flexDirection:'row',gap:7,backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:7,paddingVertical:5,borderRadius:0,borderWidth:1,borderColor:colors.border},legendItem:{flexDirection:'row',alignItems:'center',gap:3},legendDot:{width:7,height:7,borderRadius:0},legendText:{fontSize:8,fontWeight:'800',color:colors.text},
  locationNotice:{position:'absolute',left:10,right:10,bottom:10,padding:9,borderRadius:0,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,flexDirection:'row',justifyContent:'space-between'},
  busPreview:{position:'absolute',left:9,right:9,bottom:9,borderRadius:0,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,shadowColor:'#17312F',shadowOpacity:.14,shadowRadius:12,shadowOffset:{width:0,height:4},elevation:6},
