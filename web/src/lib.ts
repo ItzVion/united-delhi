@@ -10,14 +10,16 @@ export const storageGet=(k:string)=>{try{return window.localStorage.getItem(k)}c
 export const storageSet=(k:string,v:string)=>{try{window.localStorage.setItem(k,v);return true}catch{return false}};
 
 export const SERVICE_COLORS:Record<string,string>={cluster:'#E57D43',dtc:'#E57D43',electric:'#2FAFBC',unknown:'#E57D43'};
-export const ROUTE_COLORS:Record<string,string>={'772':'#2F80ED'};
+export const ROUTE_COLORS:Record<string,string>={};
 export const isHex=(v:unknown):v is string=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 export const busColor=(v:{serviceColor?:string|null;serviceType?:string|null;routeShortName?:string|null;routeId?:string|null;routeName?:string|null}|null|undefined,route?:unknown)=>{
   const rawRoute=route??v?.routeShortName??v?.routeName??v?.routeId;
   const normalized=routeName(rawRoute);
   if(normalized&&ROUTE_COLORS[normalized])return ROUTE_COLORS[normalized];
-  if(isHex((v as any)?.routeColor))return String((v as any).routeColor);
-  return isHex(v?.serviceColor)?String(v!.serviceColor):SERVICE_COLORS[String(v?.serviceType||'')]||SERVICE_COLORS.unknown;
+  const type=String(v?.serviceType||'');
+  if(type==='electric')return SERVICE_COLORS.electric;
+  if(type==='dtc'||type==='cluster'||type==='unknown')return SERVICE_COLORS.dtc;
+  return SERVICE_COLORS.unknown;
 };
 export const textOn=(bg:string)=>{const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.6?'#14211B':'#FFFFFF'};
 
