@@ -9,7 +9,7 @@ export const BOUNDS:[[number,number],[number,number]]=[[28.40,76.84],[28.88,77.3
 export const storageGet=(k:string)=>{try{return window.localStorage.getItem(k)}catch{return null}};
 export const storageSet=(k:string,v:string)=>{try{window.localStorage.setItem(k,v);return true}catch{return false}};
 
-export const SERVICE_COLORS:Record<string,string>={cluster:'#E57D43',dtc:'#24C88B',electric:'#2FAFBC',unknown:'#6B7280'};
+export const SERVICE_COLORS:Record<string,string>={cluster:'#E57D43',dtc:'#E57D43',electric:'#2FAFBC',unknown:'#E57D43'};
 export const ROUTE_COLORS:Record<string,string>={'772':'#2F80ED'};
 export const isHex=(v:unknown):v is string=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 export const busColor=(v:{serviceColor?:string|null;serviceType?:string|null;routeShortName?:string|null;routeId?:string|null;routeName?:string|null}|null|undefined,route?:unknown)=>{
