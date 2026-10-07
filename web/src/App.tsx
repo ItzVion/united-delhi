@@ -6,6 +6,7 @@ import type {Go,LiveStatus,Page,Point} from './lib';
 import {Icon} from './components/ui';
 import Home from './components/Home';
 import Legend from './components/Legend';
+import Metro from './components/Metro';
 import {Planner,RoutePage,StopPage,Hub,Help,Legal,Privacy,Terms,About} from './components/pages';
 
 const CACHE_KEY='ud-live-vehicles-v3';
@@ -118,7 +119,7 @@ export default function App(){
     <main className={'view'+(page.kind==='home'?' view-home':'')}>
       {page.kind==='home'?<Home vehicles={vehicles} live={live} liveNote={liveNote} onRetry={()=>void load()} location={location} locState={locState} onLocate={locate} onLegend={()=>setLegend(true)} go={go} services={services}/>
       :page.kind==='plan'?<Planner go={go}/>
-      :page.kind==='metro'?<div className="page"><div className="card"><h1>Delhi Metro</h1><p className="muted">Metro route data is not connected to United Delhi yet.</p><p className="muted">We will only show metro routes here once a reliable metro data source is available.</p></div></div>
+      :page.kind==='metro'?<Metro go={go}/>
       :page.kind==='settings'?<Hub go={go} onLegend={()=>setLegend(true)}/>
       :page.kind==='hub'?<Hub go={go} onLegend={()=>setLegend(true)}/>
       :page.kind==='help'?<Help go={go}/>
