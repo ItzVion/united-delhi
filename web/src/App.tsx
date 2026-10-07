@@ -30,10 +30,9 @@ const routeName=(value:any)=>{
 const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||routeName(v.routeId)||'BUS';
 const isHex=(v:any)=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 const textFor=(bg:string)=>{const h=bg.replace('#','');const rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.55?'#17313B':'#FFFFFF';};
-const BUS_COLORS:any={evAc:'#53B8C7',evDeviOrange:'#E9A064',evDeviGreen:'#43A865',cngAcBlue:'#4A90D9',cngAcRed:'#E4777C',cngNonAcPeach:'#EAB184',cngNonAcGreen:'#55C28D'};
-const FALLBACK_ROUTE_COLORS=['#55C28D','#53B8C7','#E9A064','#4A90D9','#E4777C','#8E6BDC','#C9A24A','#49A28E'];
-const routeFallbackColor=(routeId:any,vehicleId:any)=>{const key=String(routeId||vehicleId||'BUS');let h=0;for(let i=0;i<key.length;i++)h=(h*31+key.charCodeAt(i))>>>0;return FALLBACK_ROUTE_COLORS[h%FALLBACK_ROUTE_COLORS.length];};
-const busColorFor=(v:any)=>isHex(v.routeColor)?String(v.routeColor):isHex(v.serviceColor)?String(v.serviceColor):routeFallbackColor(v.routeId,v.id);
+const BUS_COLORS:any={electric:'#2FAFBC',cluster:'#E57D43',dtc:'#24C88B',unknown:'#6B7280'};
+const routeFallbackColor=()=>BUS_COLORS.unknown;
+const busColorFor=(v:any)=>isHex(v.serviceColor)?String(v.serviceColor):isHex(v.routeColor)?String(v.routeColor):routeFallbackColor();
 const ageLabel=(value?:string)=>{const t=Date.parse(String(value||''));if(!Number.isFinite(t))return'Live';const s=Math.max(0,Math.round((Date.now()-t)/1000));return s<60?'Just now':Math.floor(s/60)+' min ago';};
 const escapeHtml=(value:any)=>String(value??'').replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]||ch));
 
@@ -267,9 +266,9 @@ function Home({vehicles,location,locationStatus,liveStatus,locate,go,onLegend}:{
           <div className="map-topbar"><i/><b>{liveStatus==='loading'?'Checking live buses':vehicles.length?(liveStatus==='stale'?vehicles.length+' buses · updating':vehicles.length+' buses live'):'Live data unavailable'}</b></div>
           <div className="map-attribution">© OpenStreetMap contributors</div>
           <div className="map-legend">
-            <span><i style={{background:BUS_COLORS.cngNonAcGreen}}/>DTC</span>
-            <span><i style={{background:BUS_COLORS.evDeviOrange}}/>Cluster</span>
-            <span><i style={{background:BUS_COLORS.evAc}}/>Electric</span>
+            <span><i style={{background:BUS_COLORS.dtc}}/>DTC</span>
+            <span><i style={{background:BUS_COLORS.cluster}}/>Cluster</span>
+            <span><i style={{background:BUS_COLORS.electric}}/>Electric</span>
           </div>
         </div>
         {locationStatus?<button className="location-notice" onClick={locate}><span>{locationStatus}</span><b>Retry</b></button>:null}
@@ -299,10 +298,10 @@ function TransitSheet({stops,go}:{stops:any[];go:(path:string)=>void}){
 function BusLegend({open,onClose}:{open:boolean;onClose:()=>void}){
   if(!open)return null;
   const rows=[
-    [['#53B8C7','EV AC (12 mtr)']],
-    [['#E9A064','EV DEVI AC (9 mtr)'],['#43A865','EV DEVI AC (9 mtr)']],
-    [['#4A90D9','CNG AC (12 mtr)'],['#E4777C','CNG AC (12 mtr)']],
-    [['#EAB184','CNG NonAC (12 mtr)'],['#55C28D','CNG NonAC (12 mtr)']]
+    [['#E57D43','Cluster / orange service']],
+    [['#24C88B','DTC / green service']],
+    [['#2FAFBC','Electric bus']],
+    [['#6B7280','Unclassified / unavailable type']]
   ];
   return <div className="legend-overlay" role="dialog" aria-modal="true" aria-label="Bus Color Legend" onClick={onClose}>
     <div className="legend-dialog" onClick={e=>e.stopPropagation()}>
@@ -600,7 +599,7 @@ function Details({detail,go}:{detail:any;go:(path:string)=>void}){
   if(kind==='route'){
     const route=data.route||{},stops=Array.isArray(data.stops)?data.stops:[],buses=Array.isArray(data.vehicles)?data.vehicles:[];
     const name=route.publicRouteName||routeName(route.short_name)||routeName(route.long_name)||'Bus route';
-    const bg=isHex(route.route_color)?route.route_color:BUS_COLORS.cngAcBlue,fg=isHex(route.route_text_color)?route.route_text_color:textFor(bg);
+    const bg=isHex(route.route_color)?route.route_color:BUS_COLORS.unknown,fg=isHex(route.route_text_color)?route.route_text_color:textFor(bg);
     return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">BUS ROUTE</span><h1>{name}</h1><p>{route.fromStop||stops[0]?.name||'Starting stop'} → {route.toStop||stops[stops.length-1]?.name||'Ending stop'}</p></div></div>
       <div className="flat-card route-hero"><span className="route-badge route-hero-badge" style={{backgroundColor:bg,color:fg}}>{name}</span><div className="direction-stack"><b>{route.fromStop||stops[0]?.name||'Starting stop'}</b><span><i/><b/><i/></span><b>{route.toStop||stops[stops.length-1]?.name||'Ending stop'}</b></div></div>
       <RouteMiniMap stops={stops} buses={buses}/>
@@ -612,7 +611,7 @@ function Details({detail,go}:{detail:any;go:(path:string)=>void}){
   const title=stop.name||'Bus stop';
   return <section className="screen"><div className="page-top"><button className="back-button" onClick={()=>go('/')}>‹</button><div><span className="eyebrow">BUS STOP</span><h1>{title}</h1><p>{stop.stop_id||'Stop details'}</p></div></div>
     <div className="flat-card stop-hero"><span className="square-icon">●</span><div><h2>{title}</h2><p>Bus stop</p></div></div>
-    <div className="flat-card detail-section"><div className="section-head-inline"><h2>Buses at this stop</h2><small>Live positions</small></div>{arrivals.length?arrivals.map((a:any)=><button className="arrival-row" key={a.vehicleId}><strong style={{background:a.serviceColor||BUS_COLORS.cngAcBlue,color:'#fff',padding:'6px 8px'}}>{routeName(a.routeShortName)||'Bus'}</strong><span className="row-copy"><b>To {a.toStop||'Destination'}</b><small>{a.observedAgeSeconds<60?'Updated just now':'Updated '+Math.floor(a.observedAgeSeconds/60)+' min ago'}</small></span><span className="chevron">›</span></button>):<p className="muted">No live buses are reporting at this stop right now.</p>}</div>
+    <div className="flat-card detail-section"><div className="section-head-inline"><h2>Buses at this stop</h2><small>Live positions</small></div>{arrivals.length?arrivals.map((a:any)=><button className="arrival-row" key={a.vehicleId}><strong style={{background:a.serviceColor||BUS_COLORS.unknown,color:'#fff',padding:'6px 8px'}}>{routeName(a.routeShortName)||'Bus'}</strong><span className="row-copy"><b>To {a.toStop||'Destination'}</b><small>{a.observedAgeSeconds<60?'Updated just now':'Updated '+Math.floor(a.observedAgeSeconds/60)+' min ago'}</small></span><span className="chevron">›</span></button>):<p className="muted">No live buses are reporting at this stop right now.</p>}</div>
     <div className="flat-card detail-section"><div className="section-head-inline"><h2>Routes at this stop</h2><span className="count-box">{routes.length}</span></div>{routes.map((r:any)=><button className="route-row" key={r.route_id} onClick={()=>go('/routes/'+encodeURIComponent(r.route_id))}><RouteBadge name={routeName(r.publicRouteName||r.short_name)||'Bus'} color={r.route_color} textColor={r.route_text_color}/><span className="row-copy"><b>{r.fromStop||'Starting stop'}</b><small>to {r.toStop||'Ending stop'}</small></span><span className="chevron">›</span></button>)}</div>
   </section>;
 }
