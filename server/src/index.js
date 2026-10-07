@@ -135,10 +135,12 @@ app.get('/health',(_q,r)=>r.json({status:'OK',service:'united-delhi',realtime:ca
 app.get('/healthz',(_q,r)=>r.json({status:'OK'}));
 app.get('/ready',(_q,r)=>r.json({status:'OK',database:Boolean(pool),realtime:cache.status,cachedVehicles:cache.vehicles.length}));
 app.get('/api/status',async(_q,r)=>{let database='NOT_CONFIGURED';if(pool){try{await pool.query('SELECT 1');database='OK'}catch{database='ERROR'}}r.json({status:'OK',database,realtime:cache.status,realtimeVehicles:cache.vehicles.length,fetchedAt:cache.fetchedAt,source:cache.source,persistedAt:cache.persistedAt,reason:cache.reason})});
-app.get('/api/realtime/vehicles',(_q,r)=>{
+app.get('/api/realtime/vehicles',async(_q,r)=>{
  const stale=!cache.fetchedAt||Date.now()-Date.parse(cache.fetchedAt)>90000;
- if(stale&&KEY)void refresh();
+ if(stale&&KEY)await refresh().catch(()=>{});
  const hasData=cache.vehicles.length>0;
+ r.setHeader('Cache-Control','no-store, no-cache, must-revalidate, proxy-revalidate');
+ r.setHeader('Pragma','no-cache');
  r.json({status:hasData?'OK':cache.status,count:cache.vehicles.length,vehicles:cache.vehicles,fetchedAt:cache.fetchedAt,stale:stale||cache.status==='STALE',source:cache.source,cacheAgeSeconds:cache.fetchedAt?Math.max(0,Math.round((Date.now()-Date.parse(cache.fetchedAt))/1000)):null,reason:cache.reason});
 });
 
