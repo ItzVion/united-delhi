@@ -186,7 +186,7 @@ export default function App(){
     <main className="app-main">
       <div className="search-box">
         <span className="search-icon">⌕</span>
-        <input value={q} onChange={e=>{setQ(e.target.value);setSearchOpen(true);}} onFocus={()=>setSearchOpen(true)} placehconst FALLBACK_ROUTE_COLORS=['#55C28D','#53B8C7','#E9A064','#4A90D9','#E4777C','#8E6BDC','#C9A24A','#49A28E'];er="Search 500+ routes, stops or places"/>
+        <input value={q} onChange={e=>{setQ(e.target.value);setSearchOpen(true);}} onFocus={()=>setSearchOpen(true)} placeholder="Search 500+ routes, stops or places"/>
         {searchBusy?<span className="spinner"/>:null}
         {q?<button className="clear" onClick={()=>{setQ('');setSearchOpen(false);}}>×</button>:null}
       </div>
