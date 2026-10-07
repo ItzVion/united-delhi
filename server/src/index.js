@@ -66,6 +66,7 @@ async function ensureRuntimeSchema(){if(!pool)return;const c=await pool.connect(
 
 async function seed(){
  if(!pool)return;
+ if(String(process.env.STATIC_IMPORT_ENABLED||'').toLowerCase()!=='true'){console.log('Static GTFS DB-only mode: skipping bundled static import.');return;}
  const c=await pool.connect();
  try{
   await c.query("SELECT pg_advisory_lock(hashtext('united-delhi-static-seed'))");
