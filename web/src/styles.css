@@ -491,3 +491,10 @@ body{background:var(--ud-bg);color:var(--ud-ink)}
 @media(max-width:919px){
   .web-bus{height:26px!important}
 }
+
+/* One Delhi-inspired live bus colors: pastel/light route badges with restrained contrast. */
+.web-bus{border-radius:2px!important;box-shadow:none!important;height:26px!important;padding:2px 7px!important}
+.web-bus-label{font-size:10px!important;font-weight:800!important;letter-spacing:0!important}
+.bus-glyph{width:17px!important;height:17px!important}
+.route-badge{box-shadow:none!important}
+.one-delhi-bus-popup .leaflet-popup-content-wrapper{box-shadow:0 4px 12px rgba(30,55,45,.12)!important}
