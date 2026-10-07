@@ -225,7 +225,7 @@ export default function HomeScreen(){
                 [['#4D8FD0','CNG AC (12 mtr)'],['#DE737B','CNG AC (12 mtr)']],
                 [['#E8B083','CNG NonAC (12 mtr)'],['#55B98E','CNG NonAC (12 mtr)']]
               ].map((row,index)=><View key={index} style={styles.legendRow}><View style={styles.legendIcons}>{row.map(([color],j)=><View key={j} style={[styles.legendBus,{backgroundColor:color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View>)}</View><Text style={styles.legendType}>{row[0][1]}</Text></View>)}
-              <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Got it</Text></Pressable>
+              <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Understood</Text></Pressable>
             </Pressable>
           </Pressable>
         </Modal>
