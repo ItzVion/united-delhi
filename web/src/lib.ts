@@ -16,6 +16,7 @@ export const busColor=(v:{serviceColor?:string|null;serviceType?:string|null;rou
   const rawRoute=route??v?.routeShortName??v?.routeName??v?.routeId;
   const normalized=routeName(rawRoute);
   if(normalized&&ROUTE_COLORS[normalized])return ROUTE_COLORS[normalized];
+  if(isHex((v as any)?.routeColor))return String((v as any).routeColor);
   return isHex(v?.serviceColor)?String(v!.serviceColor):SERVICE_COLORS[String(v?.serviceType||'')]||SERVICE_COLORS.unknown;
 };
 export const textOn=(bg:string)=>{const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.6?'#14211B':'#FFFFFF'};
@@ -27,7 +28,7 @@ export const routeName=(value:unknown)=>{
   t=t.split(/\s*[|:–—]\s*/)[0].trim();
   t=t.replace(/\b(?:UP|DOWN|DWN)\b/gi,'').replace(/\s+/g,' ').trim();
   const air=t.match(/^AIR[- ]*0*(\d+[A-Z]?)/i);if(air)return 'AIR-'+air[1].toUpperCase();
-  const num=t.match(/^(\d{1,5}[A-Z]?)(?:\s|$)/i);if(num)return num[1].toUpperCase();
+  const num=t.match(/^(\d{1,5}[A-Z]?)(?=$|[\s\-_\/])/i);if(num)return num[1].toUpperCase();
   return t.length<=14?t:null;
 };
 export const fullRouteName=(value:unknown)=>{
