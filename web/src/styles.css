@@ -439,3 +439,27 @@ body{background:var(--ud-bg);color:var(--ud-ink)}
 .gate{background:var(--ud-bg)}.check-row input{accent-color:var(--ud-green)}
 @media(max-width:919px){.app-main{padding-left:0;padding-right:0}.app-main>.search-box{margin-left:10px;margin-right:10px}.map-card{border-radius:0;height:clamp(455px,69vh,680px)}.transit-sheet.one-delhi-sheet{margin-top:-20px}}
 @media(min-width:920px){.app-main{max-width:1240px;margin:0 auto;padding:0 20px}.app-main>.search-box,.search-results{margin-left:0;margin-right:0}.home-layout{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:18px;align-items:start}.home-side{position:sticky;top:16px}.home-side .transit-sheet{margin-top:0;min-height:0;border-radius:20px;padding-bottom:18px;box-shadow:0 8px 28px rgba(20,70,45,.09)}.home-side .sheet-handle{display:none}.home-side .sheet-tabs{padding-top:14px}.home-side .legal-link{padding:14px 0}}
+
+/* Mobile composition fixes: keep the nearby-stop sheet visible below the map and make navigation compact. */
+@media(max-width:919px){
+  .app-shell{padding-bottom:64px}
+  .app-main>.search-box{margin-top:0}
+  .map-card{height:clamp(430px,58vh,600px);position:relative}
+  .home-layout{display:flex!important;flex-direction:column!important}
+  .home-map{width:100%}
+  .home-side{width:100%;display:block}
+  .transit-sheet.one-delhi-sheet{position:relative;margin:-18px 0 0!important;z-index:1200;border-radius:20px 20px 0 0;min-height:250px;padding:5px 14px 12px;box-shadow:0 -6px 22px rgba(20,70,45,.16)}
+  .sheet-handle{display:flex!important;align-items:center;justify-content:center;height:22px}
+  .sheet-handle span{width:52px;height:5px;background:#b7c5bd;border-radius:99px}
+  .sheet-stop-row{min-height:48px;padding:9px 2px;display:flex!important;align-items:center;border-top:1px solid #edf1ee}
+  .sheet-stop-row>span:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column;text-align:left}
+  .sheet-stop-row b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sheet-stop-row small{font-size:9px;color:var(--ud-muted);margin-top:2px}
+  .bottom-nav.one-delhi-nav{position:fixed;left:0;right:0;bottom:0;transform:none;width:100%;height:64px;z-index:2000;border-radius:0!important;display:flex!important}
+  .bottom-nav.one-delhi-nav button{height:54px;flex:1;width:auto!important;max-width:25%;gap:1px}
+}
+/* Calm rectangular bus badges: no inflated pills, no excessive shadow. */
+.web-bus{border-radius:3px!important;box-shadow:0 1px 3px rgba(25,60,45,.18)!important;border:0!important;height:28px!important;padding:3px 8px!important}
+.web-bus-label{font-size:11px!important;font-weight:800!important;letter-spacing:0!important}
+.bus-glyph{width:18px!important;height:18px!important;flex:0 0 18px!important}
+.one-delhi-bus{border-radius:3px!important}
