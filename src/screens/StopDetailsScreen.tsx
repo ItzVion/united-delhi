@@ -106,13 +106,22 @@ export default function StopDetailsScreen() {
 
           {grouped.map(([name, items]) => {
             const first = items[0];
+            const raw = String(first.short_name || '').toUpperCase();
             const rawLong = String(first.long_name || '').replace(/(?:UP|DOWN|DWN)$/i, '').trim();
-            const detail = rawLong && rawLong.toUpperCase() !== name.toUpperCase()
-              ? rawLong
-              : name === '801'
-                ? 'Inderlok Metro - IGI Airport'
-                : name === 'AIR-5'
-                  ? 'Azadpur Terminal - IGI Airport Terminal 2'
+            const detail = name === '801'
+              ? raw.includes('IGI-IND')
+                ? 'IGI Airport - Inderlok Metro'
+                : raw.includes('IND-IGI')
+                  ? 'Inderlok Metro - IGI Airport'
+                  : raw.includes('KAP-UTT')
+                    ? 'Kapashera Border - Uttam Nagar Terminal'
+                    : raw.includes('UTT-KAP')
+                      ? 'Uttam Nagar Terminal - Kapashera Border'
+                      : 'Inderlok Metro - IGI Airport'
+              : name === 'AIR-5'
+                ? 'Azadpur Terminal - IGI Airport Terminal 2'
+                : rawLong && rawLong.toUpperCase() !== name.toUpperCase() && !/^\d+[A-Z]?[-_]/.test(rawLong)
+                  ? rawLong
                   : null;
             const liveArrival = arrivals.find(a => displayRouteName(a.routeShortName || a.routeId)?.toUpperCase() === name.toUpperCase());
             const live = liveRoutes.has(name.toUpperCase());
