@@ -1,5 +1,5 @@
 import {useEffect} from 'react';
 import {SERVICE_COLORS} from '../lib';
 import {Icon} from './ui';
-const rows:[string,string,string][]=[['cluster','Non-AC CNG','DTC non-AC CNG bus'],['electric','Electric bus','Electric fleet']];
+const rows:[string,string,string][]=[['cluster','Non-AC CNG','Non-AC CNG fleet'],['electric','Electric bus','Electric fleet']];
 export default function Legend({open,onClose}:{open:boolean;onClose:()=>void}){useEffect(()=>{if(!open)return;const k=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose()};window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k)},[open,onClose]);if(!open)return null;return <div className="modal" role="dialog" aria-modal="true" aria-label="Bus colour legend" onClick={onClose}><div className="modal-card" onClick={e=>e.stopPropagation()}><h2>Bus colours</h2><p className="muted">Colour shows the service type reported by United Delhi.</p>{rows.map(([k,t,s])=><div className="legend-row" key={k}><span className="bus-pill static" style={{background:SERVICE_COLORS[k]}}><Icon n="bus" size={14}/><span>123</span></span><span><b>{t}</b><small>{s}</small></span></div>)}<button className="btn" onClick={onClose} autoFocus>Got it</button></div></div>}
