@@ -80,7 +80,7 @@ export default function RouteDetailsScreen(){
     <View style={styles.summary}>
       <Metric value={String(stops.length)} label="stops"/>
       <Metric value={String(vehicles.length)} label="live buses"/>
-      <Metric value={selectedBus?.operator||'BUS'} label="service"/>
+      <Metric value={selectedBus?.serviceType==='electric'?'Electric':'Non-AC CNG'} label="bus type"/>
     </View>
 
     {vehicles.length>0?<View style={styles.liveCard}>
