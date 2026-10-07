@@ -2,7 +2,7 @@ import React from 'react';
 import {createRoot} from 'react-dom/client';
 import 'leaflet/dist/leaflet.css';
 import './styles.css';
-import './motion.css';
+
 import App from './App';
 
 class ErrorBoundary extends React.Component<React.PropsWithChildren, {error: Error|null}> {
