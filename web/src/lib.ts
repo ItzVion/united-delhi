@@ -28,7 +28,7 @@ export const routeName=(value:unknown)=>{
   t=t.split(/\s*[|:–—]\s*/)[0].trim();
   t=t.replace(/\b(?:UP|DOWN|DWN)\b/gi,'').replace(/\s+/g,' ').trim();
   const air=t.match(/^AIR[- ]*0*(\d+[A-Z]?)/i);if(air)return 'AIR-'+air[1].toUpperCase();
-  const num=t.match(/^(\d{1,5}[A-Z]?)(?=$|[\s\-_\/])/i);if(num)return num[1].toUpperCase();
+  const num=t.match(/^(?:D[-\s]?)?(\d{1,5}[A-Z]?)(?=$|[\s\-_\/])/i);if(num)return num[1].toUpperCase();
   return t.length<=14?t:null;
 };
 export const fullRouteName=(value:unknown)=>{
@@ -40,7 +40,7 @@ export const vehicleRoute=(v:Partial<Vehicle>)=>routeName(v.routeShortName)||rou
 export const vehicleRouteFullName=(v:Partial<Vehicle>)=>{
   const n=routeName(v.routeShortName)||routeName(v.routeId);
   if(n==='801')return 'Inderlok Metro - IGI Airport';
-  return fullRouteName((v as any).routeLongName)||null;
+  return fullRouteName(v.routeLongName)||null;
 };
 
 export const ageText=(iso?:string|null)=>{
