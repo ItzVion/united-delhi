@@ -5,7 +5,7 @@ import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { api, SearchResult, Stop, Vehicle } from '../api/client';
+import { api, readVehicleCache, SearchResult, Stop, Vehicle } from '../api/client';
 import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
@@ -88,7 +88,19 @@ export default function HomeScreen(){
 
   useEffect(()=>{void requestLocation();},[requestLocation]);
   useEffect(()=>{if(location)void loadNearby(location.coords.latitude,location.coords.longitude);},[location,loadNearby]);
-  useEffect(()=>{void loadVehicles();const id=setInterval(()=>void loadVehicles(),15000);return()=>clearInterval(id);},[loadVehicles]);
+  useEffect(()=>{
+    let active=true;
+    void readVehicleCache().then(cached=>{
+      if(active&&cached?.vehicles?.length){
+        lastVehiclesRef.current=cached.vehicles;
+        setVehicles(cached.vehicles);
+        setLastRealtimeAt(cached.fetchedAt||null);
+        setFresh('stale');
+      }
+    }).finally(()=>{if(active)void loadVehicles();});
+    const id=setInterval(()=>void loadVehicles(),15000);
+    return()=>{active=false;clearInterval(id);};
+  },[loadVehicles]);
 
   useEffect(()=>{const value=searchQuery.trim();if(value.length<2){setSearchResults([]);setSearchError(null);setSearchLoading(false);return;}let cancelled=false;setSearchLoading(true);setSearchError(null);const timer=setTimeout(async()=>{try{const result=await api.search(value);if(!cancelled){const seen=new Set<string>();const cleaned=(result.status==='OK'?result.results:[]).filter(item=>{const key=item.type+'|'+item.id+'|'+item.label.toLowerCase();if(seen.has(key))return false;seen.add(key);return true}).slice(0,12);setSearchResults(cleaned);}}catch(e){if(!cancelled){setSearchResults([]);setSearchError((e as Error).message||'Search is temporarily unavailable.');}}finally{if(!cancelled)setSearchLoading(false);}},220);return()=>{cancelled=true;clearTimeout(timer);};},[searchQuery]);
 
