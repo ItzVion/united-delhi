@@ -111,7 +111,7 @@ export default function App(){
   }
 
   const tab=page.kind==='home'||page.kind==='route'||page.kind==='stop'?'home':page.kind==='plan'?'plan':page.kind==='metro'?'metro':page.kind==='settings'||page.kind==='hub'||page.kind==='legal'||page.kind==='privacy'||page.kind==='terms'||page.kind==='help'?'settings':'home';
-  const nav:[string,string,'bus'|'plan'|'hub'|'help',string][]=[['home','/','bus','Bus'],['plan','/plan','plan','Trip Plan'],['metro','/metro','hub','Metro'],['settings','/settings','help','Settings']];
+  const nav:[string,string,'bus'|'plan'|'metro'|'hub'|'help',string][]=[['home','/','bus','Bus'],['plan','/plan','plan','Trip Plan'],['metro','/metro','hub','Metro'],['settings','/settings','help','Settings']];
 
   return <div className="app">
     {!online?<div className="banner off" role="status">You're offline. Showing the last saved data.</div>:null}
