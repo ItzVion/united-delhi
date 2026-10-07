@@ -106,3 +106,38 @@ body,#root{background:var(--bg)}
   .map-banner{left:18px;right:auto;top:84px;max-width:450px}
   .page{margin:0 auto}
 }
+
+
+/* Final shape pass: United Delhi uses hard geometry, not pill/rounded UI. */
+.search,.hdr-logo,.chip,.fab,.map-banner,.sheet,.pin,.badge,.btn,.btn.ghost,
+.topbar,.card,.list,.updated,.route-top,.stats,.timeline,.planner,.suggest,.trip,
+.faq,.gate-card,.modal-card,.map-chip,.bus-pill,.bp-b,.bp-go,.bus-popup .leaflet-popup-content-wrapper,
+.stop-row,.row,.stop-main,.count,.field,.nav,.nav button,.map-wrap,.map,.sec{border-radius:0!important}
+.sheet{
+  bottom:0!important;height:232px!important;max-height:48%!important;
+  left:0!important;right:0!important;border-left:0!important;border-right:0!important;
+  border-bottom:0!important;box-shadow:0 -10px 28px #07101926
+}
+.home-body{--sheet-h:232px!important}
+.map-ctl{bottom:calc(var(--sheet-h) + 14px)!important}
+.nav{
+  bottom:0!important;left:0!important;transform:none!important;width:100%!important;
+  max-width:none!important;height:62px!important;padding:4px 8px!important;
+  border-radius:0!important;border-left:0!important;border-right:0!important;
+  box-shadow:0 -4px 18px #07101928
+}
+.nav button{border-radius:0!important}
+.sheet-head{padding:9px 18px 10px;border-bottom:1px solid var(--line)}
+.grab{display:none!important}
+.sheet-title b{font-size:17px}
+.sheet-body{padding-bottom:6px}
+.stop-row{padding-right:18px}
+.stop-row .btn{min-width:104px}
+.map-wrap{border-radius:0!important}
+.bus-pill{padding:0 7px!important}
+@media(min-width:920px){
+  .nav{left:0!important;bottom:0!important;width:100%!important;height:62px!important}
+  .sheet{top:84px!important;bottom:76px!important;left:16px!important;right:auto!important;width:390px!important;height:auto!important;max-height:none!important}
+  .map-wrap{left:0!important}
+  .map-ctl{bottom:78px!important}
+}
