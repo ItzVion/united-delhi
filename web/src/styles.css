@@ -162,3 +162,24 @@ body,#root{background:var(--bg)}
   .legend-exact-bus{width:74px;height:54px}
   .legend-exact-type{font-size:16px}
 }
+
+/* V1 launch fixes */
+.view{padding-bottom:62px}
+.page{padding-bottom:90px}
+.hdr-logo{background:transparent!important;box-shadow:none!important;padding:2px!important}
+.sheet-head{touch-action:none;cursor:grab;min-height:54px}
+.grab{display:block!important;width:46px!important;height:5px!important;margin:2px auto 10px!important;background:#7F8B91!important;border-radius:0!important}
+.sheet-body{overscroll-behavior:contain}
+@media(max-width:919px){
+  .home-body{--sheet-h:232px!important}
+  .sheet{height:232px!important;max-height:80%!important}
+  .sheet.snap0{height:158px!important}
+  .sheet.snap1{height:52vh!important}
+  .sheet.snap2{height:calc(100% - 12px)!important}
+  .sheet.snap0 .sheet-body{overflow:hidden}
+  .sheet.snap1 .sheet-body,.sheet.snap2 .sheet-body{overflow:auto}
+}
+@media(min-width:920px){
+  .view{padding-bottom:62px}
+  .page{padding-bottom:90px}
+}
