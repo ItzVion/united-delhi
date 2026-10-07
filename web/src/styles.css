@@ -463,3 +463,31 @@ body{background:var(--ud-bg);color:var(--ud-ink)}
 .web-bus-label{font-size:11px!important;font-weight:800!important;letter-spacing:0!important}
 .bus-glyph{width:18px!important;height:18px!important;flex:0 0 18px!important}
 .one-delhi-bus{border-radius:3px!important}
+
+/* One Delhi-like bus palette: lighter, flatter, calmer route badges. */
+:root{
+  --od-bus-orange:#E9A064;
+  --od-bus-green:#2E9A59;
+  --od-bus-blue:#2F82C4;
+  --od-bus-cyan:#4EB8C6;
+  --od-bus-pink:#D96B72;
+  --od-bus-teal:#168F82;
+  --od-bus-amber:#C99A38;
+}
+.web-bus{
+  border-radius:2px!important;
+  box-shadow:none!important;
+  height:26px!important;
+  padding:2px 7px!important;
+  border:0!important;
+}
+.web-bus-label{
+  font-size:10px!important;
+  font-weight:800!important;
+  letter-spacing:0!important;
+}
+.bus-glyph{width:17px!important;height:17px!important;flex:0 0 17px!important}
+.one-delhi-bus{border-radius:2px!important}
+@media(max-width:919px){
+  .web-bus{height:26px!important}
+}
