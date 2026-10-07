@@ -5,7 +5,7 @@ import {BOUNDS,CENTER,busColor,textOn,vehicleRoute,vehicleRouteFullName,ageText,
 import type {Go,Point} from '../lib';
 import {Icon} from './ui';
 const BUS_SVG='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"><rect x="4.5" y="3.5" width="15" height="14" rx="0"/><path d="M4.5 11h15M8 20.5v-3M16 20.5v-3"/></svg>';
-const PILL_ZOOM=14,MAX_PILLS=120,MAX_DOTS=3000;
+const PILL_ZOOM=14,MAX_PILLS=400,MAX_DOTS=3000;
 export const TILE='https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 export const busIcon=(v:Vehicle,small=false)=>{const bg=busColor(v),label=vehicleRoute(v),w=Math.max(small?34:38,label.length*6.5+(small?10:14)),h=small?16:18;return L.divIcon({className:'bus-icon',iconSize:[w,h],iconAnchor:[w/2,h/2],html:'<div class="bus-pill" style="background:'+esc(bg)+';color:'+textOn(bg)+'">'+(small?'':BUS_SVG)+'<span>'+esc(label)+'</span></div>'})};
 export const busPopup=(v:Vehicle)=>{const bg=busColor(v),route=vehicleRoute(v),full=vehicleRouteFullName(v);return '<div class="bp"><div class="bp-h"><span class="bp-b" style="background:'+esc(bg)+';color:'+textOn(bg)+'">'+esc(route)+'</span><span class="bp-age">'+esc(ageText(v.observedAt))+'</span></div>'+(full?'<div class="bp-route-name">'+esc(full)+'</div>':'')+'<div class="bp-meta">'+esc(v.vehicleLabel||v.licensePlate||v.id)+'</div>'+(v.routeId?'<button type="button" class="bp-go" data-route="/routes/'+encodeURIComponent(v.routeId)+'">View route</button>':'')+'</div>'};
