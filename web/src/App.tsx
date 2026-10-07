@@ -55,8 +55,10 @@ export default function App(){
       const r=await api.vehicles();
       const list=Array.isArray(r.vehicles)?r.vehicles:[];
       if(list.length){hasData.current=true;setVehicles(list)}
-      setLive(r.status==='OK'&&!r.stale?'ok':list.length||hasData.current?'stale':'unavailable');
-      setLiveNote(r.status==='OK'&&!r.stale?'':(r.reason||''));
+      const age= r.fetchedAt ? Math.max(0,Date.now()-Date.parse(r.fetchedAt)) : Infinity;
+      const fresh=list.length>0 && Number.isFinite(age) && age<=90000 && r.source!=='client-cache';
+      setLive(fresh?'ok':list.length||hasData.current?'stale':'unavailable');
+      setLiveNote(fresh?'':(r.reason||''));
     }catch(e){
       setLive(hasData.current?'stale':'unavailable');
       setLiveNote(hasData.current?'Showing the last known bus positions.':((e as Error).message||'Live data is unavailable.'));
@@ -67,7 +69,7 @@ export default function App(){
     const c=readCache();if(c.length){hasData.current=true;setVehicles(c);setLive('stale');setLiveNote('Showing the last known bus positions while live data loads.')}
     void load();
     const tick=()=>{if(!document.hidden)void load()};
-    const id=window.setInterval(tick,15000);
+    const id=window.setInterval(tick,10000);
     document.addEventListener('visibilitychange',tick);window.addEventListener('online',tick);
     return()=>{window.clearInterval(id);document.removeEventListener('visibilitychange',tick);window.removeEventListener('online',tick)};
   },[accepted,load]);
