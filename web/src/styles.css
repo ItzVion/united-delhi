@@ -388,3 +388,54 @@ body{background:var(--ud-bg);color:var(--ud-ink)}
   .home-side .sheet-stops{max-height:520px}
   .home-side .legal-link{padding:14px 0}
 }
+
+
+/* United Delhi — One Delhi-inspired desktop/mobile composition */
+:root{
+  --ud-green:#0b6b57;
+  --ud-green-deep:#075445;
+  --ud-green-mid:#2e8b68;
+  --ud-leaf:#49a66d;
+  --ud-mint:#e8f3ec;
+  --ud-bg:#f4f7f4;
+  --ud-surface:#fff;
+  --ud-ink:#1e2a25;
+  --ud-muted:#64736b;
+  --ud-line:#d5e0d9;
+}
+body{background:var(--ud-bg);color:var(--ud-ink)}
+.app-shell{background:var(--ud-bg);min-height:100vh;padding-bottom:76px}
+.mobile-header.one-delhi-header{background:linear-gradient(180deg,var(--ud-green),var(--ud-green-deep));border:0;padding:12px 14px 10px;position:sticky;top:0;z-index:1100;box-shadow:0 2px 12px rgba(11,107,87,.18)}
+.one-header-row{display:flex;align-items:center;gap:12px;justify-content:space-between;max-width:1220px;margin:0 auto}
+.one-brand{color:#fff!important}.one-brand .brand-mark{background:#fff;border-radius:10px;width:44px;height:44px;padding:4px}.one-brand .brand-copy b,.one-brand .brand-copy small{color:#fff}.one-brand .brand-copy b{font-size:18px;letter-spacing:.7px}.one-brand .brand-copy small{opacity:.85}
+.one-delhi-header .status{border:1px solid rgba(255,255,255,.42);background:rgba(255,255,255,.11);color:#fff;padding:6px 9px;font-size:9px}.one-delhi-header .status i{background:#8be28f}
+.app-main{padding-top:0}
+.app-main>.search-box{margin:-1px auto 10px;position:relative;z-index:1101;max-width:1220px;background:#fff;border:1px solid var(--ud-line);border-radius:28px;box-shadow:0 5px 18px rgba(20,70,45,.12);height:56px}.app-main>.search-box input{font-size:15px}.search-icon{font-size:23px;color:var(--ud-green)}
+.search-results{max-width:1220px;margin:0 auto 10px;position:relative;z-index:1102;border:1px solid var(--ud-line);box-shadow:0 10px 22px rgba(20,70,45,.12)}
+.live-section{display:none}
+.map-card{height:clamp(480px,68vh,700px);border:0;border-radius:18px;margin:0;background:#eaf1ec;overflow:hidden}
+.map-topbar{top:12px;left:12px;border-radius:18px;box-shadow:0 3px 10px rgba(20,70,45,.14);background:rgba(255,255,255,.95)}
+.map-legend{display:none}
+.map-attribution{font-size:7px}
+.map-locate,.map-legend-control{border-color:var(--ud-line);color:var(--ud-green);box-shadow:0 4px 14px rgba(20,70,45,.16)}
+.web-bus-icon{background:transparent!important;border:0!important}
+.web-bus{border:0!important;border-radius:6px;box-shadow:0 2px 7px rgba(20,70,45,.24);height:30px;white-space:nowrap}
+.web-bus-label{font-weight:900;letter-spacing:.2px}
+.one-delhi-bus-popup .leaflet-popup-content-wrapper{padding:0;border:1px solid #c9d9cf;border-radius:10px;box-shadow:0 8px 24px rgba(20,55,38,.22)}.one-delhi-bus-popup .leaflet-popup-content{margin:0;padding:0}.one-delhi-bus-popup .leaflet-popup-tip{background:#fff}
+.transit-sheet.one-delhi-sheet{margin:-22px 0 0;border:0;border-radius:18px 18px 0 0;box-shadow:0 -7px 20px rgba(20,70,45,.14);padding:5px 12px 16px;min-height:310px;background:#fff}
+.sheet-handle{height:25px}.sheet-handle span{width:40px;height:4px;background:#b9c5bf}
+.sheet-tabs{display:flex;gap:8px;padding:0 2px 10px;border-bottom:1px solid var(--ud-line)}.sheet-tabs button{border:0;background:#fff;color:#6f7b74;font-weight:800;font-size:13px;padding:8px 12px;border-radius:18px}.sheet-tabs button.active{background:var(--ud-mint);color:var(--ud-green)}
+.sheet-stop-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 2px 9px}.sheet-stop-head b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:250px}.sheet-stop-head small{display:block;font-size:10px;color:var(--ud-muted);margin-top:2px}.sheet-stop-head button{border:1px solid #b9cbbf;background:#fff;border-radius:18px;padding:7px 10px;color:var(--ud-green);font-size:10px;font-weight:800;white-space:nowrap}
+.sheet-stop-row{display:flex;align-items:center;gap:10px;border-top:1px solid #edf1ee;border-bottom:1px solid #edf1ee;padding:11px 2px}.sheet-mini-icon{width:32px;height:32px;border-radius:50%;background:var(--ud-mint);color:var(--ud-green);display:grid;place-items:center;font-size:13px}.sheet-stop-row>div:nth-child(2){flex:1;min-width:0}.sheet-stop-row b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sheet-stop-row small{display:block;color:var(--ud-muted);font-size:10px;margin-top:2px}
+.one-delhi-actions{padding-top:10px}.one-delhi-actions .sheet-action{border:0;background:#f9fbfa;border-radius:9px;min-height:46px}.one-delhi-actions .sheet-action span{color:var(--ud-green)}
+.bottom-nav.one-delhi-nav{height:68px;background:#fff;border-top:1px solid var(--ud-line);box-shadow:0 -3px 12px rgba(20,70,45,.07);padding:2px 4px 5px}.bottom-nav.one-delhi-nav button{height:58px;width:20%;gap:2px;color:#78837e}.bottom-nav.one-delhi-nav button span{font-size:20px}.bottom-nav.one-delhi-nav button small{font-size:9px}.bottom-nav.one-delhi-nav button.active{color:var(--ud-green)}
+.screen{padding-top:0}.page-top{background:#fff;margin:0 -16px 10px;padding:14px 16px;border-bottom:1px solid var(--ud-line)}.page-top h1{font-size:23px}.planner-form{border-radius:14px;border:1px solid var(--ud-line);background:#fff}.planner-suggestions{border-color:var(--ud-line);box-shadow:0 7px 18px rgba(20,70,45,.14)}.planner-suggestion:hover{background:#f3f8f4}.route-rail i{border-color:var(--ud-green)}.route-rail b{background:var(--ud-line)}.route-rail i:last-child{background:#2d82e5;border-color:#2d82e5}.swap-button{background:var(--ud-mint);color:var(--ud-green)}.primary-button{background:var(--ud-green)}.secondary-button{color:var(--ud-green);background:var(--ud-mint);border-color:var(--ud-line)}
+.result-heading{color:var(--ud-ink)}.journey{border:1px solid var(--ud-line);background:#fff;border-radius:12px}.journey.featured{border-color:var(--ud-green)}.empty-panel{background:var(--ud-mint);border-radius:12px}.empty-icon{color:var(--ud-green)}
+.metro-card span{color:var(--ud-green)}.square-icon{background:var(--ud-mint);color:var(--ud-green)}.count-box{background:var(--ud-mint);color:var(--ud-green)}
+.detail-section{background:#fff;border:1px solid var(--ud-line);border-radius:12px}.arrival-row,.route-row,.ordered-stop,.legal-row{border-color:var(--ud-line);background:#fff}.arrival-row:hover,.route-row:hover,.ordered-stop:hover,.legal-row:hover{background:#f3f8f4}
+.arrival-row>strong{background:var(--ud-green)!important}.route-map{border-color:var(--ud-line);background:#eaf1ec}.timeline i{background:var(--ud-green);box-shadow:0 0 0 1px var(--ud-green)}
+.simple-tab-hero>span{background:var(--ud-mint);color:var(--ud-green)}.error-box{background:#f6ece8;border-color:#c56c5b;color:#8c3f34}
+.legal-copy h3,.legal-row b,.section-head-inline h2,.page-top h1{color:var(--ud-ink)}
+.gate{background:var(--ud-bg)}.check-row input{accent-color:var(--ud-green)}
+@media(max-width:919px){.app-main{padding-left:0;padding-right:0}.app-main>.search-box{margin-left:10px;margin-right:10px}.map-card{border-radius:0;height:clamp(455px,69vh,680px)}.transit-sheet.one-delhi-sheet{margin-top:-20px}}
+@media(min-width:920px){.app-main{max-width:1240px;margin:0 auto;padding:0 20px}.app-main>.search-box,.search-results{margin-left:0;margin-right:0}.home-layout{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:18px;align-items:start}.home-side{position:sticky;top:16px}.home-side .transit-sheet{margin-top:0;min-height:0;border-radius:20px;padding-bottom:18px;box-shadow:0 8px 28px rgba(20,70,45,.09)}.home-side .sheet-handle{display:none}.home-side .sheet-tabs{padding-top:14px}.home-side .legal-link{padding:14px 0}}
