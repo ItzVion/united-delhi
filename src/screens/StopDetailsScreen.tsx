@@ -8,7 +8,6 @@ import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
-import { resolveRouteColor } from '../lib/routeColor';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'StopDetails'>;
 type StopRoute = RouteProp<RootStackParamList, 'StopDetails'>;
@@ -115,8 +114,9 @@ export default function StopDetailsScreen() {
                 : name === 'AIR-5'
                   ? 'Azadpur Terminal - IGI Airport Terminal 2'
                   : null;
+            const liveArrival = arrivals.find(a => displayRouteName(a.routeShortName || a.routeId)?.toUpperCase() === name.toUpperCase());
             const live = liveRoutes.has(name.toUpperCase());
-            const routeColor = resolveRouteColor(name, first.route_color, first.route_text_color);
+            const routeColor = liveArrival?.serviceColor ? { background: liveArrival.serviceColor, text: liveArrival.serviceType === 'electric' ? '#17313B' : '#FFFFFF' } : { background: '#E57D43', text: '#FFFFFF' };
             return (
               <Pressable
                 key={name}
