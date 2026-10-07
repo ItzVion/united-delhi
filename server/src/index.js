@@ -19,7 +19,6 @@ const KEY_PARAM=String(process.env.DTC_API_KEY_PARAM||'key').trim()||'key';
 const pool=DB?new Pool({connectionString:DB,max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000,ssl:/localhost|127(?:\.\d+){3}|::1/i.test(DB)?false:{rejectUnauthorized:true}}):null;
 
 const DATA=path.join(path.dirname(fileURLToPath(import.meta.url)),'../data/otd_gtfs');
-const CACHE_FILE=path.join(DATA,'live-cache.json');
 const str=(v,max=160)=>{const x=String(v??'').trim();return x&&x.length<=max?x:null};
 const num=v=>{const x=Number(v);return Number.isFinite(x)?x:null};
 const coord=(v,a,b)=>{const x=num(v);return x!==null&&x>=a&&x<=b?x:null};
@@ -31,36 +30,31 @@ const cache={vehicles:[],status:KEY?'STARTING':'UNAVAILABLE',reason:KEY?'Render 
 let refreshing=null,poll=null;
 const routeMeta=new Map();
 
-function loadPersistentCache(){
- try{
-  const raw=fs.readFileSync(CACHE_FILE,'utf8');
-  const saved=JSON.parse(raw);
-  if(Array.isArray(saved.vehicles)&&saved.vehicles.length){
-   cache.vehicles=saved.vehicles;
-   cache.fetchedAt=saved.fetchedAt||saved.persistedAt||null;
-   cache.persistedAt=saved.persistedAt||null;
-   cache.source='persistent-cache';
-   cache.status='STALE';
-   cache.reason='Render is waking up; showing the last collected bus positions.';
-   console.log('Loaded persistent realtime cache: '+cache.vehicles.length+' vehicles from '+CACHE_FILE);
-  }
- }catch(e){if(e?.code!=='ENOENT')console.error('Persistent cache load failed:',e?.message||e)}
-}
-function savePersistentCache(){
- try{
-  fs.mkdirSync(path.dirname(CACHE_FILE),{recursive:true});
-  const tmp=CACHE_FILE+'.tmp';
-  const payload={version:1,fetchedAt:cache.fetchedAt,persistedAt:new Date().toISOString(),vehicles:cache.vehicles};
-  fs.writeFileSync(tmp,JSON.stringify(payload));
-  fs.renameSync(tmp,CACHE_FILE);
-  cache.persistedAt=payload.persistedAt;
-  cache.source='persistent-cache';
- }catch(e){console.error('Persistent cache write failed:',e?.message||e)}
-}
-loadPersistentCache();
-
 async function loadRouteMeta(){if(!pool)return;try{const rows=(await pool.query('SELECT route_id,agency_id,short_name,route_color,route_text_color FROM routes')).rows;routeMeta.clear();for(const x of rows)routeMeta.set(String(x.route_id),x);console.log('Loaded route metadata: '+routeMeta.size+' routes.')}catch(e){console.error('Route metadata load failed:',e?.message||e)}}
 const applyRouteMeta=v=>{const x=routeMeta.get(String(v.routeId||''));const svc=service(v.id,x?.agency_id);return {...v,routeShortName:x?.short_name||null,routeColor:x?.route_color||svc.serviceColor||fallbackColor(v.routeId,v.id),routeTextColor:x?.route_text_color||null,operator:x?.agency_id||null,...svc}};
+async function loadDatabaseVehicleCache(){
+ if(!pool)return;
+ try{
+  const rows=(await pool.query("SELECT vehicle_id,route_id,trip_id,stop_id,latitude,longitude,bearing,observed_at FROM vehicle_positions WHERE observed_at > NOW() - INTERVAL '24 hours' ORDER BY observed_at DESC")).rows;
+  const latest=new Map();
+  for(const row of rows){
+   const id=str(row.vehicle_id);
+   if(!id||latest.has(id))continue;
+   latest.set(id,{id,routeId:str(row.route_id),tripId:str(row.trip_id),stopId:str(row.stop_id),vehicleLabel:null,licensePlate:null,latitude:Number(row.latitude),longitude:Number(row.longitude),bearing:num(row.bearing),observedAt:new Date(row.observed_at).toISOString()});
+  }
+  const hydrated=[...latest.values()].filter(v=>Number.isFinite(v.latitude)&&Number.isFinite(v.longitude));
+  if(!hydrated.length)return;
+  cache.vehicles=hydrated.map(applyRouteMeta);
+  const timestamps=hydrated.map(v=>Date.parse(v.observedAt)).filter(Number.isFinite);
+  const newest=timestamps.length?Math.max(...timestamps):NaN;
+  cache.fetchedAt=Number.isFinite(newest)?new Date(newest).toISOString():null;
+  cache.status='STALE';
+  cache.source='neon-cache';
+  cache.reason='Showing the last known cached bus positions while live data reconnects.';
+  cache.persistedAt=new Date().toISOString();
+  console.log('Loaded Neon realtime cache: '+cache.vehicles.length+' vehicles.');
+ }catch(e){console.error('Neon realtime cache load failed:',e?.message||e)}
+}
 
 app.disable('x-powered-by');app.set('trust proxy',1);
 app.use(cors({origin:(o,cb)=>{const allow=String(process.env.APP_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);if(!o||!allow.length||allow.includes(o))return cb(null,true);cb(new Error('Origin not allowed'))},methods:['GET','POST'],optionsSuccessStatus:204}));
@@ -89,7 +83,7 @@ async function seed(){
   const e=[...links.entries()];for(let i=0;i<e.length;i+=500){const ch=e.slice(i,i+500),v=[];const p=ch.map(([k,seq],j)=>{const z=k.indexOf('\0'),b=j*3;v.push(k.slice(0,z),k.slice(z+1),seq);return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+')'}).join(',');await c.query('INSERT INTO route_stops(route_id,stop_id,stop_sequence) VALUES '+p+' ON CONFLICT(route_id,stop_id) DO UPDATE SET stop_sequence=LEAST(route_stops.stop_sequence,EXCLUDED.stop_sequence)',v)}
   await c.query("UPDATE static_feed_meta SET source_key='bundled-gtfs',source_url='https://otd.delhi.gov.in/',imported_at=NOW(),imported_route_count=(SELECT COUNT(*) FROM routes),imported_stop_count=(SELECT COUNT(*) FROM stops),imported_route_stop_count=(SELECT COUNT(*) FROM route_stops) WHERE id=TRUE");
   await c.query('COMMIT');console.log('Static GTFS seed complete: '+routes.length+' routes, '+stops.length+' stops, '+links.size+' links.')
- }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e}finally{await c.query("SELECT pg_advisory_unlock(hashtext('united-delhi-static-seed')).catch(()=>{});c.release()")}
+ }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e}finally{await c.query("SELECT pg_advisory_unlock(hashtext('united-delhi-static-seed'))").catch(()=>{});c.release()}
 }
 
 function parseVehicle(e,feedTs){
@@ -109,7 +103,7 @@ async function enrich(vs){
  const ids=[...new Set(vs.map(v=>v.routeId).filter(Boolean))];if(!ids.length)return vs.map(v=>({...v,routeColor:fallbackColor(v.routeId,v.id),...service(v.id,null)}));
  try{const rows=(await pool.query('SELECT route_id,agency_id,short_name,route_color,route_text_color FROM routes WHERE route_id=ANY($1::text[])',[ids])).rows;const map=new Map(rows.map(x=>[String(x.route_id),x]));return vs.map(v=>{const x=map.get(String(v.routeId||'')),svc=service(v.id,x?.agency_id);return {...v,routeShortName:x?.short_name||v.routeId||null,routeColor:x?.route_color||svc.serviceColor||fallbackColor(v.routeId,v.id),routeTextColor:x?.route_text_color||null,operator:x?.agency_id||null,...svc}})}catch{return vs.map(v=>({...v,routeShortName:v.routeId||null,routeColor:fallbackColor(v.routeId,v.id),routeTextColor:null,operator:null,...service(v.id,null)}))}
 }
-async function persist(vs){if(!pool||!vs.length)return;const c=await pool.connect();try{await c.query('BEGIN');await c.query("SET LOCAL statement_timeout='10000'");for(let i=0;i<Math.min(vs.length,5000);i+=250){const chunk=vs.slice(i,i+250),values=[];const p=chunk.map((v,j)=>{const b=j*8;values.push(v.id,v.routeId,v.tripId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+',$'+(b+5)+',$'+(b+6)+',$'+(b+7)+',$'+(b+8)+',NOW())'}).join(',');await c.query('INSERT INTO vehicle_positions(vehicle_id,route_id,trip_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+p+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,trip_id=EXCLUDED.trip_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values)}await c.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '20 minutes'");await c.query('COMMIT')}catch(e){await c.query('ROLLBACK').catch(()=>{});console.error('Vehicle persistence failed:',e.message)}finally{c.release()}}
+async function persist(vs){if(!pool||!vs.length)return;const c=await pool.connect();try{await c.query('BEGIN');await c.query("SET LOCAL statement_timeout='10000'");for(let i=0;i<Math.min(vs.length,5000);i+=250){const chunk=vs.slice(i,i+250),values=[];const p=chunk.map((v,j)=>{const b=j*8;values.push(v.id,v.routeId,v.tripId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+',$'+(b+5)+',$'+(b+6)+',$'+(b+7)+',$'+(b+8)+',NOW())'}).join(',');await c.query('INSERT INTO vehicle_positions(vehicle_id,route_id,trip_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+p+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,trip_id=EXCLUDED.trip_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values)}await c.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '24 hours'");await c.query('COMMIT')}catch(e){await c.query('ROLLBACK').catch(()=>{});console.error('Vehicle persistence failed:',e.message)}finally{c.release()}}
 
 async function refresh(){
  if(refreshing)return refreshing;
@@ -120,8 +114,9 @@ async function refresh(){
    cache.vehicles=raw.map(applyRouteMeta);
    cache.status='OK';cache.reason=null;cache.fetchedAt=new Date().toISOString();
    savePersistentCache();
+   cache.source='dtc-live';cache.persistedAt=new Date().toISOString();
    void persist(cache.vehicles);
-   console.log('Realtime feed decoded: '+raw.length+' vehicles; persistent cache refreshed.');
+   console.log('Realtime feed decoded: '+raw.length+' vehicles; Neon/client caches refreshed.');
   }catch(e){
    cache.status=cache.fetchedAt?'STALE':'UNAVAILABLE';
    cache.reason=cache.vehicles.length?'Render is waking up; showing the last collected bus positions.':(e?.message||'Realtime request failed');
@@ -150,7 +145,7 @@ app.get('/api/search',async(q,r)=>{if(!pool)return r.status(503).json({status:'U
 app.get('/api/plan',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',options:[],reason:'Database is not configured'});let fromId=str(q.query.fromStopId),toId=str(q.query.toStopId);try{if(!fromId){const name=str(q.query.from);if(name)fromId=(await pool.query('SELECT stop_id FROM stops WHERE name=$1 ORDER BY stop_id LIMIT 1',[name])).rows[0]?.stop_id||null}if(!toId){const name=str(q.query.to);if(name)toId=(await pool.query('SELECT stop_id FROM stops WHERE name=$1 ORDER BY stop_id LIMIT 1',[name])).rows[0]?.stop_id||null}if(!fromId||!toId||fromId===toId)return r.status(400).json({status:'ERROR',options:[],reason:'Please select two different bus stops from the suggestions.'});const rows=(await pool.query("SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,o.stop_id from_stop_id,o.name from_stop,d.stop_id to_stop_id,d.name to_stop,o.stop_sequence from_sequence,d.stop_sequence to_sequence FROM route_stops o JOIN route_stops d ON d.route_id=o.route_id AND d.stop_sequence>o.stop_sequence JOIN routes r ON r.route_id=o.route_id WHERE o.stop_id=$1 AND d.stop_id=$2 ORDER BY (d.stop_sequence-o.stop_sequence),r.route_id LIMIT 10",[fromId,toId])).rows;const options=rows.map(x=>({type:'direct',durationMinutes:Math.max(3,Math.ceil((Number(x.to_sequence)-Number(x.from_sequence))*2.5)),durationIsEstimate:true,walkingMinutes:null,walkingIsEstimated:true,legs:[{routeId:String(x.route_id),routeName:x.short_name||x.long_name||'Bus',routeColor:x.route_color,routeTextColor:x.route_text_color,fromStop:x.from_stop,toStop:x.to_stop,fromStopId:x.from_stop_id,toStopId:x.to_stop_id}]}));const origin=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[fromId])).rows[0]||null;const destination=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[toId])).rows[0]||null;return r.json({status:'OK',origin,destination,options:options.slice(0,5),reason:options.length?null:'No direct bus journey was found'})}catch(e){console.error('Journey planner failed:',e?.message||e);return r.status(500).json({status:'ERROR',options:[],reason:'Journey planner is temporarily unavailable. Please try again.'})}});
 app.use((_q,r)=>r.status(404).json({status:'NOT_FOUND',reason:'Endpoint not found'}));
 app.use((e,_q,r,_n)=>{console.error('Unhandled request error:',e?.message||e);if(!r.headersSent)r.status(500).json({status:'ERROR',reason:'Internal server error'})});
-const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(async()=>{try{if(pool){await ensureRuntimeSchema();await seed();await loadRouteMeta()}}catch(e){console.error('Database bootstrap failed:',e?.message||e)}if(KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}},1500)});
+const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(async()=>{try{if(pool){await ensureRuntimeSchema();await seed();await loadRouteMeta();await loadDatabaseVehicleCache()}}catch(e){console.error('Database bootstrap failed:',e?.message||e)}if(KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}},1500)});
 server.requestTimeout=30000;server.headersTimeout=40000;server.keepAliveTimeout=65000;
 process.on('unhandledRejection',e=>console.error('Unhandled rejection:',e));process.on('uncaughtException',e=>console.error('Uncaught exception:',e));
 for(const sig of ['SIGTERM','SIGINT'])process.on(sig,async()=>{if(poll)clearInterval(poll);server.close();await pool?.end().catch(()=>{});process.exit(0)});
