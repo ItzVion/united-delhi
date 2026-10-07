@@ -30,8 +30,8 @@ const routeName=(value:any)=>{
 const displayVehicleRoute=(v:any)=>routeName(v.routeShortName)||routeName(v.routeId)||'BUS';
 const isHex=(v:any)=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 const textFor=(bg:string)=>{const h=bg.replace('#','');const rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.55?'#17313B':'#FFFFFF';};
-const BUS_COLORS:any={evAc:'#2FAFBC',evDeviOrange:'#E57D43',evDeviGreen:'#168F49',cngAcBlue:'#3D82CE',cngAcRed:'#E35F67',cngNonAcPeach:'#E5A16E',cngNonAcGreen:'#24C88B'};
-const FALLBACK_ROUTE_COLORS=['#24C88B','#2FAFBC','#E57D43','#3D82CE','#E35F67','#8B5CF6','#C58B2A','#00897B'];
+const BUS_COLORS:any={evAc:'#53B8C7',evDeviOrange:'#E9A064',evDeviGreen:'#43A865',cngAcBlue:'#4A90D9',cngAcRed:'#E4777C',cngNonAcPeach:'#EAB184',cngNonAcGreen:'#55C28D'};
+const FALLBACK_ROUTE_COLORS=['#55C28D','#53B8C7','#E9A064','#4A90D9','#E4777C','#8E6BDC','#C9A24A','#49A28E'];
 const routeFallbackColor=(routeId:any,vehicleId:any)=>{const key=String(routeId||vehicleId||'BUS');let h=0;for(let i=0;i<key.length;i++)h=(h*31+key.charCodeAt(i))>>>0;return FALLBACK_ROUTE_COLORS[h%FALLBACK_ROUTE_COLORS.length];};
 const busColorFor=(v:any)=>isHex(v.routeColor)?String(v.routeColor):isHex(v.serviceColor)?String(v.serviceColor):routeFallbackColor(v.routeId,v.id);
 const ageLabel=(value?:string)=>{const t=Date.parse(String(value||''));if(!Number.isFinite(t))return'Live';const s=Math.max(0,Math.round((Date.now()-t)/1000));return s<60?'Just now':Math.floor(s/60)+' min ago';};
@@ -186,7 +186,7 @@ export default function App(){
     <main className="app-main">
       <div className="search-box">
         <span className="search-icon">⌕</span>
-        <input value={q} onChange={e=>{setQ(e.target.value);setSearchOpen(true);}} onFocus={()=>setSearchOpen(true)} placehconst FALLBACK_ROUTE_COLORS=['#24C88B','#2FAFBC','#E57D43','#3D82CE','#E35F67','#8B5CF6','#C58B2A','#00897B'];er="Search 500+ routes, stops or places"/>
+        <input value={q} onChange={e=>{setQ(e.target.value);setSearchOpen(true);}} onFocus={()=>setSearchOpen(true)} placehconst FALLBACK_ROUTE_COLORS=['#55C28D','#53B8C7','#E9A064','#4A90D9','#E4777C','#8E6BDC','#C9A24A','#49A28E'];er="Search 500+ routes, stops or places"/>
         {searchBusy?<span className="spinner"/>:null}
         {q?<button className="clear" onClick={()=>{setQ('');setSearchOpen(false);}}>×</button>:null}
       </div>
@@ -288,10 +288,10 @@ function TransitSheet({stops,go}:{stops:any[];go:(path:string)=>void}){
 function BusLegend({open,onClose}:{open:boolean;onClose:()=>void}){
   if(!open)return null;
   const rows=[
-    [['#2FAFBC','EV AC (12 mtr)']],
-    [['#E57D43','EV DEVI AC (9 mtr)'],['#168F49','EV DEVI AC (9 mtr)']],
-    [['#3D82CE','CNG AC (12 mtr)'],['#E35F67','CNG AC (12 mtr)']],
-    [['#E5A16E','CNG NonAC (12 mtr)'],['#24C88B','CNG NonAC (12 mtr)']]
+    [['#53B8C7','EV AC (12 mtr)']],
+    [['#E9A064','EV DEVI AC (9 mtr)'],['#43A865','EV DEVI AC (9 mtr)']],
+    [['#4A90D9','CNG AC (12 mtr)'],['#E4777C','CNG AC (12 mtr)']],
+    [['#EAB184','CNG NonAC (12 mtr)'],['#55C28D','CNG NonAC (12 mtr)']]
   ];
   return <div className="legend-overlay" role="dialog" aria-modal="true" aria-label="Bus Color Legend" onClick={onClose}>
     <div className="legend-dialog" onClick={e=>e.stopPropagation()}>
