@@ -47,7 +47,7 @@ export default function App(){
       setLocState(err?.code===1?'denied':'unavailable');
     },{enableHighAccuracy:true,maximumAge:300000,timeout:15000});
   },[]);
-  useEffect(()=>{if(accepted)locate()},[accepted,locate]);
+  useEffect(()=>{if(!accepted)return;try{const saved=JSON.parse(storageGet('ud-last-location')||'null');if(Number.isFinite(saved?.lat)&&Number.isFinite(saved?.lon))setLocation({lat:saved.lat,lon:saved.lon})}catch{}},[accepted]);
 
   const load=useCallback(async()=>{
     if(busy.current)return;busy.current=true;
