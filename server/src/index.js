@@ -116,7 +116,6 @@ async function refresh(){
    if(!raw.length)throw new Error('DTC realtime feed returned no valid vehicles');
    cache.vehicles=raw.map(applyRouteMeta);
    cache.status='OK';cache.reason=null;cache.fetchedAt=new Date().toISOString();
-   savePersistentCache();
    cache.source='dtc-live';cache.persistedAt=new Date().toISOString();
    void persist(cache.vehicles);
    console.log('Realtime feed decoded: '+raw.length+' vehicles; Neon/client caches refreshed.');
@@ -136,8 +135,9 @@ app.get('/healthz',(_q,r)=>r.json({status:'OK'}));
 app.get('/ready',(_q,r)=>r.json({status:'OK',database:Boolean(pool),realtime:cache.status,cachedVehicles:cache.vehicles.length}));
 app.get('/api/status',async(_q,r)=>{let database='NOT_CONFIGURED';if(pool){try{await pool.query('SELECT 1');database='OK'}catch{database='ERROR'}}r.json({status:'OK',database,realtime:cache.status,realtimeVehicles:cache.vehicles.length,fetchedAt:cache.fetchedAt,source:cache.source,persistedAt:cache.persistedAt,reason:cache.reason})});
 app.get('/api/realtime/vehicles',async(_q,r)=>{
- const stale=!cache.fetchedAt||Date.now()-Date.parse(cache.fetchedAt)>90000;
+ let stale=!cache.fetchedAt||Date.now()-Date.parse(cache.fetchedAt)>90000;
  if(stale&&KEY)await refresh().catch(()=>{});
+ stale=!cache.fetchedAt||Date.now()-Date.parse(cache.fetchedAt)>90000;
  const hasData=cache.vehicles.length>0;
  r.setHeader('Cache-Control','no-store, no-cache, must-revalidate, proxy-revalidate');
  r.setHeader('Pragma','no-cache');
