@@ -7,6 +7,7 @@ import {Icon} from './components/ui';
 import Home from './components/Home';
 import Legend from './components/Legend';
 import Metro from './components/Metro';
+import MetroRoute from './components/MetroRoute';
 import {Planner,RoutePage,StopPage,Hub,Help,Legal,Privacy,Terms,About} from './components/pages';
 
 const CACHE_KEY='ud-live-vehicles-v3';
@@ -120,6 +121,7 @@ export default function App(){
       {page.kind==='home'?<Home vehicles={vehicles} live={live} liveNote={liveNote} onRetry={()=>void load()} location={location} locState={locState} onLocate={locate} onLegend={()=>setLegend(true)} go={go} services={services}/>
       :page.kind==='plan'?<Planner go={go}/>
       :page.kind==='metro'?<Metro go={go}/>
+      :page.kind==='metroRoute'?<MetroRoute id={page.id||''} go={go}/>
       :page.kind==='settings'?<Hub go={go} onLegend={()=>setLegend(true)}/>
       :page.kind==='hub'?<Hub go={go} onLegend={()=>setLegend(true)}/>
       :page.kind==='help'?<Help go={go}/>
