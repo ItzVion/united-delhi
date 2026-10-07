@@ -4,10 +4,6 @@ import cors from 'cors';
 import pg from 'pg';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { rateLimit } from 'express-rate-limit';
-import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import readline from 'node:readline';
-import { parse } from 'csv-parse/sync';
 
 const {Pool}=pg,app=express();
 const PORT=Number(process.env.PORT)||10000;
@@ -64,28 +60,8 @@ app.use('/api',rateLimit({windowMs:60000,limit:180,standardHeaders:'draft-8',leg
 
 async function ensureRuntimeSchema(){if(!pool)return;const c=await pool.connect();try{await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS trip_id TEXT');await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS route_id TEXT');await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS stop_id TEXT');await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS bearing DOUBLE PRECISION');console.log('Runtime database schema verified.')}finally{c.release()}}
 
- if(!pool)return;
- if(String(process.env.STATIC_IMPORT_ENABLED||'').toLowerCase()!=='true'){console.log('Static GTFS DB-only mode: skipping bundled static import.');return;}
- const c=await pool.connect();
- try{
-  await c.query("SELECT pg_advisory_lock(hashtext('united-delhi-static-seed'))");
-  const q=(await c.query('SELECT (SELECT COUNT(*)::int FROM routes) r,(SELECT COUNT(*)::int FROM stops) s,(SELECT COUNT(*)::int FROM route_stops rs) l')).rows[0];
-  const force=String(process.env.FORCE_STATIC_REBUILD||'').toLowerCase()==='true';
-  if(!force&&q.r>=2000&&q.s>=5000&&q.l>=50000){console.log('Static GTFS already populated: '+q.r+' routes, '+q.s+' stops, '+q.l+' links.');return}
-  const read=f=>parse(fs.readFileSync(path.join(DATA,f),'utf8'),{columns:true,skip_empty_lines:true,bom:true,relax_column_count:true,trim:true});
-  const routes=read('routes.txt'),stops=read('stops.txt'),trips=read('trips.txt'),tripRoute=new Map(),routeIds=new Set(routes.map(x=>str(x.route_id)).filter(Boolean)),stopIds=new Set(stops.map(x=>str(x.stop_id)).filter(Boolean));
-  for(const x of trips){const t=str(x.trip_id),r=str(x.route_id);if(t&&r)tripRoute.set(t,r)}
-  const links=new Map();const rl=readline.createInterface({input:fs.createReadStream(path.join(DATA,'stop_times.txt'),{encoding:'utf8'}),crlfDelay:Infinity});let header=null,ti=-1,si=-1,qi=-1;
-  for await(const line of rl){if(!header){header=line.split(',');ti=header.indexOf('trip_id');si=header.indexOf('stop_id');qi=header.indexOf('stop_sequence');continue}const p=line.split(','),r=tripRoute.get(str(p[ti])),sid=str(p[si]),seq=num(p[qi]);if(!r||!sid||seq===null||!routeIds.has(r)||!stopIds.has(sid))continue;const k=r+'\0'+sid,o=links.get(k);if(o===undefined||seq<o)links.set(k,seq)}
-  await c.query('BEGIN');await c.query("SET LOCAL statement_timeout='120000'");await c.query('TRUNCATE route_stops,routes,stops RESTART IDENTITY CASCADE');
-  for(let i=0;i<routes.length;i+=300){const ch=routes.slice(i,i+300),v=[];const p=ch.map((x,j)=>{const b=j*6;v.push(str(x.route_id),str(x.agency_id),str(x.route_short_name),str(x.route_long_name),str(x.route_color),str(x.route_text_color));return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+',$'+(b+5)+',$'+(b+6)+')'}).join(',');await c.query('INSERT INTO routes(route_id,agency_id,short_name,long_name,route_color,route_text_color) VALUES '+p+' ON CONFLICT(route_id) DO UPDATE SET agency_id=EXCLUDED.agency_id,short_name=EXCLUDED.short_name,long_name=EXCLUDED.long_name,route_color=EXCLUDED.route_color,route_text_color=EXCLUDED.route_text_color,updated_at=NOW()',v)}
-  for(let i=0;i<stops.length;i+=300){const ch=stops.slice(i,i+300),v=[];const p=ch.map((x,j)=>{const b=j*4;v.push(str(x.stop_id),str(x.stop_name,200),num(x.stop_lat),num(x.stop_lon));return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+')'}).join(',');await c.query('INSERT INTO stops(stop_id,name,latitude,longitude) VALUES '+p+' ON CONFLICT(stop_id) DO UPDATE SET name=EXCLUDED.name,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,updated_at=NOW()',v)}
-  const e=[...links.entries()];for(let i=0;i<e.length;i+=500){const ch=e.slice(i,i+500),v=[];const p=ch.map(([k,seq],j)=>{const z=k.indexOf('\0'),b=j*3;v.push(k.slice(0,z),k.slice(z+1),seq);return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+')'}).join(',');await c.query('INSERT INTO route_stops(route_id,stop_id,stop_sequence) VALUES '+p+' ON CONFLICT(route_id,stop_id) DO UPDATE SET stop_sequence=LEAST(route_stops.stop_sequence,EXCLUDED.stop_sequence)',v)}
-  await c.query("UPDATE static_feed_meta SET source_key='bundled-gtfs',source_url='https://otd.delhi.gov.in/',imported_at=NOW(),imported_route_count=(SELECT COUNT(*) FROM routes),imported_stop_count=(SELECT COUNT(*) FROM stops),imported_route_stop_count=(SELECT COUNT(*) FROM route_stops) WHERE id=TRUE");
-  await c.query('COMMIT');console.log('Static GTFS seed complete: '+routes.length+' routes, '+stops.length+' stops, '+links.size+' links.')
- }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e}finally{await c.query("SELECT pg_advisory_unlock(hashtext('united-delhi-static-seed'))").catch(()=>{});c.release()}
-}
 
+/* Static GTFS is DB-only: the current feed is imported into Neon outside the web service. */
 function parseVehicle(e,feedTs){
  const v=e?.vehicle,p=v?.position;if(!p)return null;
  const lat=coord(p.latitude,-90,90),lon=coord(p.longitude,-180,180),id=str(v?.vehicle?.id||v?.id||e?.id);if(lat===null||lon===null||!id)return null;
