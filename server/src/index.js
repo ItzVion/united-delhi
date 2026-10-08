@@ -31,7 +31,7 @@ const classifyFleet=(id,...aliases)=>{
  if(v.startsWith('DL51EV'))return{serviceType:'electric',busType:'EV AC (12 mtr)',serviceColor:SERVICE_COLORS.electricAc};
  if(v.startsWith('DL51GD'))return{serviceType:'electric',busType:'EV DEVI AC (9 mtr)',serviceColor:SERVICE_COLORS.electricDevi};
  if(v.startsWith('DL1PD')||v.startsWith('DL1PE'))return{serviceType:'dtc',busType:'CNG AC (12 mtr)',serviceColor:SERVICE_COLORS.cngAc};
- if(v.startsWith('DL1PB')||v.startsWith('DL1PC'))return{serviceType:'cluster',busType:'CNG NonAC (12 mtr)',serviceColor:SERVICE_COLORS.cngNonAc};
+ if(v.startsWith('DL1PB')||v.startsWith('DL1PC'))return{serviceType:'dtc',busType:'CNG NonAC (12 mtr)',serviceColor:SERVICE_COLORS.cngNonAc};
  return{serviceType:'unknown',busType:'Unknown',serviceColor:SERVICE_COLORS.unknown};
 };
 const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>classifyFleet(id,licensePlate,vehicleLabel);
