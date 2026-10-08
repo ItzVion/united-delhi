@@ -25,7 +25,7 @@ function Sheet({location,locState,onLocate,go}:{location:Point|null;locState:str
   const load=useCallback(()=>{if(!location){setStops([]);return}let on=true;setBusy(true);setErr('');api.nearby(location.lat,location.lon).then(r=>{if(on){setStops(r.status==='OK'?r.stops:[]);if(r.status!=='OK')setErr(r.reason||'Nearby stops unavailable.')}}).catch(e=>{if(on){setStops([]);setErr((e as Error).message||'Nearby stops unavailable.')}}).finally(()=>{if(on)setBusy(false)});return()=>{on=false}},[location]);
   useEffect(()=>load(),[load]);
   const heights=()=>{const H=el.current?.parentElement?.clientHeight||600;return[158,Math.round(H*.52),H-12]};
-  const apply=useCallback((h:number,animate:boolean)=>{const s=el.current;if(!s)return;s.classList.toggle('anim',animate);s.style.height=h+'px';s.parentElement?.style.setProperty('--sheet-h',h+'px','important')},[]);
+  const apply=useCallback((h:number,animate:boolean)=>{const s=el.current;if(!s)return;s.classList.toggle('anim',animate);s.style.setProperty('height',h+'px','important');s.parentElement?.style.setProperty('--sheet-h',h+'px','important')},[]);
   useEffect(()=>{apply(heights()[snap],true)},[snap,apply]);useEffect(()=>{const f=()=>apply(heights()[snap],false);window.addEventListener('resize',f);return()=>window.removeEventListener('resize',f)},[snap,apply]);
   const down=(e:RPE)=>{if(window.matchMedia('(min-width:920px)').matches)return;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);drag.current={y:e.clientY,h:el.current!.offsetHeight,t:performance.now()}};
   const move=(e:RPE)=>{const d=drag.current;if(!d)return;const hs=heights();apply(Math.max(110,Math.min(hs[2],d.h+(d.y-e.clientY))),false)};
