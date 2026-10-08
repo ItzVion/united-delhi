@@ -13,7 +13,7 @@ const DB=String(process.env.DATABASE_URL||'').trim();
 const KEY=String(process.env.DTC_API_KEY||'').trim();
 const FEED=String(process.env.DTC_REALTIME_URL||'https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb').trim();
 const KEY_PARAM=String(process.env.DTC_API_KEY_PARAM||'key').trim()||'key';
-const pool=DB?new Pool({connectionString:DB,max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000,ssl:/localhost|127(?:\.\d+){3}|::1/i.test(DB)?false:{rejectUnauthorized:true}}):null;
+let DB_CONNECTION=DB;try{if(DB){const u=new URL(DB);u.searchParams.delete('sslmode');DB_CONNECTION=u.toString()}}catch{} const pool=DB?new Pool({connectionString:DB_CONNECTION,max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000,ssl:/localhost|127(?:\.\d+){3}|::1/i.test(DB)?false:{rejectUnauthorized:true}}):null;
 
 const str=(v,max=160)=>{const x=String(v??'').trim();return x&&x.length<=max?x:null};
 const num=v=>{const x=Number(v);return Number.isFinite(x)?x:null};
