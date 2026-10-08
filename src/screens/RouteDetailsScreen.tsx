@@ -10,6 +10,7 @@ import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
+import { resolveVehicleColor } from '../lib/vehicleColor';
 
 type Nav=NativeStackNavigationProp<RootStackParamList,'RouteDetails'>;
 type RouteDetailsRoute=RouteProp<RootStackParamList,'RouteDetails'>;
