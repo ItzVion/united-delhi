@@ -165,3 +165,4 @@ body,#root{background:var(--bg)}
 .legend-exact-type{font-size:14px;line-height:18px}
 .legend-understood{height:46px;margin-top:12px;font-size:16px}
 }
+.route-banner{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 0;border-bottom:1px solid var(--line)}.route-banner>b{font-weight:700;color:var(--ink)}
