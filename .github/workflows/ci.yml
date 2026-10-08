@@ -57,4 +57,5 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm ci
       - run: npm run check
+      - run: node --check scripts/import-dtc-static.mjs
       - run: npm audit --omit=dev --audit-level=moderate
