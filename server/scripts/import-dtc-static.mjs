@@ -3,11 +3,14 @@ import { createInflateRaw } from 'node:zlib';
 import { Readable } from 'node:stream';
 
 const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
-const STATIC_URL = String(
-  process.env.DTC_STATIC_URL ||
-  'https://files.mobilitydatabase.org/mdb-1262/mdb-1262-202506170152/mdb-1262-202506170152.zip'
-).trim();
-const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'mobilitydb-mdb-1262-202506170152').trim();
+const STATIC_URL_OVERRIDE = String(process.env.DTC_STATIC_URL || '').trim();
+const STATIC_URLS = STATIC_URL_OVERRIDE
+  ? [STATIC_URL_OVERRIDE]
+  : [
+      'https://files.mobilitydatabase.org/mdb-1262/latest.zip',
+      'https://files.mobilitydatabase.org/mdb-3139/latest.zip'
+    ];
+const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'mobilitydb-mdb-1262-latest').trim();
 const MAX_COMPRESSED_BYTES = 50 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES = 250 * 1024 * 1024;
 
@@ -171,30 +174,35 @@ const batches = (items, size) => {
 };
 
 async function downloadZip() {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 120000);
-  try {
-    const response = await fetch(STATIC_URL, {
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/zip, application/octet-stream;q=0.9',
-        'User-Agent': 'United-Delhi-static-import/1.0'
-      }
-    });
-    if (!response.ok) throw new Error('DTC static download HTTP ' + response.status);
-    const contentLength = Number(response.headers.get('content-length') || 0);
-    if (contentLength && contentLength > MAX_COMPRESSED_BYTES) throw new Error('DTC static ZIP exceeds the compressed-size safety limit');
-    const data = Buffer.from(await response.arrayBuffer());
-    if (data.length > MAX_COMPRESSED_BYTES) throw new Error('DTC static ZIP exceeds the compressed-size safety limit');
-    console.log('Downloaded DTC static ZIP: ' + Math.round(data.length / 1024 / 1024 * 100) / 100 + ' MB');
-    return data;
-  } catch (error) {
-    if (error?.name === 'AbortError') throw new Error('DTC static download timed out');
-    throw error;
-  } finally {
-    clearTimeout(timer);
+  let lastError = null;
+  for (const url of STATIC_URLS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120000);
+    try {
+      console.log('Trying DTC static source: ' + url);
+      const response = await fetch(url, {
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/zip, application/octet-stream;q=0.9',
+          'User-Agent': 'United-Delhi-static-import/1.1'
+        }
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const contentLength = Number(response.headers.get('content-length') || 0);
+      if (contentLength && contentLength > MAX_COMPRESSED_BYTES) throw new Error('ZIP exceeds the compressed-size safety limit');
+      const data = Buffer.from(await response.arrayBuffer());
+      if (data.length > MAX_COMPRESSED_BYTES) throw new Error('ZIP exceeds the compressed-size safety limit');
+      console.log('Downloaded DTC static ZIP: ' + Math.round(data.length / 1024 / 1024 * 100) / 100 + ' MB');
+      return { data, sourceUrl: url };
+    } catch (error) {
+      lastError = error?.name === 'AbortError' ? new Error('download timed out') : error;
+      console.warn('DTC static source failed: ' + url + ' (' + (lastError?.message || lastError) + ')');
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  throw new Error('All DTC static sources failed: ' + (lastError?.message || lastError || 'unknown error'));
 }
 
 async function main() {
@@ -222,7 +230,10 @@ async function main() {
       if (missing.length) {
         throw new Error('Database schema is missing: ' + missing.join(', ') + '. Run server/sql/001_reset_and_schema.sql first.');
       }
-      const zip = new ZipArchive(await downloadZip());
+      const downloaded = await downloadZip();
+      const sourceUrl = downloaded.sourceUrl;
+      const zip = new ZipArchive(downloaded.data);
+      console.log('ZIP source selected: ' + sourceUrl);
       console.log('ZIP entries: ' + zip.entries.size);
       console.log('Expanded ZIP size: ' + Math.round(zip.totalUncompressed / 1024 / 1024 * 100) / 100 + ' MB');
 
@@ -291,11 +302,10 @@ async function main() {
       }
 
       const sourceKey = SOURCE_KEY;
-      const client2 = await pool.connect();
       try {
-        await client2.query('BEGIN');
-        await client2.query("SET LOCAL statement_timeout='120000'");
-        await client2.query('TRUNCATE route_stops, routes, stops CASCADE');
+        await client.query('BEGIN');
+        await client.query("SET LOCAL statement_timeout='120000'");
+        await client.query('TRUNCATE route_stops, routes, stops CASCADE');
 
         for (const batch of batches(routes, 300)) {
           const values = [];
@@ -304,7 +314,7 @@ async function main() {
             values.push(x.route_id, x.agency_id, x.short_name, x.long_name, x.route_color, x.route_text_color);
             return '(' + [1,2,3,4,5,6].map((n) => '$' + (base + n)).join(',') + ',NOW(),NOW())';
           }).join(',');
-          await client2.query(
+          await client.query(
             'INSERT INTO routes(route_id,agency_id,short_name,long_name,route_color,route_text_color,created_at,updated_at) VALUES ' + sql,
             values
           );
@@ -317,7 +327,7 @@ async function main() {
             values.push(x.stop_id, x.name, x.latitude, x.longitude);
             return '(' + [1,2,3,4].map((n) => '$' + (base + n)).join(',') + ',NOW(),NOW())';
           }).join(',');
-          await client2.query(
+          await client.query(
             'INSERT INTO stops(stop_id,name,latitude,longitude,created_at,updated_at) VALUES ' + sql,
             values
           );
@@ -331,30 +341,30 @@ async function main() {
             values.push(x.route_id, x.stop_id, x.stop_sequence);
             return '(' + [1,2,3].map((n) => '$' + (base + n)).join(',') + ')';
           }).join(',');
-          await client2.query(
+          await client.query(
             'INSERT INTO route_stops(route_id,stop_id,stop_sequence) VALUES ' + sql + ' ON CONFLICT DO NOTHING',
             values
           );
         }
 
-        await client2.query(
+        await client.query(
           'INSERT INTO static_feed_meta(id,source_key,source_url,feed_version,feed_start_date,feed_end_date,imported_at,updated_at,imported_route_count,imported_stop_count,imported_route_stop_count) VALUES(1,$1,$2,$3,$4,$5,NOW(),NOW(),$6,$7,$8) ON CONFLICT(id) DO UPDATE SET source_key=EXCLUDED.source_key,source_url=EXCLUDED.source_url,feed_version=EXCLUDED.feed_version,feed_start_date=EXCLUDED.feed_start_date,feed_end_date=EXCLUDED.feed_end_date,imported_at=NOW(),updated_at=NOW(),imported_route_count=EXCLUDED.imported_route_count,imported_stop_count=EXCLUDED.imported_stop_count,imported_route_stop_count=EXCLUDED.imported_route_stop_count',
-          [sourceKey, STATIC_URL, feedVersion, feedStart, feedEnd, routes.length, stops.length, validLinks.length]
+          [sourceKey, sourceUrl, feedVersion, feedStart, feedEnd, routes.length, stops.length, validLinks.length]
         );
 
-        await client2.query('ANALYZE routes');
-        await client2.query('ANALYZE stops');
-        await client2.query('ANALYZE route_stops');
-        await client2.query('ANALYZE static_feed_meta');
-        await client2.query('COMMIT');
+        await client.query('ANALYZE routes');
+        await client.query('ANALYZE stops');
+        await client.query('ANALYZE route_stops');
+        await client.query('ANALYZE static_feed_meta');
+        await client.query('COMMIT');
 
         console.log('DTC static import complete: ' + routes.length + ' routes, ' + stops.length + ' stops, ' + validLinks.length + ' route-stop links.');
-        console.log('Source: ' + STATIC_URL);
+        console.log('Source: ' + sourceUrl);
       } catch (error) {
-        await client2.query('ROLLBACK').catch(() => {});
+        await client.query('ROLLBACK').catch(() => {});
         throw error;
       } finally {
-        client2.release();
+        
       }
     } finally {
       // The initial schema-check client is released only when its scope ends.
