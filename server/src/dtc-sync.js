@@ -137,6 +137,12 @@ export async function syncDtcStatic(pool,{onlyIfEmpty=false}={}){
       if(candidate.kind==='otd-direct'){
         const form=new FormData();
         form.append('csrfmiddlewaretoken',TOKEN);
+        form.append('usage_type','non-commercial');
+        form.append('usageType','Non-Commercial');
+        form.append('purpose','academia');
+        form.append('agree','on');
+        form.append('terms','on');
+        form.append('download','1');
         response=await fetch(candidate.url,{method:'POST',headers:{cookie:'csrftoken='+TOKEN,referer:candidate.url,'user-agent':'United-Delhi/2.0'},body:form,signal:controller.signal});
       } else if(candidate.kind==='otd-form'){
         const page=await fetch(candidate.url,{method:'GET',headers:{accept:'text/html','user-agent':'United-Delhi/2.0'},signal:controller.signal});
@@ -156,7 +162,11 @@ export async function syncDtcStatic(pool,{onlyIfEmpty=false}={}){
       } else {
         response=await fetch(candidate.url,{headers:{accept:'application/zip','user-agent':'United-Delhi/2.0'},signal:controller.signal});
       }
-      if(!response.ok)throw new Error(candidate.kind+' HTTP '+response.status);
+      if(!response.ok){
+        let detail='';
+        try{detail=(await response.text()).slice(0,600).replace(/\s+/g,' ')}catch{}
+        throw new Error(candidate.kind+' HTTP '+response.status+(detail?' · '+detail:''));
+      }
       const candidateBody=Buffer.from(await response.arrayBuffer());
       if(!candidateBody.slice(0,2).equals(Buffer.from([0x50,0x4b])))throw new Error(candidate.kind+' response was not a ZIP');
       const probeDir=path.join(dir,'probe-'+candidate.kind);
