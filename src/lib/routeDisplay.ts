@@ -2,7 +2,8 @@ export function normalizePublicRouteName(value: string | null | undefined): stri
   let route = String(value ?? '').trim();
   if (!route) return null;
   route = route.replace(/(?:UP|DOWN|DWN)$/i, '').trim() || route;
-  const air = route.match(/^(?:AIRPORT|AIR)[-_ ]*0*(\d+[A-Z]?)/i);\n  if (air) return 'AIR-' + air[1].toUpperCase();
+  const air = route.match(/^(?:AIRPORT|AIR)[-_ ]*0*(\d+[A-Z]?)/i);
+  if (air) return 'AIR-' + air[1].toUpperCase();
   return route || null;
 }
 
