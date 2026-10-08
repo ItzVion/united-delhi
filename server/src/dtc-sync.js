@@ -8,6 +8,7 @@ import {brotliDecompressSync} from 'node:zlib';
 
 const execFileAsync=promisify(execFile);
 const OTD_URL='https://otd.delhi.gov.in/data/static/';
+const OTD_DIRECT_URL='https://otd.delhi.gov.in/data/staticDMRC/';
 const MOBILITY_URL='https://files.mobilitydatabase.org/mdb-1262/mdb-1262-202506170152/mdb-1262-202506170152.zip';
 const BUNDLED_DIR=path.resolve(process.cwd(),'data','dtc-static-v1');
 const BUNDLED_SOURCE='uploaded-delhi_buses_static_gtfs_v1-2.zip';
@@ -124,24 +125,52 @@ export async function syncDtcStatic(pool,{onlyIfEmpty=false}={}){
  }
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),180000),dir=await fs.mkdtemp(path.join(os.tmpdir(),'united-delhi-dtc-'));
  try{
-  const TOKEN='1'.repeat(64);let body=null,sourceUrl=OTD_URL,lastError=null;
-  for(const candidate of [MOBILITY_URL,OTD_URL]){
-   try{
-    if(candidate===OTD_URL){
-     const page=await fetch(OTD_URL,{method:'GET',headers:{accept:'text/html','user-agent':'United-Delhi/2.0'},signal:controller.signal});
-     if(!page.ok)throw new Error('Static page HTTP '+page.status);
-     const html=await page.text(),cookie=(page.headers.get('set-cookie')||'').match(/csrftoken=([^;]+)/)?.[1]||TOKEN;
-     const token=html.match(/name=[\"']csrfmiddlewaretoken[\"'][^>]*value=[\"']([^\"']+)/i)?.[1]||cookie;
-     const form=new FormData();form.append('csrfmiddlewaretoken',token);form.append('usage_type','non-commercial');form.append('usageType','Non-Commercial');form.append('purpose','academia');form.append('agree','on');form.append('terms','on');form.append('download','1');
-     const response=await fetch(OTD_URL,{method:'POST',headers:{cookie:'csrftoken='+cookie,referer:OTD_URL,'user-agent':'United-Delhi/2.0'},body:form,signal:controller.signal});if(!response.ok)throw new Error('Static download HTTP '+response.status);body=Buffer.from(await response.arrayBuffer());
-    }else{
-     const response=await fetch(candidate,{headers:{accept:'application/zip','user-agent':'United-Delhi/2.0'},signal:controller.signal});if(!response.ok)throw new Error('Fallback static download HTTP '+response.status);body=Buffer.from(await response.arrayBuffer());
+  const TOKEN='1'.repeat(64);let body=null,sourceUrl=null,lastError=null;
+  const candidates=[
+    {url:OTD_DIRECT_URL,kind:'otd-direct'},
+    {url:OTD_URL,kind:'otd-form'},
+    {url:MOBILITY_URL,kind:'mobility'}
+  ];
+  for(const candidate of candidates){
+    try{
+      let response;
+      if(candidate.kind==='otd-direct'){
+        const form=new FormData();
+        form.append('csrfmiddlewaretoken',TOKEN);
+        response=await fetch(candidate.url,{method:'POST',headers:{cookie:'csrftoken='+TOKEN,referer:candidate.url,'user-agent':'United-Delhi/2.0'},body:form,signal:controller.signal});
+      } else if(candidate.kind==='otd-form'){
+        const page=await fetch(candidate.url,{method:'GET',headers:{accept:'text/html','user-agent':'United-Delhi/2.0'},signal:controller.signal});
+        if(!page.ok)throw new Error('Static page HTTP '+page.status);
+        const html=await page.text();
+        const cookie=(page.headers.get('set-cookie')||'').match(/csrftoken=([^;]+)/)?.[1]||TOKEN;
+        const token=html.match(/name=["']csrfmiddlewaretoken["'][^>]*value=["']([^"']+)/i)?.[1]||cookie;
+        const form=new FormData();
+        form.append('csrfmiddlewaretoken',token);
+        form.append('usage_type','non-commercial');
+        form.append('usageType','Non-Commercial');
+        form.append('purpose','academia');
+        form.append('agree','on');
+        form.append('terms','on');
+        form.append('download','1');
+        response=await fetch(candidate.url,{method:'POST',headers:{cookie:'csrftoken='+cookie,referer:candidate.url,'user-agent':'United-Delhi/2.0'},body:form,signal:controller.signal});
+      } else {
+        response=await fetch(candidate.url,{headers:{accept:'application/zip','user-agent':'United-Delhi/2.0'},signal:controller.signal});
+      }
+      if(!response.ok)throw new Error(candidate.kind+' HTTP '+response.status);
+      const candidateBody=Buffer.from(await response.arrayBuffer());
+      if(!candidateBody.slice(0,2).equals(Buffer.from([0x50,0x4b])))throw new Error(candidate.kind+' response was not a ZIP');
+      const probeDir=path.join(dir,'probe-'+candidate.kind);
+      const probe=await unzipFeed(candidateBody,probeDir);
+      if(candidate.kind!=='mobility' && (!probe.routes.length || probe.routes.length<1000))throw new Error(candidate.kind+' ZIP is not the DTC bus feed (routes='+probe.routes.length+')');
+      body=candidateBody;
+      sourceUrl=candidate.url;
+      console.log('DTC static candidate selected:',candidate.kind,'routes=',probe.routes.length);
+      break;
+    }catch(e){
+      lastError=e;
+      console.warn('DTC static candidate failed:',candidate.kind,e?.message||e);
     }
-    if(body.slice(0,2).equals(Buffer.from([0x50,0x4b]))){sourceUrl=candidate;break}
-    throw new Error('Response was not a ZIP');
-   }catch(e){lastError=e}
-  }
-  if(!body||!body.slice(0,2).equals(Buffer.from([0x50,0x4b])))throw new Error('DTC static download failed: '+(lastError?.message||'unknown error'));
+  }if(!body||!body.slice(0,2).equals(Buffer.from([0x50,0x4b])))throw new Error('DTC static download failed: '+(lastError?.message||'unknown error'));
   const feed=await unzipFeed(body,dir);if(!feed.routes.length||!feed.stops.length||!feed.trips.length||!feed.stopTimesFile)throw new Error('DTC feed is missing required GTFS files');
   const tripRoute=new Map(feed.trips.map(x=>[esc(x.trip_id),esc(x.route_id)]));const links=new Map();
   const rl=createInterface({input:(await import('node:fs')).createReadStream(feed.stopTimesFile,{encoding:'utf8'}),crlfDelay:Infinity});let header=null;
