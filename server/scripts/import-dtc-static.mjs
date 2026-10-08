@@ -10,32 +10,6 @@ const STATIC_URL = String(
 const MAX_COMPRESSED_BYTES = 50 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES = 250 * 1024 * 1024;
 
-const csvLine = (line) => {
-  const cells = [];
-  let cell = '';
-  let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (quoted) {
-      if (ch === '"' && line[i + 1] === '"') {
-        cell += '"';
-        i += 1;
-      } else if (ch === '"') {
-        quoted = false;
-      } else {
-        cell += ch;
-      }
-    } else if (ch === '"') {
-      quoted = true;
-    } else {
-      cell += ch === ',' ? '\u0000' : ch;
-      if (ch === ',') cells.push(cell.slice(0, -1)), cell = '';
-    }
-  }
-  cells.push(cell);
-  return cells;
-};
-
 const parseCsvLine = (line) => {
   const cells = [];
   let cell = '';
@@ -247,8 +221,6 @@ async function main() {
       if (missing.length) {
         throw new Error('Database schema is missing: ' + missing.join(', ') + '. Run server/sql/001_reset_and_schema.sql first.');
       }
-      client.release();
-
       const zip = new ZipArchive(await downloadZip());
       console.log('ZIP entries: ' + zip.entries.size);
       console.log('Expanded ZIP size: ' + Math.round(zip.totalUncompressed / 1024 / 1024 * 100) / 100 + ' MB');
@@ -376,7 +348,8 @@ async function main() {
         client2.release();
       }
     } finally {
-      if (!client._ending) client.release();
+      // The initial schema-check client is released only when its scope ends.
+      client.release();
     }
   } finally {
     await pool.end().catch(() => {});
