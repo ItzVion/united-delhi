@@ -10,8 +10,6 @@ on:
 permissions:
   contents: read
 
-# Intentionally manual-only.
-# Do not run CI/builds automatically on push or pull request.
 jobs:
   frontend:
     runs-on: ubuntu-latest
