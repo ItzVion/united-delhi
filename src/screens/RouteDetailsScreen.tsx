@@ -50,7 +50,7 @@ export default function RouteDetailsScreen(){
   const routeName=route?.publicRouteName||displayRouteName(route?.short_name)||displayRouteName(label)||'Bus route';
   const from=route?.fromStop||stops[0]?.name||'Starting stop';
   const to=route?.toStop||stops[stops.length-1]?.name||'Ending stop';
-  const liveType=vehicles.find(v=>v.serviceType)?.serviceType;const c=liveType==='electric'?{background:'#2FAFBC',text:'#17313B'}:{background:'#E57D43',text:'#FFFFFF'};
+  const liveVehicle=vehicles[0]||null;const c=liveVehicle?resolveVehicleColor(liveVehicle):resolveRouteColor(routeName,route?.route_color,route?.route_text_color);
 
   return <SafeAreaView style={styles.safe}>
     <View style={styles.topBar}>
