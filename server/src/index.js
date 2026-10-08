@@ -101,7 +101,7 @@ async function refresh(){
  if(refreshing)return refreshing;
  refreshing=(async()=>{
   try{
-   if(pool && (routeMeta.size===0 || Date.now()-routeMetaLoadedAt>15*60*1000))await loadRouteMeta();
+   if(pool && (routeMetaLoadedAt===0 || Date.now()-routeMetaLoadedAt>15*60*1000))await loadRouteMeta();
    const raw=await fetchLive();
    if(!raw.length)throw new Error('DTC realtime feed returned no valid vehicles');
    cache.vehicles=raw.map(applyRouteMeta);
