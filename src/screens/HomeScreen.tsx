@@ -18,12 +18,6 @@ import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type MapBounds = { south:number; west:number; north:number; east:number };
 const DELHI={latitude:28.6139,longitude:77.209};
-const BUS_COLORS={
-  evAc:'#2FAFBC', evDeviOrange:'#E57D43', evDeviGreen:'#168F49',
-  cngAcBlue:'#3D82CE', cngAcRed:'#E35F67', cngNonAcPeach:'#E5A16E', cngNonAcGreen:'#24C88B'
-} as const;
-const SERVICE_COLORS={dtc:BUS_COLORS.evDeviOrange,cluster:BUS_COLORS.evDeviOrange,electric:BUS_COLORS.evAc,unknown:BUS_COLORS.evDeviOrange} as const;
-
 export default function HomeScreen(){
   const navigation=useNavigation<Nav>();
   const { width:windowWidth }=useWindowDimensions();
@@ -123,8 +117,7 @@ export default function HomeScreen(){
       stops:nearbyStops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
       buses:visible.map(v=>{
         const route=displayRouteName(v.routeShortName) || 'LIVE';
-        const fallback=SERVICE_COLORS[v.serviceType||'unknown'];
-        const c={background:fallback,text:v.serviceType==='electric'?'#17313B':'#FFFFFF'};
+        const c=resolveVehicleColor(v);
         return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];
       }).flat(),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
@@ -191,7 +184,7 @@ export default function HomeScreen(){
           <View style={styles.liveDot}/>
           <Text style={styles.mapTopText}>{fresh==='ok'?(`${vehicles.length} buses live`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='unavailable'?'Live data unavailable':'Checking live buses'}</Text>
         </View>
-        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.cluster}]}/><Text style={styles.legendText}>Non-AC CNG</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:SERVICE_COLORS.electric}]}/><Text style={styles.legendText}>Electric</Text></View></View>
+        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#58B8C7'}]}/><Text style={styles.legendText}>EV AC (12 mtr)</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#42A968'}]}/><Text style={styles.legendText}>EV DEVI AC (9 mtr)</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#4D8FD0'}]}/><Text style={styles.legendText}>CNG AC (12 mtr)</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#E8B083'}]}/><Text style={styles.legendText}>CNG NonAC (12 mtr)</Text></View></View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
           const name=displayRouteName(selectedBus.routeShortName) || 'Live bus';
@@ -222,9 +215,9 @@ export default function HomeScreen(){
               <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Type</Text></View>
               {[
                 [['#58B8C7','EV AC (12 mtr)']],
-                [['#E7A05F','EV DEVI AC (9 mtr)'],['#42A968','EV DEVI AC (9 mtr)']],
-                [['#4D8FD0','CNG AC (12 mtr)'],['#DE737B','CNG AC (12 mtr)']],
-                [['#E8B083','CNG NonAC (12 mtr)'],['#55B98E','CNG NonAC (12 mtr)']]
+                [['#42A968','EV DEVI AC (9 mtr)']],
+                [['#4D8FD0','CNG AC (12 mtr)']],
+                [['#E8B083','CNG NonAC (12 mtr)']]
               ].map((row,index)=><View key={index} style={styles.legendRow}><View style={styles.legendIcons}>{row.map(([color],j)=><View key={j} style={[styles.legendBus,{backgroundColor:color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View>)}</View><Text style={styles.legendType}>{row[0][1]}</Text></View>)}
               <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Understood</Text></Pressable>
             </Pressable>
