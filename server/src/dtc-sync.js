@@ -4,7 +4,7 @@ import path from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createInterface} from 'node:readline';
-import {brotliDecompressSync,inflateSync} from 'node:zlib';
+import {brotliDecompressSync,inflateSync,gunzipSync,unzipSync} from 'node:zlib';
 
 const execFileAsync=promisify(execFile);
 const OTD_URL='https://otd.delhi.gov.in/data/static/';
@@ -49,7 +49,7 @@ async function readBundled(){
  const encoded=(await Promise.all(parts.map(f=>fs.readFile(path.join(BUNDLED_DIR,f),'utf8')))).join('');
  const compressed=Buffer.from(encoded,'base64');
  let raw;
- try{raw=brotliDecompressSync(compressed)}catch{raw=inflateSync(compressed)}
+ try{raw=brotliDecompressSync(compressed)}catch{try{raw=gunzipSync(compressed)}catch{try{raw=inflateSync(compressed)}catch{raw=unzipSync(compressed)}}}
  let p=0;
  const magic=raw.subarray(0,4).toString('ascii');p=4;
  if(magic!=='UD2\0')throw new Error('Bundled DTC dataset has an invalid header');
