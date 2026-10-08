@@ -8,7 +8,7 @@ export interface SearchResult { type:'stop'|'route'; id:string; label:string; fr
 export interface TripPlanOption { type:'direct'|'one-transfer'; durationMinutes:number; walkingMinutes:number|null; legs:Array<{routeId:string;routeName:string;routeColor?:string|null;routeTextColor?:string|null;fromStop:string;toStop:string;fromStopId:string;toStopId:string}>; transferStop?:string|null; }
 export interface TripPlanStop { stop_id:string; name:string; latitude:number; longitude:number; }
 export interface TripPlanResponse { status:string; origin:TripPlanStop|null; destination:TripPlanStop|null; options:TripPlanOption[]; reason?:string; }
-export interface Arrival { vehicleId:string; routeId:string|null; routeShortName?:string|null; routeColor?:string|null; routeTextColor?:string|null; serviceType?:'dtc'|'cluster'|'electric'|'unknown'; serviceColor?:string|null; busType?:string|null; distanceMeters:number; observedAgeSeconds:number; fromStop?:string|null; toStop?:string|null; }
+export interface Arrival { vehicleId:string; routeId:string|null; routeShortName?:string|null; routeColor?:string|null; routeTextColor?:string|null; serviceType?:'dtc'|'electric'|'unknown'; serviceColor?:string|null; busType?:string|null; distanceMeters:number; observedAgeSeconds:number; fromStop?:string|null; toStop?:string|null; }
 export interface VehicleResponse { status:string; count:number; vehicles:Vehicle[]; reason?:string; fetchedAt?:string; stale?:boolean; source?:string; cacheAgeSeconds?:number|null; }
 class ApiError extends Error { status:number; constructor(message:string,status:number){super(message);this.status=status;} }
 const LIVE_CACHE_KEY='ud-live-vehicles-v3';
