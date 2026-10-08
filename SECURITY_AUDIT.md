@@ -54,7 +54,7 @@ Added server/sql/002_security_hardening.sql and server/sql/006_database_security
 - vehicle coordinate/bearing bounds
 - indexes for stop-name lookup, route-name lookup, route sequencing, and stop-to-route lookup
 - revoked public CREATE privilege on the public PostgreSQL schema to reduce object-shadowing risk
-- enabled PostgreSQL Row Level Security on all five application tables, including static_feed_meta; no permissive policies are created because the mobile app has no direct database connection, so non-owner roles default to deny
+- enabled PostgreSQL Row Level Security on all application tables, including static_feed_meta and the Metro static tables; no permissive policies are created because the mobile app has no direct database connection, so non-owner roles default to deny
 - revoked PUBLIC table privileges for the application tables and revoked future default table/sequence/function privileges from PUBLIC
 
 The migration is applied before static-data checks and by the GTFS importer.
