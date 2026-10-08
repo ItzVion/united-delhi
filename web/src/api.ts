@@ -6,7 +6,7 @@ type VehicleResponse={status:string;count:number;vehicles:Vehicle[];reason?:stri
 const readVehicleCache=():VehicleResponse|null=>{try{const raw=window.localStorage.getItem(LIVE_CACHE_KEY);if(!raw)return null;const d=JSON.parse(raw);return Array.isArray(d?.vehicles)&&d.vehicles.length?d:null}catch{return null}};
 const writeVehicleCache=(d:VehicleResponse)=>{try{window.localStorage.setItem(LIVE_CACHE_KEY,JSON.stringify({...d,storedAt:new Date().toISOString()}))}catch{}};
 export const api={
- vehicles:async()=>{try{const d=await request<VehicleResponse>('/realtime/vehicles?_='+Date.now(),{},7000,0);if(Array.isArray(d.vehicles)&&d.vehicles.length)writeVehicleCache(d);return d}catch(error){const c=readVehicleCache();if(c)return{...c,status:'STALE',stale:true,source:'client-cache',reason:'Showing the last known bus positions while live data reconnects.'};throw error}},
+ vehicles:async()=>{try{const d=await request<VehicleResponse>('/realtime/vehicles?_='+Date.now(),{},7000,2);if(Array.isArray(d.vehicles)&&d.vehicles.length)writeVehicleCache(d);return d}catch(error){const c=readVehicleCache();if(c)return{...c,status:'STALE',stale:true,source:'client-cache',reason:'Showing the last known bus positions while live data reconnects.'};throw error}},
  search:(q:string)=>request<{status:string;results:any[]}>(`/search?q=${encodeURIComponent(q)}`,{},8000,1),
  route:(id:string)=>request<any>(`/routes/${encodeURIComponent(id)}`,{},8000,1),
  stop:async(id:string)=>{const stopResult=await request<any>(`/stops/${encodeURIComponent(id)}`);let arrivals:any={status:'UNAVAILABLE',arrivals:[],reason:'Live arrival data is unavailable.'};try{arrivals=await request<any>(`/stops/${encodeURIComponent(id)}/arrivals`,{},8000,1)}catch{}return [stopResult,arrivals] as const},
