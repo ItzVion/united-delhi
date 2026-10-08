@@ -12,6 +12,7 @@ const DB=String(process.env.DATABASE_URL||'').trim();
 const KEY=String(process.env.DTC_API_KEY||'').trim();
 const FEED=String(process.env.DTC_REALTIME_URL||'https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb').trim();
 const KEY_PARAM=String(process.env.DTC_API_KEY_PARAM||'key').trim()||'key';
+const REALTIME_PERSIST_INTERVAL_MS=Math.max(15000,Number(process.env.REALTIME_PERSIST_INTERVAL_MS)||60000);
 let DB_CONNECTION=DB;try{if(DB){const u=new URL(DB);u.searchParams.delete('sslmode');DB_CONNECTION=u.toString()}}catch{} const pool=DB?new Pool({connectionString:DB_CONNECTION,max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000,ssl:/localhost|127(?:\.\d+){3}|::1/i.test(DB)?false:{rejectUnauthorized:true}}):null;
 
 const str=(v,max=160)=>{const x=String(v??'').trim();return x&&x.length<=max?x:null};
@@ -37,7 +38,7 @@ const classifyFleet=(id,...aliases)=>{
 const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>classifyFleet(id,licensePlate,vehicleLabel);
 const fallbackColor=()=>SERVICE_COLORS.unknown; // fleet colours are resolved from vehicle identity first
 const cache={vehicles:[],status:KEY?'STARTING':'UNAVAILABLE',reason:KEY?'Render API is starting':'DTC_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
-let refreshing=null,poll=null,routeMetaLoadedAt=0;
+let refreshing=null,poll=null,routeMetaLoadedAt=0,persistPromise=null,lastPersistAt=0;
 const routeMeta=new Map();
 
 async function loadRouteMeta(){if(!pool)return;try{const rows=(await pool.query(`SELECT r.route_id,r.agency_id,r.short_name,r.long_name,r.route_color,r.route_text_color,first_stop.name AS from_stop,last_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.stop_id ASC LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true`)).rows;routeMeta.clear();for(const x of rows)routeMeta.set(String(x.route_id),x);routeMetaLoadedAt=Date.now();console.log('Loaded route metadata: '+routeMeta.size+' routes.')}catch(e){console.error('Route metadata load failed:',e?.message||e)}}
@@ -95,8 +96,13 @@ async function enrich(vs){
  const ids=[...new Set(vs.map(v=>v.routeId).filter(Boolean))];if(!ids.length)return vs.map(v=>{const svc=service(v.id,null,v.routeShortName,v.routeId);return {...v,routeColor:svc.serviceColor||fallbackColor(),routeLongName:null,...svc}});
  try{const rows=(await pool.query('SELECT route_id,agency_id,short_name,long_name,route_color,route_text_color FROM routes WHERE route_id=ANY($1::text[])',[ids])).rows;const map=new Map(rows.map(x=>[String(x.route_id),x]));return vs.map(v=>{const x=map.get(String(v.routeId||'')),svc=service(v.id,x?.agency_id,x?.short_name,v.routeId);return {...v,routeShortName:x?.short_name||v.routeId||null,routeColor:svc.serviceColor||fallbackColor(),routeTextColor:x?.route_text_color||null,routeLongName:x?.long_name||null,operator:x?.agency_id||null,...svc}})}catch{return vs.map(v=>{const svc=service(v.id,null,v.routeShortName,v.routeId);return {...v,routeShortName:v.routeId||null,routeColor:svc.serviceColor||fallbackColor(),routeTextColor:null,routeLongName:null,operator:null,...svc}})}
 }
-async function persist(vs){if(!pool||!vs.length)return;const c=await pool.connect();try{await c.query('BEGIN');await c.query("SET LOCAL statement_timeout='10000'");for(let i=0;i<Math.min(vs.length,5000);i+=250){const chunk=vs.slice(i,i+250),values=[];const p=chunk.map((v,j)=>{const b=j*8;values.push(v.id,v.routeId,v.tripId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+',$'+(b+5)+',$'+(b+6)+',$'+(b+7)+',$'+(b+8)+',NOW())'}).join(',');await c.query('INSERT INTO vehicle_positions(vehicle_id,route_id,trip_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+p+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,trip_id=EXCLUDED.trip_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values)}await c.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '24 hours'");await c.query('COMMIT')}catch(e){await c.query('ROLLBACK').catch(()=>{});console.error('Vehicle persistence failed:',e.message)}finally{c.release()}}
+async function persist(vs){if(!pool||!vs.length)return false;const c=await pool.connect();try{await c.query('BEGIN');await c.query("SET LOCAL statement_timeout='10000'");for(let i=0;i<Math.min(vs.length,5000);i+=250){const chunk=vs.slice(i,i+250),values=[];const p=chunk.map((v,j)=>{const b=j*8;values.push(v.id,v.routeId,v.tripId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+',$'+(b+5)+',$'+(b+6)+',$'+(b+7)+',$'+(b+8)+',NOW())'}).join(',');await c.query('INSERT INTO vehicle_positions(vehicle_id,route_id,trip_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+p+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,trip_id=EXCLUDED.trip_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values)}await c.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '24 hours'");await c.query('COMMIT');return true}catch(e){await c.query('ROLLBACK').catch(()=>{});console.error('Vehicle persistence failed:',e.message);return false}finally{c.release()}}
 
+function queuePersist(vs){
+ if(!pool||!vs.length||persistPromise||Date.now()-lastPersistAt<REALTIME_PERSIST_INTERVAL_MS)return;
+ lastPersistAt=Date.now();
+ persistPromise=persist(vs).then(ok=>{if(ok)cache.persistedAt=new Date().toISOString()}).catch(e=>console.error('Vehicle persistence queue failed:',e?.message||e)).finally(()=>{persistPromise=null});
+}
 async function refresh(){
  if(refreshing)return refreshing;
  refreshing=(async()=>{
@@ -106,8 +112,8 @@ async function refresh(){
    if(!raw.length)throw new Error('DTC realtime feed returned no valid vehicles');
    cache.vehicles=raw.map(applyRouteMeta);
    cache.status='OK';cache.reason=null;cache.fetchedAt=new Date().toISOString();
-   cache.source='dtc-live';cache.persistedAt=new Date().toISOString();
-   void persist(cache.vehicles);
+   cache.source='dtc-live';
+   queuePersist(cache.vehicles);
    console.log('Realtime feed decoded: '+raw.length+' vehicles; Neon/client caches refreshed.');
   }catch(e){
    cache.status=cache.fetchedAt?'STALE':'UNAVAILABLE';
