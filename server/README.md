@@ -1,10 +1,10 @@
 # United Delhi API v2
 
-The server exposes HTTP immediately. GTFS seeding and realtime polling run in the background after startup, so Render health checks never wait for Neon or the DTC feed.
+The server exposes HTTP immediately. Realtime polling and DMRC Metro static refresh run in the background after startup, so Render health checks never wait for Neon or the DTC feed. DTC static route/stop data is canonical in Neon and is not bundled into the server.
 
 Secrets are server-only: DATABASE_URL and DTC_API_KEY must never be bundled into the web app or APK.
 
-Static route/stop metadata is loaded from data/otd_gtfs. Live vehicles come from the configured GTFS-Realtime endpoint.
+DTC route/stop metadata is loaded from the canonical Neon PostgreSQL database. Live DTC vehicles come from the configured GTFS-Realtime endpoint. Metro static data is refreshed separately by the DMRC GTFS synchronizer.
 
 Endpoints:
 GET /health
