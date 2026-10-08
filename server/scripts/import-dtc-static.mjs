@@ -212,11 +212,11 @@ async function main() {
     const client = await pool.connect();
     try {
       const required = ['routes', 'stops', 'route_stops', 'static_feed_meta'];
-      const rows = (await client.query(
+      const schemaRows = (await client.query(
         "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1::text[])",
         [required]
       )).rows;
-      const present = new Set(rows.map((x) => x.table_name));
+      const present = new Set(schemaRows.map((x) => x.table_name));
       const missing = required.filter((x) => !present.has(x));
       if (missing.length) {
         throw new Error('Database schema is missing: ' + missing.join(', ') + '. Run server/sql/001_reset_and_schema.sql first.');
