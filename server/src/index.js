@@ -5,7 +5,6 @@ import pg from 'pg';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { rateLimit } from 'express-rate-limit';
 import {syncMetroStatic} from './metro-sync.js';
-import {syncDtcStatic} from './dtc-sync.js';
 
 const {Pool}=pg,app=express();
 const PORT=Number(process.env.PORT)||10000;
