@@ -7,6 +7,7 @@ const STATIC_URL = String(
   process.env.DTC_STATIC_URL ||
   'https://files.mobilitydatabase.org/mdb-1262/mdb-1262-202506170152/mdb-1262-202506170152.zip'
 ).trim();
+const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'mobilitydb-mdb-1262-202506170152').trim();
 const MAX_COMPRESSED_BYTES = 50 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES = 250 * 1024 * 1024;
 
@@ -257,6 +258,10 @@ async function main() {
         if (tripId && routeId) tripRoutes.set(tripId, routeId);
       }
 
+      if (routes.length < 100 || stops.length < 1000) {
+        throw new Error('DTC static feed is unexpectedly small; refusing to replace the live static database');
+      }
+
       const routeIds = new Set(routes.map((x) => x.route_id));
       const stopIds = new Set(stops.map((x) => x.stop_id));
       const links = new Map();
@@ -267,6 +272,10 @@ async function main() {
         if (!routeId || !routeIds.has(routeId) || !stopId || !stopIds.has(stopId) || sequence === null) continue;
         const key = routeId + '\u0000' + stopId + '\u0000' + sequence;
         if (!links.has(key)) links.set(key, { route_id: routeId, stop_id: stopId, stop_sequence: sequence });
+      }
+
+      if (links.size < 5000) {
+        throw new Error('DTC static feed has unexpectedly few route-stop links; refusing to replace the live static database');
       }
 
       let feedVersion = null;
@@ -281,7 +290,7 @@ async function main() {
         }
       }
 
-      const sourceKey = 'mobilitydb-mdb-1262-202506170152';
+      const sourceKey = SOURCE_KEY;
       const client2 = await pool.connect();
       try {
         await client2.query('BEGIN');
