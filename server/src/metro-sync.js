@@ -39,17 +39,29 @@ export async function syncMetroStatic(pool){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'united-delhi-dmrc-'));
   try{
-    const page=await fetch(URL,{method:'GET',headers:{accept:'text/html', 'user-agent':'United-Delhi/2.0'},signal:controller.signal});
-    if(!page.ok)throw new Error('Static page HTTP '+page.status);
-    const html=await page.text();
-    const cookie=(page.headers.get('set-cookie')||'').match(/csrftoken=([^;]+)/)?.[1]||TOKEN;
-    const token=html.match(/name=[\"']csrfmiddlewaretoken[\"'][^>]*value=[\"']([^\"']+)/i)?.[1]||html.match(/value=[\"']([^\"']+)[\"'][^>]*name=[\"']csrfmiddlewaretoken[\"']/i)?.[1]||cookie;
-    const form=new FormData();form.append('csrfmiddlewaretoken',token);form.append('usage_type','non-commercial');form.append('usageType','Non-Commercial');form.append('purpose','academia');form.append('agree','on');form.append('terms','on');form.append('download','1');
-    const r=await fetch(URL,{method:'POST',headers:{cookie:'csrftoken='+cookie,referer:URL,'user-agent':'United-Delhi/2.0'},body:form,signal:controller.signal});
-    if(!r.ok)throw new Error('DMRC static download HTTP '+r.status);
-    const type=r.headers.get('content-type')||'';
-    const body=Buffer.from(await r.arrayBuffer());
-    if(!type.includes('zip')&&!body.slice(0,2).equals(Buffer.from([0x50,0x4b])))throw new Error('DMRC static download was not a ZIP');
+    let body=null,sourceUrl=URL,lastError=null;
+    for(const candidate of [URL,'https://ethanc8.github.io/delhi-gtfs/metro.zip']){
+      try{
+        if(candidate===URL){
+          const page=await fetch(URL,{method:'GET',headers:{accept:'text/html','user-agent':'United-Delhi/2.0'},signal:controller.signal});
+          if(!page.ok)throw new Error('Static page HTTP '+page.status);
+          const html=await page.text();
+          const cookie=(page.headers.get('set-cookie')||'').match(/csrftoken=([^;]+)/)?.[1]||TOKEN;
+          const token=html.match(/name=[\"']csrfmiddlewaretoken[\"'][^>]*value=[\"']([^\"']+)/i)?.[1]||html.match(/value=[\"']([^\"']+)[\"'][^>]*name=[\"']csrfmiddlewaretoken[\"']/i)?.[1]||cookie;
+          const form=new FormData();form.append('csrfmiddlewaretoken',token);form.append('usage_type','non-commercial');form.append('usageType','Non-Commercial');form.append('purpose','academia');form.append('agree','on');form.append('terms','on');form.append('download','1');
+          const response=await fetch(URL,{method:'POST',headers:{cookie:'csrftoken='+cookie,referer:URL,'user-agent':'United-Delhi/2.0'},body:form,signal:controller.signal});
+          if(!response.ok)throw new Error('DMRC static download HTTP '+response.status);
+          body=Buffer.from(await response.arrayBuffer());
+        }else{
+          const response=await fetch(candidate,{headers:{accept:'application/zip','user-agent':'United-Delhi/2.0'},signal:controller.signal});
+          if(!response.ok)throw new Error('Metro fallback HTTP '+response.status);
+          body=Buffer.from(await response.arrayBuffer());
+        }
+        if(body.slice(0,2).equals(Buffer.from([0x50,0x4b]))){sourceUrl=candidate;break}
+        throw new Error('Response was not a ZIP');
+      }catch(e){lastError=e}
+    }
+    if(!body||!body.slice(0,2).equals(Buffer.from([0x50,0x4b])))throw new Error('DMRC static download failed: '+(lastError?.message||'unknown error'));
     const feed=await unzipFeed(body,dir);
     if(!feed.routes.length||!feed.stops.length||!feed.trips.length||!feed.stopTimes.length)throw new Error('DMRC feed is missing required GTFS files');
 
@@ -88,7 +100,7 @@ export async function syncMetroStatic(pool){
       await c.query('CREATE INDEX IF NOT EXISTS idx_metro_stops_name ON metro_stops(lower(name))');
       await c.query('CREATE INDEX IF NOT EXISTS idx_metro_route_stops_stop ON metro_route_stops(stop_id,stop_sequence)');
       await c.query('CREATE INDEX IF NOT EXISTS idx_metro_route_stops_route ON metro_route_stops(route_id,stop_sequence)');
-      await c.query('INSERT INTO metro_feed_meta(id,source_url,source_key,imported_at,route_count,stop_count,route_stop_count) VALUES(1,$1,$2,NOW(),$3,$4,$5) ON CONFLICT(id) DO UPDATE SET source_url=EXCLUDED.source_url,source_key=EXCLUDED.source_key,imported_at=EXCLUDED.imported_at,route_count=EXCLUDED.route_count,stop_count=EXCLUDED.stop_count,route_stop_count=EXCLUDED.route_stop_count',[URL,'official-dmrc-gtfs',feed.routes.length,feed.stops.length,valid.length]);
+      await c.query('INSERT INTO metro_feed_meta(id,source_url,source_key,imported_at,route_count,stop_count,route_stop_count) VALUES(1,$1,$2,NOW(),$3,$4,$5) ON CONFLICT(id) DO UPDATE SET source_url=EXCLUDED.source_url,source_key=EXCLUDED.source_key,imported_at=EXCLUDED.imported_at,route_count=EXCLUDED.route_count,stop_count=EXCLUDED.stop_count,route_stop_count=EXCLUDED.route_stop_count',[sourceUrl,'official-dmrc-gtfs',feed.routes.length,feed.stops.length,valid.length]);
       await c.query('COMMIT');
       console.log('DMRC static sync complete: '+feed.routes.length+' routes, '+feed.stops.length+' stops, '+valid.length+' route-stop links.');
       return {ok:true,routes:feed.routes.length,stops:feed.stops.length,routeStops:valid.length};
