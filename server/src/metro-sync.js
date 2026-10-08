@@ -108,7 +108,6 @@ export async function syncMetroStatic(pool){
       return {ok:true,routes:feed.routes.length,stops:feed.stops.length,routeStops:valid.length};
     }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e}finally{c.release()}
   }finally{
-    clearTimeout(timer);
     await fs.rm(dir,{recursive:true,force:true}).catch(()=>{});
   }
 }
