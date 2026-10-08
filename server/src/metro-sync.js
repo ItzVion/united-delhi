@@ -39,9 +39,13 @@ export async function syncMetroStatic(pool){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'united-delhi-dmrc-'));
   try{
-    const form=new FormData();
-    form.append('csrfmiddlewaretoken',TOKEN);
-    const r=await fetch(URL,{method:'POST',headers:{cookie:`csrftoken=${TOKEN}`},body:form,signal:controller.signal});
+    const page=await fetch(URL,{method:'GET',headers:{accept:'text/html', 'user-agent':'United-Delhi/2.0'},signal:controller.signal});
+    if(!page.ok)throw new Error('Static page HTTP '+page.status);
+    const html=await page.text();
+    const cookie=(page.headers.get('set-cookie')||'').match(/csrftoken=([^;]+)/)?.[1]||TOKEN;
+    const token=html.match(/name=[\"']csrfmiddlewaretoken[\"'][^>]*value=[\"']([^\"']+)/i)?.[1]||html.match(/value=[\"']([^\"']+)[\"'][^>]*name=[\"']csrfmiddlewaretoken[\"']/i)?.[1]||cookie;
+    const form=new FormData();form.append('csrfmiddlewaretoken',token);
+    const r=await fetch(URL,{method:'POST',headers:{cookie:'csrftoken='+cookie,referer:URL,'user-agent':'United-Delhi/2.0'},body:form,signal:controller.signal});
     if(!r.ok)throw new Error('DMRC static download HTTP '+r.status);
     const type=r.headers.get('content-type')||'';
     const body=Buffer.from(await r.arrayBuffer());
