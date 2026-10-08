@@ -44,7 +44,7 @@ export async function syncMetroStatic(pool){
     const html=await page.text();
     const cookie=(page.headers.get('set-cookie')||'').match(/csrftoken=([^;]+)/)?.[1]||TOKEN;
     const token=html.match(/name=[\"']csrfmiddlewaretoken[\"'][^>]*value=[\"']([^\"']+)/i)?.[1]||html.match(/value=[\"']([^\"']+)[\"'][^>]*name=[\"']csrfmiddlewaretoken[\"']/i)?.[1]||cookie;
-    const form=new FormData();form.append('csrfmiddlewaretoken',token);
+    const form=new FormData();form.append('csrfmiddlewaretoken',token);form.append('usage_type','non-commercial');form.append('usageType','Non-Commercial');form.append('purpose','academia');form.append('agree','on');form.append('terms','on');form.append('download','1');
     const r=await fetch(URL,{method:'POST',headers:{cookie:'csrftoken='+cookie,referer:URL,'user-agent':'United-Delhi/2.0'},body:form,signal:controller.signal});
     if(!r.ok)throw new Error('DMRC static download HTTP '+r.status);
     const type=r.headers.get('content-type')||'';
