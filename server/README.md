@@ -30,3 +30,4 @@ DATABASE_URL="..." npm run import:dtc
 
 The importer uses the current public Mobility Database snapshot by default. Override it with `DTC_STATIC_URL` when a newer verified GTFS ZIP becomes available. Run `server/sql/001_reset_and_schema.sql` first when a full database reset/rebuild is intended.
 
+The realtime service refreshes its in-memory DTC route metadata when the database was previously empty and then periodically (at most every 15 minutes), so a completed one-time static import is picked up without requiring a database-side restart.
