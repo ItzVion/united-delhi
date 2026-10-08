@@ -10,7 +10,10 @@ export const storageGet=(k:string)=>{try{return window.localStorage.getItem(k)}c
 export const storageSet=(k:string,v:string)=>{try{window.localStorage.setItem(k,v);return true}catch{return false}};
 
 export const SERVICE_COLORS:Record<string,string>={electricAc:'#58B8C7',electricDevi:'#42A968',cngAc:'#4D8FD0',cngNonAc:'#E8B083',unknown:'#8B959B'};
-export const ROUTE_COLORS:Record<string,string>={};
+export const ROUTE_COLORS:Record<string,string>={}
+export const METRO_LINE_COLORS={RED:'#D83B3B',YELLOW:'#E5B12C',BLUE:'#2F63B7',GREEN:'#2F9B62',VIOLET:'#7A4FB5',MAGENTA:'#B044A6',PINK:'#D65A9A',ORANGE:'#E06B2C',GRAY:'#6B7280',RAPID:'#3A8D8D',AQUA:'#159A9C'};
+export const metroColor=(value)=>{const t=String(value||'').toUpperCase();for(const k of Object.keys(METRO_LINE_COLORS))if(t.includes(k))return METRO_LINE_COLORS[k];return '#1F3D36';};
+
 export const isHex=(v:unknown):v is string=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 export const busColor=(v:{serviceColor?:string|null;serviceType?:string|null;busType?:string|null;routeShortName?:string|null;routeId?:string|null;routeName?:string|null;routeColor?:string|null},route?:unknown)=>{const service=String(v?.serviceColor||'').trim();if(isHex(service))return service;const t=String(v?.busType||'').trim().toUpperCase();if(t.startsWith('EV AC'))return SERVICE_COLORS.electricAc;if(t.startsWith('EV DEVI'))return SERVICE_COLORS.electricDevi;if(t.startsWith('CNG AC'))return SERVICE_COLORS.cngAc;if(t.startsWith('CNG NONAC'))return SERVICE_COLORS.cngNonAc;if(v?.serviceType==='electric')return SERVICE_COLORS.electricAc;if(v?.serviceType==='cluster')return SERVICE_COLORS.cngNonAc;if(v?.serviceType==='dtc')return SERVICE_COLORS.cngAc;const routeFallback=String(v?.routeColor||'').trim();if(isHex(routeFallback))return routeFallback;return SERVICE_COLORS.unknown};
 export const textOn=(bg:string)=>{const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.6?'#14211B':'#FFFFFF'};
