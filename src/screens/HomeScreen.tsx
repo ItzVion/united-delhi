@@ -150,7 +150,7 @@ export default function HomeScreen(){
         {searchQuery?<Pressable onPress={()=>setSearchQuery('')}><Text style={styles.searchKey}>×</Text></Pressable>:null}
       </View>
       {searchQuery.trim().length>=2?<View style={styles.searchResults}>
-        {searchError?<Text style={styles.searchError}>{searchError}</Text>:searchResults.length?searchResults.map((item,index)=>{const name=item.type==='route'?(displayRouteName(item.label)||item.label):item.label;const rc=item.type==='route'?resolveRouteColor(displayRouteName(item.label),item.routeColor,item.routeTextColor):null;return <Pressable key={item.type+'-'+item.id+'-'+index} style={styles.searchResult} onPress={()=>item.type==='stop'?navigation.navigate('StopDetails',{stopId:item.id,stopName:item.label}):navigation.navigate('RouteDetails',{routeId:item.id,label:item.label})}>
+        {searchError?<Text style={styles.searchError}>{searchError}</Text>:searchResults.length?searchResults.map((item,index)=>{const name=item.type==='route'?(displayRouteName(item.label)||item.label):item.label;const rc=item.type==='route'?{background:'#E57D43',text:'#FFFFFF'}:null;return <Pressable key={item.type+'-'+item.id+'-'+index} style={styles.searchResult} onPress={()=>item.type==='stop'?navigation.navigate('StopDetails',{stopId:item.id,stopName:item.label}):navigation.navigate('RouteDetails',{routeId:item.id,label:item.label})}>
           {item.type==='route'?<View style={[styles.searchBadge,{backgroundColor:rc?.background}]}><Text style={[styles.searchBadgeText,{color:rc?.text}]}>{name}</Text></View>:<View style={styles.searchStopIcon}><Text style={styles.searchStopDot}>●</Text></View>}
           <View style={styles.searchCopy}><Text style={styles.searchTitle} numberOfLines={1}>{item.type==='route'?'Bus route':item.label}</Text><Text style={styles.searchMeta} numberOfLines={1}>{item.type==='route'?(item.fromStop||'Start')+' → '+(item.toStop||'Destination'):'Bus stop'}</Text></View><Text style={styles.searchArrow}>›</Text>
         </Pressable>}):<Text style={styles.searchEmpty}>{searchLoading?'Searching…':'No matching routes or stops found.'}</Text>}
@@ -196,7 +196,7 @@ export default function HomeScreen(){
         {selectedBus ? (() => {
           const name=displayRouteName(selectedBus.routeShortName) || 'Live bus';
           if(!selectedBus.routeId) return null;
-          const c=resolveVehicleColor(selectedBus);
+          const c={background:SERVICE_COLORS[selectedBus.serviceType||'unknown'],text:selectedBus.serviceType==='electric'?'#17313B':'#FFFFFF'};
           const ageSeconds=Math.max(0,Math.round((Date.now()-Date.parse(selectedBus.observedAt))/1000));
           const freshness=Number.isFinite(ageSeconds)?(ageSeconds<60?'Updated just now':`Updated ${Math.floor(ageSeconds/60)} min ago`):'Live position';
           return <View style={styles.busPreview}>
