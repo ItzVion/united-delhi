@@ -26,22 +26,23 @@ const SERVICE_COLORS={
  cngNonAc:'#E8B083',
  unknown:'#8B959B'
 };
-const classifyFleet=(id)=>{
- const v=String(id||'').toUpperCase().replace(/[-_\s]/g,'');
+const classifyFleet=(id,...aliases)=>{
+ const candidates=[id,...aliases].map(x=>String(x||'').toUpperCase().replace(/[-_\s]/g,'')).filter(Boolean);
+ const v=candidates.find(x=>x.startsWith('DL51EV')||x.startsWith('DL51GD')||x.startsWith('DL1PD')||x.startsWith('DL1PE')||x.startsWith('DL1PB')||x.startsWith('DL1PC'))||candidates[0]||'';
  if(v.startsWith('DL51EV'))return{serviceType:'electric',busType:'EV AC (12 mtr)',serviceColor:SERVICE_COLORS.electricAc};
  if(v.startsWith('DL51GD'))return{serviceType:'electric',busType:'EV DEVI AC (9 mtr)',serviceColor:SERVICE_COLORS.electricDevi};
  if(v.startsWith('DL1PD')||v.startsWith('DL1PE'))return{serviceType:'dtc',busType:'CNG AC (12 mtr)',serviceColor:SERVICE_COLORS.cngAc};
  if(v.startsWith('DL1PB')||v.startsWith('DL1PC'))return{serviceType:'cluster',busType:'CNG NonAC (12 mtr)',serviceColor:SERVICE_COLORS.cngNonAc};
  return{serviceType:'unknown',busType:'Unknown',serviceColor:SERVICE_COLORS.unknown};
 };
-const service=(id,agency,routeShortName,routeId)=>classifyFleet(id);
+const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>classifyFleet(id,licensePlate,vehicleLabel);
 const fallbackColor=()=>SERVICE_COLORS.unknown; // fleet colours are resolved from vehicle identity first
 const cache={vehicles:[],status:KEY?'STARTING':'UNAVAILABLE',reason:KEY?'Render API is starting':'DTC_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
 let refreshing=null,poll=null;
 const routeMeta=new Map();
 
 async function loadRouteMeta(){if(!pool)return;try{const rows=(await pool.query(`SELECT r.route_id,r.agency_id,r.short_name,r.long_name,r.route_color,r.route_text_color,first_stop.name AS from_stop,last_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.stop_id ASC LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true`)).rows;routeMeta.clear();for(const x of rows)routeMeta.set(String(x.route_id),x);console.log('Loaded route metadata: '+routeMeta.size+' routes.')}catch(e){console.error('Route metadata load failed:',e?.message||e)}}
-const applyRouteMeta=v=>{const x=routeMeta.get(String(v.routeId||''));const svc=service(v.id,x?.agency_id,x?.short_name,v.routeId);return {...v,routeShortName:x?.short_name||null,routeColor:svc.serviceColor||fallbackColor(),routeTextColor:x?.route_text_color||null,routeLongName:x?.long_name||null,fromStop:x?.from_stop||null,toStop:x?.to_stop||null,operator:x?.agency_id||null,...svc}};
+const applyRouteMeta=v=>{const x=routeMeta.get(String(v.routeId||''));const svc=service(v.id,x?.agency_id,x?.short_name,v.routeId,v.licensePlate,v.vehicleLabel);return {...v,routeShortName:x?.short_name||null,routeColor:svc.serviceColor||fallbackColor(),routeTextColor:x?.route_text_color||null,routeLongName:x?.long_name||null,fromStop:x?.from_stop||null,toStop:x?.to_stop||null,operator:x?.agency_id||null,...svc}};
 async function loadDatabaseVehicleCache(){
  if(!pool)return;
  try{
@@ -91,7 +92,7 @@ async function fetchLive(){
  try{const r=await fetch(u,{signal:ac.signal,headers:{accept:'application/x-protobuf, application/octet-stream','user-agent':'United-Delhi/2.0'}});if(!r.ok)throw new Error('DTC realtime HTTP '+r.status);const b=new Uint8Array(await r.arrayBuffer());if(b.length>10*1024*1024)throw new Error('Realtime feed exceeds safety limit');const f=GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(b),m=new Map();for(const e of f.entity||[]){const v=parseVehicle(e,Number(f.header?.timestamp||0));if(v)m.set(v.id,v)}return[...m.values()]}catch(e){if(e?.name==='AbortError')throw new Error('DTC realtime request timed out');throw e}finally{clearTimeout(t)}
 }
 async function enrich(vs){
- if(!pool||!vs.length)return vs.map(v=>{const svc=service(v.id,null,v.routeShortName,v.routeId);return {...v,routeColor:svc.serviceColor||fallbackColor(),routeLongName:null,...svc}});
+ if(!pool||!vs.length)return vs.map(v=>{const svc=service(v.id,null,v.routeShortName,v.routeId,v.licensePlate,v.vehicleLabel);return {...v,routeColor:svc.serviceColor||fallbackColor(),routeLongName:null,...svc}});
  const ids=[...new Set(vs.map(v=>v.routeId).filter(Boolean))];if(!ids.length)return vs.map(v=>{const svc=service(v.id,null,v.routeShortName,v.routeId);return {...v,routeColor:svc.serviceColor||fallbackColor(),routeLongName:null,...svc}});
  try{const rows=(await pool.query('SELECT route_id,agency_id,short_name,long_name,route_color,route_text_color FROM routes WHERE route_id=ANY($1::text[])',[ids])).rows;const map=new Map(rows.map(x=>[String(x.route_id),x]));return vs.map(v=>{const x=map.get(String(v.routeId||'')),svc=service(v.id,x?.agency_id,x?.short_name,v.routeId);return {...v,routeShortName:x?.short_name||v.routeId||null,routeColor:svc.serviceColor||fallbackColor(),routeTextColor:x?.route_text_color||null,routeLongName:x?.long_name||null,operator:x?.agency_id||null,...svc}})}catch{return vs.map(v=>{const svc=service(v.id,null,v.routeShortName,v.routeId);return {...v,routeShortName:v.routeId||null,routeColor:svc.serviceColor||fallbackColor(),routeTextColor:null,routeLongName:null,operator:null,...svc}})}
 }
