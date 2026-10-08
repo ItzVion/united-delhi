@@ -18,3 +18,15 @@ GET /api/stops/:id
 GET /api/stops/:id/arrivals
 POST /api/stops/nearby
 GET /api/plan?fromStopId=&toStopId=
+
+### DTC static data
+DTC static route/stop data is canonical in Neon. The repository does not bundle the old DTC dataset and the API does not overwrite Neon static data on every startup.
+
+To populate or refresh the DTC static tables once, provide the Neon connection string and run:
+
+```bash
+DATABASE_URL="..." npm run import:dtc
+```
+
+The importer uses the current public Mobility Database snapshot by default. Override it with `DTC_STATIC_URL` when a newer verified GTFS ZIP becomes available. Run `server/sql/001_reset_and_schema.sql` first when a full database reset/rebuild is intended.
+
