@@ -36,11 +36,12 @@ async function unzipFeed(buf,dir){
 
 export async function syncMetroStatic(pool){
   if(!pool)return {ok:false,reason:'Database is not configured'};
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'united-delhi-dmrc-'));
   try{
     let body=null,sourceUrl=URL,lastError=null;
     for(const candidate of [URL,'https://ethanc8.github.io/delhi-gtfs/metro.zip']){
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),candidate===URL?20000:30000);
       try{
         if(candidate===URL){
           const page=await fetch(URL,{method:'GET',headers:{accept:'text/html','user-agent':'United-Delhi/2.0'},signal:controller.signal});
@@ -60,6 +61,7 @@ export async function syncMetroStatic(pool){
         if(body.slice(0,2).equals(Buffer.from([0x50,0x4b]))){sourceUrl=candidate;break}
         throw new Error('Response was not a ZIP');
       }catch(e){lastError=e}
+      finally{clearTimeout(timer)}
     }
     if(!body||!body.slice(0,2).equals(Buffer.from([0x50,0x4b])))throw new Error('DMRC static download failed: '+(lastError?.message||'unknown error'));
     const feed=await unzipFeed(body,dir);
