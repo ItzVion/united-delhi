@@ -8,7 +8,7 @@ import MapView from './MapView';
 import {Icon,RouteBadge} from './ui';
 
 type Props={vehicles:Vehicle[];live:LiveStatus;liveNote:string;onRetry:()=>void;location:Point|null;locState:string;onLocate:()=>void;onLegend:()=>void;go:Go;services:Map<string,Vehicle>};
-export default function Home({vehicles,live,liveNote,onRetry,location,locState,onLocate,onLegend,go,services}:Props){
+export default function Home /* refreshed */({vehicles,live,liveNote,onRetry,location,locState,onLocate,onLegend,go,services}:Props){
   const[q,setQ]=useState(''),[focus,setFocus]=useState(false),[results,setResults]=useState<any[]>([]),[sBusy,setSBusy]=useState(false),[sErr,setSErr]=useState('');
   const term=q.trim();
   useEffect(()=>{if(term.length<2){setResults([]);setSBusy(false);setSErr('');return}let on=true;setSBusy(true);setSErr('');const t=window.setTimeout(async()=>{try{const r=await api.search(term);if(on)setResults((r.results||[]).slice(0,40))}catch(e){if(on){setResults([]);setSErr((e as Error).message||'Search is unavailable.')}}finally{if(on)setSBusy(false)}},200);return()=>{on=false;window.clearTimeout(t)}},[term]);
