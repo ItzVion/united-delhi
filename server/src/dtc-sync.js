@@ -49,7 +49,7 @@ async function readBundled(){
  const encoded=(await Promise.all(parts.map(f=>fs.readFile(path.join(BUNDLED_DIR,f),'utf8')))).join('');
  const compressed=Buffer.from(encoded,'base64');
  let raw;
- try{raw=brotliDecompressSync(compressed)}catch{try{raw=gunzipSync(compressed)}catch{try{raw=inflateSync(compressed)}catch{raw=unzipSync(compressed)}}}
+ try{raw=brotliDecompressSync(compressed)}catch{try{raw=gunzipSync(compressed)}catch{try{raw=inflateSync(compressed)}catch{try{raw=unzipSync(compressed)}catch{raw=compressed}}}}
  let p=0;
  const magic=raw.subarray(0,4).toString('ascii');p=4;
  if(magic!=='UD2\0')throw new Error('Bundled DTC dataset has an invalid header');
