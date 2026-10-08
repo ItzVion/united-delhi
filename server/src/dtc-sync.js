@@ -9,6 +9,7 @@ import {brotliDecompressSync} from 'node:zlib';
 const execFileAsync=promisify(execFile);
 const OTD_URL='https://otd.delhi.gov.in/data/static/';
 const OTD_DIRECT_URL='https://otd.delhi.gov.in/data/staticDMRC/';
+const ETHAN_URL='https://ethanc8.github.io/delhi-gtfs/bus.zip';
 const MOBILITY_URL='https://files.mobilitydatabase.org/mdb-1262/mdb-1262-202506170152/mdb-1262-202506170152.zip';
 const BUNDLED_DIR=path.resolve(process.cwd(),'data','dtc-static-v1');
 const BUNDLED_SOURCE='uploaded-delhi_buses_static_gtfs_v1-2.zip';
@@ -30,6 +31,7 @@ const esc=v=>String(v??'').trim();
 const num=v=>Number(v);
 
 async function unzipFeed(buf,dir){
+ await fs.mkdir(dir,{recursive:true});
  const zip=path.join(dir,'dtc.zip');
  await fs.writeFile(zip,buf);
  await execFileAsync('unzip',['-oq',zip,'-d',dir],{timeout:60000});
@@ -192,7 +194,7 @@ export async function syncDtcStatic(pool,{onlyIfEmpty=false}={}){
    for(let i=0;i<feed.stops.length;i+=500){const chunk=feed.stops.slice(i,i+500).filter(x=>esc(x.stop_id)&&esc(x.stop_name)&&Number.isFinite(num(x.stop_lat))&&Number.isFinite(num(x.stop_lon))),vals=[];const sql=chunk.map((x,j)=>{const b=j*4;vals.push(esc(x.stop_id),esc(x.stop_name),num(x.stop_lat),num(x.stop_lon));return'($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+',NOW(),NOW())'}).join(',');if(sql)await c.query('INSERT INTO stops(stop_id,name,latitude,longitude,created_at,updated_at) VALUES '+sql,vals)}
    const valid=[...links.values()];for(let i=0;i<valid.length;i+=1000){const chunk=valid.slice(i,i+1000),vals=[];const sql=chunk.map((x,j)=>{const b=j*3;vals.push(x.routeId,x.stopId,x.seq);return'($'+(b+1)+',$'+(b+2)+',$'+(b+3)+')'}).join(',');await c.query('INSERT INTO route_stops(route_id,stop_id,stop_sequence) VALUES '+sql+' ON CONFLICT DO NOTHING',vals)}
    await c.query('CREATE INDEX IF NOT EXISTS idx_routes_short_name ON routes(lower(short_name))');await c.query('CREATE INDEX IF NOT EXISTS idx_routes_long_name ON routes(lower(long_name))');await c.query('CREATE INDEX IF NOT EXISTS idx_stops_name ON stops(lower(name))');await c.query('CREATE INDEX IF NOT EXISTS idx_route_stops_stop ON route_stops(stop_id,stop_sequence)');await c.query('CREATE INDEX IF NOT EXISTS idx_route_stops_route ON route_stops(route_id,stop_sequence)');
-   const info=feed.feedInfo[0]||{},version=esc(info.feed_version)||'remote-dtc';await c.query('INSERT INTO static_feed_meta(id,source_url,source_key,feed_version,feed_start_date,feed_end_date,imported_at,updated_at) VALUES(1,$1,$2,$3,$4,$5,NOW(),NOW()) ON CONFLICT(id) DO UPDATE SET source_url=EXCLUDED.source_url,source_key=EXCLUDED.source_key,feed_version=EXCLUDED.feed_version,feed_start_date=EXCLUDED.feed_start_date,feed_end_date=EXCLUDED.feed_end_date,imported_at=NOW(),updated_at=NOW()',[sourceUrl,'mobilitydb-dtc-'+version,version,esc(info.feed_start_date)||null,esc(info.feed_end_date)||null]);
+   const info=feed.feedInfo[0]||{},version=esc(info.feed_version)||'remote-dtc';const sourceKey=sourceUrl===ETHAN_URL?'ethanc8-delhi-bus-'+version:sourceUrl===MOBILITY_URL?'mobilitydb-dtc-'+version:'otd-dtc-'+version;await c.query('INSERT INTO static_feed_meta(id,source_url,source_key,feed_version,feed_start_date,feed_end_date,imported_at,updated_at) VALUES(1,$1,$2,$3,$4,$5,NOW(),NOW()) ON CONFLICT(id) DO UPDATE SET source_url=EXCLUDED.source_url,source_key=EXCLUDED.source_key,feed_version=EXCLUDED.feed_version,feed_start_date=EXCLUDED.feed_start_date,feed_end_date=EXCLUDED.feed_end_date,imported_at=NOW(),updated_at=NOW()',[sourceUrl,sourceKey,version,esc(info.feed_start_date)||null,esc(info.feed_end_date)||null]);
    await c.query('COMMIT');console.log('DTC remote static sync complete: '+feed.routes.length+' routes, '+feed.stops.length+' stops, '+valid.length+' route-stop links.');return{ok:true,source:'remote',routes:feed.routes.length,stops:feed.stops.length,routeStops:valid.length};
   }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e}finally{c.release()}
  }finally{clearTimeout(timer);await fs.rm(dir,{recursive:true,force:true}).catch(()=>{})}
