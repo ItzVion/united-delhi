@@ -3,10 +3,10 @@ import type { Vehicle, Arrival } from '../api/client';
 export type VehicleColor={background:string;text:string};
 
 const COLORS={
-  evAc:'#2FAFBC',
-  evDevi:'#168F49',
-  cngAc:'#3D82CE',
-  cngNonAc:'#E5A16E',
+  evAc:'#58B8C7',
+  evDevi:'#42A968',
+  cngAc:'#4D8FD0',
+  cngNonAc:'#E8B083',
   unknown:'#8B959B'
 } as const;
 
@@ -34,7 +34,6 @@ export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):Vehicle
   if(busType.startsWith('CNG NONAC'))return{background:COLORS.cngNonAc,text:textFor(COLORS.cngNonAc)};
 
   if(v.serviceType==='electric')return{background:COLORS.evAc,text:textFor(COLORS.evAc)};
-  if(v.serviceType==='cluster')return{background:COLORS.cngNonAc,text:textFor(COLORS.cngNonAc)};
   if(v.serviceType==='dtc')return{background:COLORS.cngAc,text:'#FFFFFF'};
 
   const id=String((v as any).id||(v as any).vehicleId||(v as any).licensePlate||'').toUpperCase().replace(/[-_\s]/g,'');
