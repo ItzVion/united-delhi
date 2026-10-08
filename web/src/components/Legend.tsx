@@ -3,9 +3,9 @@ import {Icon} from './ui';
 
 const rows=[
   {colors:['#58B8C7'],label:'EV AC (12 mtr)'},
-  {colors:['#E7A05F','#42A968'],label:'EV DEVI AC (9 mtr)'},
-  {colors:['#4D8FD0','#DE737B'],label:'CNG AC (12 mtr)'},
-  {colors:['#E8B083','#55B98E'],label:'CNG NonAC (12 mtr)'}
+  {colors:['#42A968'],label:'EV DEVI AC (9 mtr)'},
+  {colors:['#4D8FD0'],label:'CNG AC (12 mtr)'},
+  {colors:['#E8B083'],label:'CNG NonAC (12 mtr)'}
 ];
 
 export default function Legend({open,onClose}:{open:boolean;onClose:()=>void}){
