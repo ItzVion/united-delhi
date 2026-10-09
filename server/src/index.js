@@ -275,7 +275,8 @@ async function refresh(){
    cache.status='OK';cache.reason=null;cache.fetchedAt=new Date().toISOString();
    cache.source='transport-stack-live';
    queuePersist(cache.vehicles);
-   console.log('Transport Stack realtime feed decoded: '+raw.length+' vehicles; Neon/client caches refreshed.');
+   const exactUpstreamColors=raw.reduce((count,vehicle)=>count+(validHexColor(vehicle.serviceColor)?1:0),0);
+   console.log('Transport Stack realtime feed decoded: '+raw.length+' vehicles; '+exactUpstreamColors+' exact per-vehicle colours supplied; Neon/client caches refreshed.');
   }catch(e){
    cache.status=cache.fetchedAt?'STALE':'UNAVAILABLE';
    const message=e instanceof Error?e.message:String(e||'Realtime request failed');

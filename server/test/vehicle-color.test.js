@@ -22,12 +22,13 @@ const varint = value => {
 const field = (number, bytes) => [...varint((number << 3) | 2), ...varint(bytes.length), ...bytes];
 const str = value => [...new TextEncoder().encode(value)];
 
-function feed({ id = 'E1', vid = 'DL1PD4669', extNum = 1001, extVal = '#F97316', where = 'descriptor' } = {}) {
+function feed({ id = 'E1', vid = 'DL1PD4669', extNum = 1001, extVal = '#F97316', where = 'descriptor', withDecoyPositionDescriptor = false } = {}) {
   const descriptor = [
     ...field(1, str(vid)),
     ...(where === 'descriptor' && extVal != null ? field(extNum, str(extVal)) : [])
   ];
   const position = [
+    ...(withDecoyPositionDescriptor ? field(2, field(1, str('DECOY-ID'))) : []),
     ...field(8, descriptor),
     ...(where === 'position' && extVal != null ? field(extNum, str(extVal)) : [])
   ];
@@ -62,6 +63,11 @@ test('wire scan finds vehicle id and unknown descriptor extension', () => {
   ));
 });
 
+test('VehiclePosition.position field 2 is never mistaken for VehicleDescriptor', () => {
+  const [entity] = scanEntities(feed({ withDecoyPositionDescriptor: true }));
+  assert.equal(entity.vehicleId, 'DL1PD4669');
+});
+
 test('auto-detects exact colour in VehicleDescriptor extensions', () => {
   assert.equal(extractColorsByVehicle(feed()).get('DL1PD4669'), '#F97316');
 });
@@ -83,6 +89,10 @@ test('explicit extension configuration is respected exactly', () => {
   assert.deepEqual(parseColorFieldSpec('VehiclePosition:1001'), { message: 'VehiclePosition', field: 1001 });
   assert.deepEqual(parseColorFieldSpec('FeedEntity:1001'), { message: 'FeedEntity', field: 1001 });
   assert.equal(parseColorFieldSpec('invalid:1001'), null);
+});
+
+test('auto-detection ignores field numbers outside GTFS extension ranges', () => {
+  assert.equal(extractColorsByVehicle(feed({ extNum: 99 })).size, 0);
 });
 
 test('invalid values are ignored, with no guessed registration or type colours', () => {

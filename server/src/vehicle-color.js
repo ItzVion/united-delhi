@@ -61,6 +61,7 @@ function fields(bytes) {
 }
 
 const decodeText = bytes => new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+const isGtfsExtensionField = number => (number >= 1000 && number <= 1999) || (number >= 9000 && number <= 9999);
 
 export function parseColorFieldSpec(spec) {
   const match = /^(FeedEntity|VehiclePosition|VehicleDescriptor):(\d{1,5})$/.exec(String(spec || '').trim());
@@ -140,6 +141,7 @@ export function extractColorsByVehicle(bytes, spec) {
     const candidates = record.unknown.filter(field => {
       if (field.wireType !== 2) return false;
       if (config) return field.message === config.message && field.field === config.field;
+      if (!isGtfsExtensionField(field.field)) return false;
       return field.message === 'VehicleDescriptor' || field.message === 'VehiclePosition' || field.message === 'FeedEntity';
     });
 
