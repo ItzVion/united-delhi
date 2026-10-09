@@ -7,6 +7,7 @@ const STATIC_URL_OVERRIDE = String(process.env.DTC_STATIC_URL || '').trim();
 const STATIC_URLS = STATIC_URL_OVERRIDE
   ? [STATIC_URL_OVERRIDE]
   : [
+      'https://ethanc8.github.io/delhi-gtfs/bus.zip',
       'https://files.mobilitydatabase.org/mdb-1262/latest.zip',
       'https://files.mobilitydatabase.org/mdb-3139/latest.zip'
     ];
@@ -301,7 +302,9 @@ async function main() {
         }
       }
 
-      const sourceKey = SOURCE_KEY;
+      const sourceKey = sourceUrl.includes('ethanc8.github.io/delhi-gtfs')
+        ? 'ethanc8-delhi-gtfs-bus'
+        : SOURCE_KEY;
       try {
         await client.query('BEGIN');
         await client.query("SET LOCAL statement_timeout='120000'");
