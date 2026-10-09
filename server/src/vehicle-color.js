@@ -143,7 +143,10 @@ export function extractColorsByVehicle(bytes, spec) {
       return field.message === 'VehicleDescriptor' || field.message === 'VehiclePosition' || field.message === 'FeedEntity';
     });
 
-    const priority = { VehicleDescriptor: 0, VehiclePosition: 1, FeedEntity: 2 };\n    candidates.sort((a, b) => priority[a.message] - priority[b.message]);\n\n    for (const candidate of candidates) {
+    const priority = { VehicleDescriptor: 0, VehiclePosition: 1, FeedEntity: 2 };
+    candidates.sort((a, b) => priority[a.message] - priority[b.message]);
+
+    for (const candidate of candidates) {
       const color = validHexColor(candidate.value);
       if (!color) continue;
       for (const key of [record.vehicleId, record.id]) {
