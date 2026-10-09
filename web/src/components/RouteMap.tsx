@@ -1,11 +1,11 @@
 import {useEffect,useRef} from 'react';
 import L from 'leaflet';
 import type {Vehicle} from '../api';
-import {busColor} from '../lib';
+import {busColor,esc,textOn} from '../lib';
 import {TILE,busIcon,busPopup} from './MapView';
 export default function RouteMap({stops,buses,onStop}:{stops:any[];buses:Vehicle[];onStop:(id:string)=>void}){
  const el=useRef<HTMLDivElement>(null),mapRef=useRef<L.Map|null>(null),busLayer=useRef<L.LayerGroup|null>(null),stopRef=useRef(onStop);stopRef.current=onStop;
- const vehicleIdIcon=(b:Vehicle)=>{const label=String(b.vehicleLabel||b.licensePlate||b.id||'').trim()||'BUS';return L.divIcon({className:'vehicle-id-icon',iconSize:[Math.max(42,label.length*6.4),16],iconAnchor:[Math.max(21,label.length*3.2),8],html:'<span class="vehicle-id-marker">'+label.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c))+'</span>'})};
+ const vehicleIdIcon=(b:Vehicle)=>{const label=String(b.vehicleLabel||b.licensePlate||b.id||'').trim()||'BUS',color=busColor(b),foreground=textOn(color);return L.divIcon({className:'vehicle-id-icon',iconSize:[Math.max(42,label.length*6.4),18],iconAnchor:[Math.max(21,label.length*3.2),9],html:'<span class="vehicle-id-marker" style="background:'+esc(color)+';color:'+esc(foreground)+'">'+esc(label)+'</span>'})};
  const valid=stops.filter(s=>Number.isFinite(Number(s.latitude))&&Number.isFinite(Number(s.longitude)));
  const stopsKey=valid.map(s=>String(s.stop_id)).join(',');
  const stopsRef=useRef(valid);stopsRef.current=valid;
