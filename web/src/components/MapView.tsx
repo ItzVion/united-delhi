@@ -1,7 +1,7 @@
 import {useEffect,useRef} from 'react';
 import L from 'leaflet';
 import type {Vehicle} from '../api';
-import {CENTER,busColor,textOn,vehicleRoute,vehicleRouteFullName,ageText,esc,storageGet,storageSet} from '../lib';
+import {CENTER,busColor,vehicleFleetKind,textOn,vehicleRoute,vehicleRouteFullName,ageText,esc,storageGet,storageSet} from '../lib';
 import type {Go,Point} from '../lib';
 import {Icon} from './ui';
 const BUS_SVG='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"><rect x="4.5" y="3.5" width="15" height="14" rx="0"/><path d="M4.5 11h15M8 20.5v-3M16 20.5v-3"/></svg>';
@@ -9,11 +9,11 @@ const PILL_ZOOM=14,MAX_PILLS=400,MAX_DOTS=1800,GRID_STEP=.03;
 export const TILE='https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 export const busIcon=(v:Vehicle,small=false)=>{const bg=busColor(v),label=vehicleRoute(v),w=Math.max(small?34:38,label.length*6.5+(small?10:14)),h=small?16:18;return L.divIcon({className:'bus-icon',iconSize:[w,h],iconAnchor:[w/2,h/2],html:'<div class="bus-pill" style="background:'+esc(bg)+';color:'+textOn(bg)+'">'+(small?'':BUS_SVG)+'<span>'+esc(label)+'</span></div>'})};
 const mapDotStyle=(v:Vehicle)=>{
- const color=busColor(v),type=String(v.busType||'').toUpperCase();
- if(type.startsWith('EV AC'))return{radius:6,weight:2,color:'#064E5B',fillColor:color,fillOpacity:1,key:'ev-ac'};
- if(type.startsWith('EV DEVI'))return{radius:5.8,weight:2.2,color:'#14532D',fillColor:color,fillOpacity:1,key:'ev-devi'};
- if(type.startsWith('CNG AC'))return{radius:4.1,weight:1.4,color:'#EFF6FF',fillColor:color,fillOpacity:1,key:'cng-ac'};
- if(type.startsWith('CNG NONAC'))return{radius:5.8,weight:2,color:'#7C2D12',fillColor:color,fillOpacity:1,key:'cng-nonac'};
+ const color=busColor(v),kind=vehicleFleetKind(v);
+ if(kind==='ev-ac')return{radius:6,weight:2,color:'#064E5B',fillColor:color,fillOpacity:1,key:'ev-ac'};
+ if(kind==='ev-devi')return{radius:5.8,weight:2.2,color:'#14532D',fillColor:color,fillOpacity:1,key:'ev-devi'};
+ if(kind==='cng-ac')return{radius:4.1,weight:1.4,color:'#EFF6FF',fillColor:color,fillOpacity:1,key:'cng-ac'};
+ if(kind==='cng-nonac')return{radius:5.8,weight:2,color:'#7C2D12',fillColor:color,fillOpacity:1,key:'cng-nonac'};
  return{radius:3.6,weight:1.2,color:'#334155',fillColor:color,fillOpacity:.9,key:'unknown'};
 };
 export const busPopup=(v:Vehicle,withLink=true)=>{const bg=busColor(v),route=vehicleRoute(v),full=(v.fromStop&&v.toStop?String(v.fromStop)+' → '+String(v.toStop):vehicleRouteFullName(v));return '<div class="bp"><div class="bp-h"><span class="bp-b" style="background:'+esc(bg)+';color:'+textOn(bg)+'">'+esc(route)+'</span><span class="bp-age">'+esc(ageText(v.observedAt))+'</span></div>'+(full?'<div class="bp-route-name">'+esc(full)+'</div>':'')+'<div class="bp-meta">'+esc(v.vehicleLabel||v.licensePlate||v.id)+'</div>'+(withLink&&v.routeId?'<button type="button" class="bp-go" data-route="/routes/'+encodeURIComponent(v.routeId)+'">View route</button>':'')+'</div>'};

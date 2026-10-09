@@ -24,28 +24,28 @@ function textFor(bg:string){
 }
 
 export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{
+  // Fleet registration prefixes override cached API colours, which may come
+  // from an older build. DL1PD/PB/PC are part of the orange Non-AC fleet.
   const ids=[(v as any).id,(v as any).vehicleId,(v as any).licensePlate,(v as any).vehicleLabel]
-    .map(value=>String(value||'').toUpperCase().replace(/[-_\\s]/g,''));
-  const id=ids.find(value=>/^(DL51EV|DL51GD|DL1PB|DL1PC|DL1PD|DL1PE)/.test(value))||'';
-  // A known registration series is authoritative: old offline caches can carry a wrong colour.
+    .map(x=>String(x??'').toUpperCase().replace(/[-_\\s]/g,''));
+  const id=ids.find(x=>/^(DL51EV|DL51GD|DL1PD|DL1PE|DL1PB|DL1PC)/.test(x))||'';
   if(id.startsWith('DL51EV'))return{background:COLORS.evAc,text:textFor(COLORS.evAc)};
   if(id.startsWith('DL51GD'))return{background:COLORS.evDevi,text:textFor(COLORS.evDevi)};
   if(id.startsWith('DL1PB')||id.startsWith('DL1PC')||id.startsWith('DL1PD'))return{background:COLORS.cngNonAc,text:textFor(COLORS.cngNonAc)};
   if(id.startsWith('DL1PE'))return{background:COLORS.cngAc,text:textFor(COLORS.cngAc)};
 
+  const busType=String((v as any).busType||'').trim().toUpperCase();
+  if(busType.startsWith('EV DEVI'))return{background:COLORS.evDevi,text:textFor(COLORS.evDevi)};
+  if(busType.startsWith('EV AC'))return{background:COLORS.evAc,text:textFor(COLORS.evAc)};
+  if(busType.startsWith('CNG NONAC')||busType.startsWith('CNG NON-AC'))return{background:COLORS.cngNonAc,text:textFor(COLORS.cngNonAc)};
+  if(busType.startsWith('CNG AC'))return{background:COLORS.cngAc,text:textFor(COLORS.cngAc)};
+
   const direct=validHex(v.serviceColor);
   if(direct)return{background:direct,text:textFor(direct)};
-
-  const busType=String((v as any).busType||'').trim().toUpperCase();
-  if(busType.startsWith('EV AC'))return{background:COLORS.evAc,text:textFor(COLORS.evAc)};
-  if(busType.startsWith('EV DEVI'))return{background:COLORS.evDevi,text:textFor(COLORS.evDevi)};
-  if(busType.startsWith('CNG AC'))return{background:COLORS.cngAc,text:'#FFFFFF'};
-  if(busType.startsWith('CNG NONAC'))return{background:COLORS.cngNonAc,text:textFor(COLORS.cngNonAc)};
-
   if(v.serviceType==='electric')return{background:COLORS.evAc,text:textFor(COLORS.evAc)};
   if(v.serviceType==='dtc')return{background:COLORS.cngAc,text:textFor(COLORS.cngAc)};
-
   const route=validHex(v.routeColor);
   if(route)return{background:route,text:textFor(route)};
   return{background:COLORS.unknown,text:'#FFFFFF'};
+}
 }
