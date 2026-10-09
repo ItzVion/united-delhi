@@ -238,9 +238,22 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
   return r.json({status:'OK',origin,destination,options,reason:options.length?null:'No bus journey was found between the selected stops.'});
  }catch(e){console.error('Journey planner failed:',e?.message||e);return r.status(500).json({status:'ERROR',options:[],reason:'Journey planner is temporarily unavailable. Please try again.'})}
 });
+function scheduleMetroStaticRetry(){
+ const retry=setTimeout(runMetroStaticSync,5*60*1000);
+ retry.unref?.();
+}
+function runMetroStaticSync(){
+ if(!pool||String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()==='false')return;
+ void syncMetroStatic(pool).then(result=>{
+  if(!result?.ok)throw new Error(result?.reason||'Metro static sync did not complete');
+ }).catch(error=>{
+  console.error('Uploaded DMRC static sync failed:',error?.message||error);
+  scheduleMetroStaticRetry();
+ });
+}
 app.use((_q,r)=>r.status(404).json({status:'NOT_FOUND',reason:'Endpoint not found'}));
 app.use((e,_q,r,_n)=>{console.error('Unhandled request error:',e?.message||e);if(!r.headersSent)r.status(500).json({status:'ERROR',reason:'Internal server error'})});
-const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(async()=>{try{if(pool){await ensureRuntimeSchema();await loadRouteMeta();await loadDatabaseVehicleCache();autoImportDtcStaticIfEmpty()}}catch(e){console.error('Database bootstrap failed:',e?.message||e)}if(KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}if(pool){if(String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()!=='false'){setTimeout(()=>void syncMetroStatic(pool).catch(e=>console.error('DMRC static sync failed:',e?.message||e)),5000);setInterval(()=>void syncMetroStatic(pool).catch(e=>console.error('DMRC static sync failed:',e?.message||e)),24*60*60*1000)}}},1500)});
+const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(async()=>{try{if(pool){await ensureRuntimeSchema();await loadRouteMeta();await loadDatabaseVehicleCache();autoImportDtcStaticIfEmpty()}}catch(e){console.error('Database bootstrap failed:',e?.message||e)}if(KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}if(pool&&String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()!=='false'){setTimeout(runMetroStaticSync,5000);setInterval(runMetroStaticSync,24*60*60*1000)}},1500)});
 server.requestTimeout=30000;server.headersTimeout=40000;server.keepAliveTimeout=65000;
 process.on('unhandledRejection',e=>console.error('Unhandled rejection:',e));process.on('uncaughtException',e=>console.error('Uncaught exception:',e));
 for(const sig of ['SIGTERM','SIGINT'])process.on(sig,async()=>{if(poll)clearInterval(poll);server.close();await pool?.end().catch(()=>{});process.exit(0)});
