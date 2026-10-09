@@ -105,7 +105,7 @@ export function scanEntities(bytes) {
               value: positionField.wireType === 2 ? decodeText(positionField.value) : null
             });
           }
-          if (positionField.number !== 8 || positionField.wireType !== 2) continue;
+          if (positionField.number !== 2 || positionField.wireType !== 2) continue;
 
           for (const descriptorField of fields(positionField.value)) {
             if (descriptorField.number === 1 && descriptorField.wireType === 2 && !record.vehicleId) {
