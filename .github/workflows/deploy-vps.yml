@@ -80,13 +80,29 @@ jobs:
           npm run check
           npm test
 
-      - name: Configure verified SSH connection
+      - name: Recheck server snapshot immediately before upload
+        id: freshness
         if: steps.debounce.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          selected_tree="$(git rev-parse "HEAD:server")"
+          latest_tree="$(git rev-parse "refs/remotes/origin/main:server")"
+          if [[ "$selected_tree" != "$latest_tree" ]]; then
+            echo "::notice::server/ changed while checks were running; the newer queued run will deploy the final snapshot."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure verified SSH connection
+        if: steps.debounce.outputs.skip != 'true' && steps.freshness.outputs.skip != 'true'
         shell: bash
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
@@ -106,12 +122,12 @@ jobs:
             "$VPS_USER@$VPS_HOST" 'test -d /opt/united-delhi/releases && test -w /opt/united-delhi/releases'
 
       - name: Upload isolated release
-        if: steps.debounce.outputs.skip != 'true'
+        if: steps.debounce.outputs.skip != 'true' && steps.freshness.outputs.skip != 'true'
         shell: bash
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
           RELEASE_SHA: ${{ steps.debounce.outputs.release_sha }}
         run: |
           set -euo pipefail
@@ -122,12 +138,12 @@ jobs:
             server/ "$VPS_USER@$VPS_HOST:/opt/united-delhi/releases/$RELEASE_SHA/"
 
       - name: Install, test and activate release with rollback
-        if: steps.debounce.outputs.skip != 'true'
+        if: steps.debounce.outputs.skip != 'true' && steps.freshness.outputs.skip != 'true'
         shell: bash
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
           RELEASE_SHA: ${{ steps.debounce.outputs.release_sha }}
         run: |
           set -euo pipefail
