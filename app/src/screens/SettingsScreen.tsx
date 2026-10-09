@@ -15,10 +15,10 @@ export default function SettingsScreen(){
    <Text style={styles.eyebrow}>UNITED DELHI</Text><Text style={styles.header}>Settings</Text><Text style={styles.caption}>App information and controls</Text>
    <View style={styles.list}>
     <Item title="Bus Color Legend" sub="What the bus colours mean" onPress={()=>navigation.navigate('Home')}/>
-    <Item title="Help & FAQs" sub="Answers and transport helplines" onPress={()=>navigation.navigate('Legal')}/>
+    <Item title="Help & FAQs" sub="Answers and transport helplines" onPress={()=>navigation.navigate('Help')}/>
     <Item title="Privacy Policy" sub="How location and data are handled" onPress={()=>navigation.navigate('Legal')}/>
     <Item title="Terms of Service" sub="Rules for using United Delhi" onPress={()=>navigation.navigate('Legal')}/>
-    <Item title="About United Delhi" sub="Data sources, map and app information" onPress={()=>navigation.navigate('Legal')}/>
+    <Item title="About United Delhi" sub="Data sources, map and app information" onPress={()=>navigation.navigate('About')}/>
    </View>
    <View style={styles.about}><Text style={styles.aboutTitle}>About this app</Text><Text style={styles.aboutText}>United Delhi provides live Delhi bus positions, routes, stops and direct bus journey planning.</Text><Text style={styles.aboutText}>No ticketing, purchases, passes or account features are included.</Text></View>
  </ScrollView></SafeAreaView>;
