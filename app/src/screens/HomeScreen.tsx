@@ -149,7 +149,7 @@ export default function HomeScreen(){
 
   const realtimeAge=lastRealtimeAt?Math.max(0,Math.round((Date.now()-Date.parse(lastRealtimeAt))/1000)):null;
   const realtimeAgeLabel=realtimeAge===null?'':realtimeAge<60?'just now':`${Math.floor(realtimeAge/60)} min ago`;
-  const liveLabel=fresh==='ok'?(`${vehicles.length} live buses`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='loading'?'Checking live buses':vehicles.length?(`${vehicles.length} buses · connection lost`):'Live data unavailable';
+  const liveLabel=fresh==='ok'?(`${vehicles.length} live · ${realtimeAgeLabel||'just now'}`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='loading'?'Checking live buses':vehicles.length?(`${vehicles.length} buses · connection lost`):'Live data unavailable';
 
   return <SafeAreaView style={styles.safe} edges={['top','left','right']}>
     <ScrollView contentContainerStyle={[styles.scroll,{paddingBottom:118+bottomInset}] showsVerticalScrollIndicator={false}>
@@ -191,7 +191,8 @@ export default function HomeScreen(){
             try{
               const m=JSON.parse(event.nativeEvent.data);
               if(m.type==='map-ready'){setMapReady(true);setMapError(false);}
-              else if(m.type==='map-error'||m.type==='map-tile-error'){setMapReady(false);setMapError(true);}
+              else if(m.type==='map-error'){setMapReady(false);setMapError(true);}
+              else if(m.type==='map-tile-error'){setMapError(true);}
               else if(m.type==='map-tiles-ok'){setMapError(false);}
               else if(m.type==='stop'){
                 const stop=nearbyStops.find(s=>s.stop_id===m.stopId);
@@ -207,7 +208,7 @@ export default function HomeScreen(){
         />
         <View pointerEvents="none" style={styles.mapTop}>
           <View style={styles.liveDot}/>
-          <Text style={styles.mapTopText}>{fresh==='ok'?(`${vehicles.length} buses live`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='unavailable'?'Live data unavailable':'Checking live buses'}</Text>
+          <Text style={styles.mapTopText}>{fresh==='ok'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'just now'}`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='unavailable'?'Live data unavailable':'Checking live buses'}</Text>
         </View>
         {mapError?<View style={styles.mapErrorOverlay}><Text style={styles.mapErrorTitle}>Map couldn't load</Text><Text style={styles.mapErrorText}>Check your connection and try loading the map again.</Text><Pressable style={styles.mapRetry} onPress={()=>{setMapReady(false);setMapError(false);mapRef.current?.reload();}}><Text style={styles.mapRetryText}>Retry map</Text></Pressable></View>:null}
         <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}>{legendRows.map(row=><View key={row.key} style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:row.color}]}/><Text style={styles.legendText}>{row.label}</Text></View>)}</View>
