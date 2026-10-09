@@ -144,7 +144,7 @@ body,#root{background:var(--bg)}
 
 
 /* Compact One Delhi-style bus colour legend. Marker colours remain API-owned. */
-.legend-modal{background:rgba(15,21,25,.48)!important;padding:16px!important}
+.legend-modal{background:rgba(15,21,25,.48)!important;padding:16px!important;place-items:center}
 .legend-exact{width:min(400px,calc(100vw - 32px));padding:16px!important;background:#fff!important;border:1px solid #d8dddd!important;box-shadow:0 12px 40px rgba(0,0,0,.18);gap:0}
 .legend-exact h2{font-size:20px!important;line-height:1.2;margin:0 0 14px!important;color:#263238!important}
 .legend-head-exact{display:grid;grid-template-columns:64px 1fr;align-items:center;color:#98a1a4;font-size:12px;padding:0 0 5px}
