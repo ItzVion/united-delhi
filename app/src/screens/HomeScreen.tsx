@@ -94,9 +94,19 @@ export default function HomeScreen(){
   const loadVehicles=useCallback(async()=>{
     try{
       const result=await api.vehicles();
-      if(Array.isArray(result.vehicles)&&result.vehicles.length){lastVehiclesRef.current=result.vehicles;setVehicles(result.vehicles);}else if(lastVehiclesRef.current.length){setVehicles(lastVehiclesRef.current);}
-      setLastRealtimeAt(result.fetchedAt||null);
-      setFresh(result.stale===true||result.status==='STALE'?'stale':result.status==='OK'?'ok':'unavailable');
+      const list=Array.isArray(result.vehicles)?result.vehicles:[];
+      // Never call a retained/cached fleet "live" when the latest response is empty.
+      if(list.length){
+        lastVehiclesRef.current=list;
+        setVehicles(list);
+        setLastRealtimeAt(result.fetchedAt||null);
+        const ageMs=result.fetchedAt?Date.now()-Date.parse(result.fetchedAt):Infinity;
+        const genuinelyFresh=result.status==='OK'&&result.stale!==true&&Number.isFinite(ageMs)&&ageMs>=-60000&&ageMs<=90000;
+        setFresh(genuinelyFresh?'ok':'stale');
+      }else{
+        if(lastVehiclesRef.current.length)setVehicles(lastVehiclesRef.current);
+        setFresh(lastVehiclesRef.current.length?'stale':'unavailable');
+      }
     }catch{
       if(lastVehiclesRef.current.length)setVehicles(lastVehiclesRef.current);
       setFresh(lastVehiclesRef.current.length?'stale':'unavailable');
