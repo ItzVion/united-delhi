@@ -8,8 +8,8 @@ React + Vite + TypeScript browser client for United Delhi.
 - Build Command: `npm run build`
 - Output Directory: `dist`
 
-The client uses only the public Render API endpoint (`https://united-delhi.onrender.com`). No DTC API key, Neon credential, or server secret belongs in this project.
+The live API is `https://united-delhi-api.onrender.com`. Production requests are proxied through `web/vercel.json`; local Vite development proxies `/api` to the same API. No DTC API key, Neon credential, or server secret belongs in this project.
 
-Security headers are defined in `vercel.json`; dependencies should stay current and CI should run npm audit before production releases.
+Security headers are defined in `vercel.json`; run typecheck and build checks before production releases.
 
 The native Expo Android/iOS app remains at the repository root and shares the same backend.
