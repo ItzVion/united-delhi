@@ -28,7 +28,7 @@ function feed({ id = 'E1', vid = 'DL1PD4669', extNum = 1001, extVal = '#F97316',
     ...(where === 'descriptor' && extVal != null ? field(extNum, str(extVal)) : [])
   ];
   const position = [
-    ...field(8, descriptor),
+    ...field(2, descriptor),
     ...(where === 'position' && extVal != null ? field(extNum, str(extVal)) : [])
   ];
   const entity = [
