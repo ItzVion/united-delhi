@@ -44,16 +44,37 @@ const routeMeta=new Map();
 
 async function loadRouteMeta(){if(!pool)return;try{const rows=(await pool.query(`SELECT r.route_id,r.agency_id,r.short_name,r.long_name,r.route_color,r.route_text_color,first_stop.name AS from_stop,last_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.stop_id ASC LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true`)).rows;routeMeta.clear();for(const x of rows)routeMeta.set(String(x.route_id),x);routeMetaLoadedAt=Date.now();console.log('Loaded route metadata: '+routeMeta.size+' routes.')}catch(e){console.error('Route metadata load failed:',e?.message||e)}}
 const applyRouteMeta=v=>{const x=routeMeta.get(String(v.routeId||''));const svc=service(v.id,x?.agency_id,x?.short_name,v.routeId,v.licensePlate,v.vehicleLabel);return {...v,routeShortName:x?.short_name||v.routeShortName||v.routeId||null,routeColor:svc.serviceColor||fallbackColor(),routeTextColor:x?.route_text_color||null,routeLongName:x?.long_name||null,fromStop:x?.from_stop||null,toStop:x?.to_stop||null,operator:x?.agency_id||null,...svc}};
+const DTC_STATIC_SOURCE_KEY='uploaded-dtc-static-gtfs-v1-20260902';
+const DTC_STATIC_BUNDLE_URL='https://br-long-salad-b3b9l7ld.storage.c-4.ap-southeast-1.aws.neon.tech/united-delhi-static-v1/dtc-static-gtfs-v1.zip';
+function scheduleDtcStaticRetry(){
+ const retry=setTimeout(autoImportDtcStaticIfEmpty,5*60*1000);
+ retry.unref?.();
+}
 function autoImportDtcStaticIfEmpty(){
  if(!pool||String(process.env.DTC_STATIC_AUTO_IMPORT??'true').toLowerCase()==='false'||dtcAutoImportRunning)return;
  void (async()=>{
   try{
-   const result=await pool.query('SELECT COUNT(*)::int AS count FROM routes');
-   if(Number(result.rows[0]?.count)>0)return;
+   const [countResult,metaResult]=await Promise.all([
+    pool.query('SELECT COUNT(*)::int AS count FROM routes'),
+    pool.query('SELECT source_key,imported_route_count,imported_stop_count FROM static_feed_meta WHERE id=1').catch(()=>({rows:[]}))
+   ]);
+   const routeCount=Number(countResult.rows[0]?.count)||0;
+   const meta=metaResult.rows[0]||{};
+   if(meta.source_key===DTC_STATIC_SOURCE_KEY&&routeCount>=2500&&Number(meta.imported_stop_count)>=6000)return;
+   // Don't touch existing rows until the uploaded ZIP is present and reachable.
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+   let response;
+   try{response=await fetch(DTC_STATIC_BUNDLE_URL,{method:'HEAD',signal:controller.signal})}
+   finally{clearTimeout(timer)}
+   if(!response.ok){
+    console.warn('Uploaded DTC GTFS ZIP is not available yet (HTTP '+response.status+'); retaining existing static data and retrying shortly.');
+    scheduleDtcStaticRetry();
+    return;
+   }
    if(dtcAutoImportRunning)return;
    dtcAutoImportRunning=true;
-   console.warn('DTC static tables are empty; launching the safety-gated GTFS import in the background.');
-   const child=spawn(process.execPath,['scripts/import-dtc-static.mjs'],{cwd:process.cwd(),env:process.env,stdio:['ignore','pipe','pipe']});
+   console.log('Uploaded DTC GTFS ZIP is available; importing the supplied static feed.');
+   const child=spawn(process.execPath,['scripts/import-dtc-static.mjs'],{cwd:process.cwd(),env:{...process.env,DTC_STATIC_URL:DTC_STATIC_BUNDLE_URL,DTC_STATIC_SOURCE_KEY:DTC_STATIC_SOURCE_KEY},stdio:['ignore','pipe','pipe']});
    child.stdout.setEncoding('utf8');
    child.stderr.setEncoding('utf8');
    child.stdout.on('data',chunk=>console.log('[DTC static importer] '+String(chunk).trimEnd()));
@@ -61,6 +82,7 @@ function autoImportDtcStaticIfEmpty(){
    child.on('error',error=>{
     dtcAutoImportRunning=false;
     console.error('Could not start DTC static importer:',error?.message||error);
+    scheduleDtcStaticRetry();
    });
    child.on('close',code=>{
     dtcAutoImportRunning=false;
@@ -69,17 +91,17 @@ function autoImportDtcStaticIfEmpty(){
      void (async()=>{
       await loadRouteMeta();
       cache.vehicles=cache.vehicles.map(applyRouteMeta);
-      console.log('DTC static import completed; route metadata and cached vehicles refreshed.');
+      console.log('Supplied DTC static feed imported; route metadata and cached vehicles refreshed.');
      })().catch(error=>console.error('Post-import metadata refresh failed:',error?.message||error));
     }else{
-     console.error('DTC static importer exited with code '+code+'. It will retry in 15 minutes while DTC static tables remain empty.');
-     const retry=setTimeout(autoImportDtcStaticIfEmpty,15*60*1000);
-     retry.unref?.();
+     console.error('Supplied DTC static importer exited with code '+code+'. Retrying in five minutes.');
+     scheduleDtcStaticRetry();
     }
    });
   }catch(error){
    dtcAutoImportRunning=false;
-   console.error('DTC static auto-import check failed:',error?.message||error);
+   console.error('DTC static sync check failed:',error?.message||error);
+   scheduleDtcStaticRetry();
   }
  })();
 }
