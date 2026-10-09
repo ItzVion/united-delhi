@@ -11,7 +11,7 @@ import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
-import { apiFleetLegendRows, resolveVehicleColor } from '../lib/vehicleColor';
+import { apiFleetLegendRows, hasApiVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
 import { confirmLocationUse } from '../lib/locationConsent';
 import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 
@@ -136,7 +136,7 @@ export default function HomeScreen(){
       buses:visible.map(v=>{
         const route=displayRouteName(v.routeShortName) || displayRouteName(v.routeId) || 'BUS';
         const c=resolveVehicleColor(v);
-        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];
+        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,colourKnown:hasApiVehicleColor(v),lat:v.latitude,lon:v.longitude}];
       }).flat(),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
     };
@@ -277,7 +277,7 @@ function buildMapHtml(){
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""><style>
 html,body,#map{margin:0;width:100%;height:100%;background:#eef2f1}.leaflet-control-zoom{border:0!important;box-shadow:0 2px 12px rgba(23,49,47,.16)!important;border-radius:0;overflow:hidden}.leaflet-control-zoom a{border:0!important;color:#17312f!important}
 .leaflet-control-locate{margin:0 8px 32px 0}.leaflet-control-locate button{width:40px;height:40px;border:1px solid #d8e4e0;border-radius:0;background:#fff;color:#0b746b;font:900 21px system-ui;line-height:40px;box-shadow:0 3px 14px rgba(23,49,47,.18);cursor:pointer}.leaflet-control-locate button:active{transform:scale(.96)}
-.stop-label{width:10px;height:10px;border-radius:0;background:#0b746b;border:2px solid #fff;box-shadow:0 2px 6px rgba(23,49,47,.28)}.ud-mobile-bus{width:44px;height:26px;border:0;box-shadow:0 3px 9px rgba(23,49,47,.30);display:flex;align-items:center;justify-content:center;gap:2px;box-sizing:border-box;font:900 7px/1 system-ui,sans-serif;overflow:hidden;white-space:nowrap}.ud-mobile-bus-glyph{width:17px;height:17px;display:grid;place-items:center;flex:0 0 auto}.ud-mobile-bus-glyph svg{width:17px;height:17px;display:block}.ud-mobile-bus-label{max-width:20px;overflow:hidden;text-overflow:clip}
+.stop-label{width:10px;height:10px;border-radius:0;background:#0b746b;border:2px solid #fff;box-shadow:0 2px 6px rgba(23,49,47,.28)}.ud-mobile-bus{position:relative;width:44px;height:26px;border:0;box-shadow:0 3px 9px rgba(23,49,47,.30);display:flex;align-items:center;justify-content:center;gap:2px;box-sizing:border-box;font:900 7px/1 system-ui,sans-serif;overflow:hidden;white-space:nowrap}.ud-mobile-bus.unknown-colour{outline:1px dashed rgba(255,255,255,.95);outline-offset:1px;box-shadow:0 0 0 1px #64748b,0 3px 9px rgba(23,49,47,.30)}.ud-colour-unknown{position:absolute;top:1px;right:1px;z-index:2;width:10px;height:10px;display:grid;place-items:center;border:1px solid #475569;border-radius:50%;background:#fff;color:#475569;font:900 8px/8px system-ui,sans-serif}.ud-mobile-bus-glyph{width:17px;height:17px;display:grid;place-items:center;flex:0 0 auto}.ud-mobile-bus-glyph svg{width:17px;height:17px;display:block}.ud-mobile-bus-label{max-width:20px;overflow:hidden;text-overflow:clip}
 </style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script>
 let currentLocation=null;let autoFocused=false;let lastBusData=[];
 const saved=localStorage.getItem('ud-map-center');
@@ -293,10 +293,11 @@ map.on('moveend',reportBounds);map.on('zoomend',reportBounds);setTimeout(reportB
 function markerFor(v){
  const bg=validColor(v.color)?v.color:'transparent';
  const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
- const fg=textColorFor(bg);
- const html='<div class="ud-mobile-bus" style="background:'+bg+';color:'+fg+'">'+
+ const fg=textColorFor(bg),knownColour=v.colourKnown===true;
+ const unknownBadge=knownColour?'':'<span class="ud-colour-unknown" title="Physical bus colour not supplied by live API" aria-hidden="true">?</span>';
+ const html='<div class="ud-mobile-bus'+(knownColour?'':' unknown-colour')+'" title="'+(knownColour?'Vehicle colour supplied by live API':'Physical vehicle colour is unknown')+'" style="background:'+bg+';color:'+fg+'">'+
    '<span class="ud-mobile-bus-glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>'+
-   '<span class="ud-mobile-bus-label">'+escapeHtml(label)+'</span></div>';
+   '<span class="ud-mobile-bus-label">'+escapeHtml(label)+'</span>'+unknownBadge+'</div>';
  return L.marker([Number(v.lat),Number(v.lon)],{zIndexOffset:1000,icon:L.divIcon({className:'ud-bus-icon',html,iconSize:[44,26],iconAnchor:[22,13]})});
 }
 function animateMarker(marker,target,duration=1100){
@@ -332,12 +333,12 @@ function renderBuses(){
    if(existing){
      animateMarker(existing,[Number(v.lat),Number(v.lon)]);
 
-     if(existing._udLabel!==label||existing._udBg!==bg){
-       const next=markerFor(v);next.on('click',()=>openBus(v.id));next._udLabel=label;next._udBg=bg;
+     if(existing._udLabel!==label||existing._udBg!==bg||existing._udKnown!==(v.colourKnown===true)){
+       const next=markerFor(v);next.on('click',()=>openBus(v.id));next._udLabel=label;next._udBg=bg;next._udKnown=v.colourKnown===true;
        busLayer.removeLayer(existing);busMarkers.set(id,next);next.addTo(busLayer);
      }
    }else{
-     const marker=markerFor(v);marker._udLabel=label;marker._udBg=bg;marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);busMarkers.set(id,marker);
+     const marker=markerFor(v);marker._udLabel=label;marker._udBg=bg;marker._udKnown=v.colourKnown===true;marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);busMarkers.set(id,marker);
    }
  }
 }
