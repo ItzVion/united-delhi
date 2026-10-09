@@ -24,8 +24,9 @@ function textFor(bg:string){
 }
 
 export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{
-  // Fleet registration prefixes override cached API colours, which may come
-  // from an older build. DL1PD/PB/PC are part of the orange Non-AC fleet.
+  const direct=validHex(v.serviceColor);
+  if((v as any).fleetColorSource==='registry'&&direct)return{background:direct,text:textFor(direct)};
+  // Prefix inference is only a fallback when there is no exact registry row. DL1PD/PB/PC are part of the orange Non-AC fleet.
   const ids=[(v as any).id,(v as any).vehicleId,(v as any).licensePlate,(v as any).vehicleLabel]
     .map(x=>String(x??'').toUpperCase().replace(/[-_\\s]/g,''));
   const id=ids.find(x=>/^(DL51EV|DL51GD|DL1PD|DL1PE|DL1PB|DL1PC)/.test(x))||'';
@@ -40,12 +41,9 @@ export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):Vehicle
   if(busType.startsWith('CNG NONAC')||busType.startsWith('CNG NON-AC'))return{background:COLORS.cngNonAc,text:textFor(COLORS.cngNonAc)};
   if(busType.startsWith('CNG AC'))return{background:COLORS.cngAc,text:textFor(COLORS.cngAc)};
 
-  const direct=validHex(v.serviceColor);
-  if(direct)return{background:direct,text:textFor(direct)};
   if(v.serviceType==='electric')return{background:COLORS.evAc,text:textFor(COLORS.evAc)};
   if(v.serviceType==='dtc')return{background:COLORS.cngAc,text:textFor(COLORS.cngAc)};
   const route=validHex(v.routeColor);
   if(route)return{background:route,text:textFor(route)};
   return{background:COLORS.unknown,text:'#FFFFFF'};
-}
 }

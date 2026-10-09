@@ -109,6 +109,18 @@ CREATE TABLE public.vehicle_positions (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE public.vehicle_fleet_registry (
+    vehicle_id TEXT PRIMARY KEY,
+    bus_type TEXT NOT NULL DEFAULT 'Unknown',
+    service_type TEXT NOT NULL DEFAULT 'unknown'
+        CHECK (service_type IN ('dtc', 'electric', 'unknown')),
+    color_hex TEXT NOT NULL DEFAULT '#64748B'
+        CHECK (color_hex ~ '^#[0-9A-Fa-f]{6}$'),
+    source TEXT NOT NULL DEFAULT 'auto'
+        CHECK (source IN ('auto', 'manual')),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE public.metro_routes (
     route_id TEXT PRIMARY KEY,
     agency_id TEXT,
@@ -170,6 +182,8 @@ CREATE INDEX idx_route_stops_route_sequence ON public.route_stops (route_id, sto
 CREATE INDEX idx_vehicle_positions_observed ON public.vehicle_positions (observed_at DESC);
 CREATE INDEX idx_vehicle_positions_route ON public.vehicle_positions (route_id, observed_at DESC);
 CREATE INDEX idx_vehicle_positions_trip ON public.vehicle_positions (trip_id, observed_at DESC);
+CREATE INDEX idx_vehicle_fleet_registry_color ON public.vehicle_fleet_registry (color_hex);
+CREATE INDEX idx_vehicle_fleet_registry_type ON public.vehicle_fleet_registry (bus_type);
 
 CREATE INDEX idx_metro_routes_short_name ON public.metro_routes (LOWER(short_name));
 CREATE INDEX idx_metro_routes_long_name ON public.metro_routes (LOWER(long_name));
@@ -183,6 +197,7 @@ ANALYZE public.routes;
 ANALYZE public.stops;
 ANALYZE public.route_stops;
 ANALYZE public.vehicle_positions;
+ANALYZE public.vehicle_fleet_registry;
 ANALYZE public.metro_routes;
 ANALYZE public.metro_stops;
 ANALYZE public.metro_route_stops;

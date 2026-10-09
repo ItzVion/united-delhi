@@ -15,12 +15,20 @@ export const METRO_LINE_COLORS={RED:'#D83B3B',YELLOW:'#E5B12C',BLUE:'#2F63B7',GR
 export const metroColor=(value)=>{const t=String(value||'').toUpperCase();for(const k of Object.keys(METRO_LINE_COLORS))if(t.includes(k))return METRO_LINE_COLORS[k];return '#1F3D36';};
 
 export const isHex=(v:unknown):v is string=>/^#[0-9a-f]{6}$/i.test(String(v||''));
-type FleetLike={id?:string|null;licensePlate?:string|null;vehicleLabel?:string|null;vehicleId?:string|null;serviceColor?:string|null;serviceType?:string|null;busType?:string|null;routeShortName?:string|null;routeId?:string|null;routeName?:string|null;routeColor?:string|null};
+type FleetLike={id?:string|null;licensePlate?:string|null;vehicleLabel?:string|null;vehicleId?:string|null;serviceColor?:string|null;serviceType?:string|null;busType?:string|null;fleetColorSource?:string|null;routeShortName?:string|null;routeId?:string|null;routeName?:string|null;routeColor?:string|null};
 const fleetIdentity=(v:FleetLike)=>{
   const ids=[v?.id,v?.vehicleId,v?.licensePlate,v?.vehicleLabel].map(x=>String(x||'').toUpperCase().replace(/[-_\s]/g,''));
   return ids.find(x=>/^(DL51EV|DL51GD|DL1PD|DL1PE|DL1PB|DL1PC)/.test(x))||'';
 };
 export const vehicleFleetKind=(v:FleetLike)=>{
+  if(v.fleetColorSource==='registry'){
+    const exact=String(v.busType||'').trim().toUpperCase();
+    if(exact.startsWith('EV DEVI'))return 'ev-devi';
+    if(exact.startsWith('EV AC'))return 'ev-ac';
+    if(exact.startsWith('CNG NONAC')||exact.startsWith('CNG NON-AC'))return 'cng-nonac';
+    if(exact.startsWith('CNG AC'))return 'cng-ac';
+    return 'unknown';
+  }
   const id=fleetIdentity(v);
   if(id.startsWith('DL51EV'))return 'ev-ac';
   if(id.startsWith('DL51GD'))return 'ev-devi';
@@ -36,7 +44,9 @@ export const vehicleFleetKind=(v:FleetLike)=>{
   return 'unknown';
 };
 export const busColor=(v:FleetLike,route?:unknown)=>{
-  // Known vehicle identities override stale cached API colours.
+  const stored=String(v?.serviceColor||'').trim();
+  if(v.fleetColorSource==='registry'&&isHex(stored))return stored;
+  // If there is no per-vehicle registry row, use legacy fleet inference.
   const id=fleetIdentity(v);
   if(id.startsWith('DL51EV'))return SERVICE_COLORS.electricAc;
   if(id.startsWith('DL51GD'))return SERVICE_COLORS.electricDevi;
