@@ -134,12 +134,13 @@ CREATE TABLE public.metro_route_stops (
     route_id TEXT NOT NULL
         REFERENCES public.metro_routes(route_id)
         ON DELETE CASCADE,
+    direction_id INTEGER NOT NULL DEFAULT 0,
     stop_id TEXT NOT NULL
         REFERENCES public.metro_stops(stop_id)
         ON DELETE CASCADE,
     stop_sequence INTEGER NOT NULL
         CHECK (stop_sequence >= 0),
-    PRIMARY KEY (route_id, stop_id, stop_sequence)
+    PRIMARY KEY (route_id, direction_id, stop_id, stop_sequence)
 );
 
 CREATE TABLE public.metro_feed_meta (
@@ -176,6 +177,7 @@ CREATE INDEX idx_metro_stops_name ON public.metro_stops (LOWER(name));
 CREATE INDEX idx_metro_stops_lat_lon ON public.metro_stops (latitude, longitude);
 CREATE INDEX idx_metro_route_stops_stop ON public.metro_route_stops (stop_id, stop_sequence);
 CREATE INDEX idx_metro_route_stops_route ON public.metro_route_stops (route_id, stop_sequence);
+CREATE INDEX idx_metro_route_stops_route_dir ON public.metro_route_stops (route_id, direction_id, stop_sequence);
 
 ANALYZE public.routes;
 ANALYZE public.stops;

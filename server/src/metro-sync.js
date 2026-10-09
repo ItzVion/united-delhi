@@ -80,7 +80,7 @@ export async function syncMetroStatic(pool){
       bucket.push({routeId,stopId,seq});
       stopsByTrip.set(tripId,bucket);
     }
-    const bestByDirection=new Map();
+    const candidatesByDirection=new Map(),seenPatterns=new Set();
     for(const [tripId,tripStops] of stopsByTrip){
       tripStops.sort((a,b)=>a.seq-b.seq);
       const ordered=tripStops.filter((x,i,a)=>i===0||x.seq!==a[i-1].seq);
@@ -90,14 +90,62 @@ export async function syncMetroStatic(pool){
       const parsed=rawDirection!==''?Number(rawDirection):inferred;
       const directionId=Number.isInteger(parsed)&&parsed>=0?parsed:inferred;
       const routeId=ordered[0].routeId,key=routeId+'|'+directionId;
-      const previous=bestByDirection.get(key);
-      if(!previous||ordered.length>previous.stops.length){
-        bestByDirection.set(key,{routeId,directionId,stops:ordered});
-      }
+      const signature=key+'|'+ordered.map(x=>x.stopId).join('>');
+      if(seenPatterns.has(signature))continue;
+      seenPatterns.add(signature);
+      const bucket=candidatesByDirection.get(key)||[];
+      bucket.push({routeId,directionId,stops:ordered});
+      candidatesByDirection.set(key,bucket);
     }
+
+    // Some feeds split one direction into adjacent trip fragments rather than
+    // publishing a single end-to-end trip (the Aqua Line is one example).
+    // Start with the longest pattern and join contiguous overlaps or fragments
+    // whose endpoints are physically adjacent, avoiding duplicate stations.
+    const stopCoords=new Map(feed.stops.map(s=>[esc(s.stop_id),{lat:num(s.stop_lat),lon:num(s.stop_lon)}]));
+    const distanceMeters=(left,right)=>{
+      const a=stopCoords.get(left),b=stopCoords.get(right);
+      if(!a||!b||![a.lat,a.lon,b.lat,b.lon].every(Number.isFinite))return Infinity;
+      const rad=n=>n*Math.PI/180,dl=rad(b.lat-a.lat),dn=rad(b.lon-a.lon);
+      const h=Math.sin(dl/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dn/2)**2;
+      return 6371000*2*Math.atan2(Math.sqrt(h),Math.sqrt(Math.max(0,1-h)));
+    };
     const routeStops=[];
-    for(const pattern of bestByDirection.values()){
-      for(const x of pattern.stops)routeStops.push({...x,directionId:pattern.directionId});
+    for(const candidates of candidatesByDirection.values()){
+      candidates.sort((a,b)=>b.stops.length-a.stops.length);
+      let path=candidates[0].stops.map((x,i)=>({...x,seq:i}));
+      const pending=candidates.slice(1);
+      let changed=true;
+      while(changed&&pending.length){
+        changed=false;
+        const inPath=new Set(path.map(x=>x.stopId));
+        for(let i=0;i<pending.length;i++){
+          const fragment=pending[i].stops;
+          if(fragment.every(x=>inPath.has(x.stopId))){pending.splice(i,1);changed=true;break;}
+          const max=Math.min(path.length,fragment.length);
+          let overlapLeft=0,overlapRight=0;
+          for(let k=1;k<=max;k++){
+            if(fragment.slice(-k).every((x,j)=>x.stopId===path[j].stopId))overlapLeft=k;
+            if(path.slice(-k).every((x,j)=>x.stopId===fragment[j].stopId))overlapRight=k;
+          }
+          if(overlapLeft){
+            path=[...fragment.slice(0,-overlapLeft),...path];
+          }else if(overlapRight){
+            path=[...path,...fragment.slice(overlapRight)];
+          }else{
+            const attachLeft=distanceMeters(fragment[fragment.length-1].stopId,path[0].stopId);
+            const attachRight=distanceMeters(path[path.length-1].stopId,fragment[0].stopId);
+            if(Math.min(attachLeft,attachRight)>2500)continue;
+            path=attachLeft<=attachRight?[...fragment,...path]:[...path,...fragment];
+          }
+          path=path.map((x,seq)=>({...x,seq}));
+          pending.splice(i,1);
+          changed=true;
+          break;
+        }
+      }
+      const directionId=candidates[0].directionId;
+      for(const [seq,x] of path.entries())routeStops.push({...x,seq,directionId});
     }
     const c=await pool.connect();
     try{

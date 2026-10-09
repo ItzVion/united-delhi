@@ -172,6 +172,5 @@ body,#root{background:var(--bg)}
 .metro-directions small{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
 .metro-directions b{font-size:12px;line-height:1.4;overflow-wrap:anywhere}
 .view:not(.view-home){padding-bottom:calc(var(--nav) + var(--safe-b) + 28px)!important}
-.page{padding-bottom:calc(var(--nav) + var(--safe-b) + 28px)}
 .timeline{margin-bottom:24px!important}
 @media(max-width:600px){.metro-directions{flex-direction:column}.metro-directions button{padding:10px 12px}}
