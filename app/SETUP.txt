@@ -1,31 +1,27 @@
-UNITED DELHI — DEVELOPMENT AND BUILD
+UNITED DELHI — DEVELOPMENT AND DEPLOYMENT
 
-Repository layout
+Repository folders
 - app/     Expo React Native app and local Android APK builder
-- web/     Vite/React website (Vercel project root)
-- server/  Express API (Render service root)
-- legal/   Privacy, terms, security and third-party notices
+- web/     Vite/React website; Vercel root directory
+- server/  Express backend and tests
+- legal/   Legal and third-party notices
 
-1. Android/iOS app
-From the repository root:
+Android app
   cd app
   npm ci
   npm run typecheck
   npm test
   npx expo start
 
-To build and install a release APK locally on Windows:
+Local Windows APK (no cloud build):
   npm run build:apk
 
-The local APK build requires Android SDK/platform-tools, JDK 17, PowerShell and Gradle access. It does not use Expo cloud builds. Build logs and the APK are written to Desktop\UnitedDelhi-Debug.
+Requirements: Node 22, JDK 17, Android SDK/platform-tools and PowerShell.
 
-2. Website
-From the repository root:
+Website
   cd web
   npm install
   npm run dev
-
-Open the local URL printed by Vite (normally http://localhost:5173). Local /api requests are proxied to the hosted API.
 
 Vercel settings:
 - Root Directory: web
@@ -34,31 +30,35 @@ Vercel settings:
 - Install Command: npm install
 - Build Command: npm run build
 - Output Directory: dist
+- Enable "Skip deployments when there are no changes to the root directory or its dependencies" so server-only commits do not rebuild the website.
 
-3. Backend
-From the repository root:
+Backend development
   cd server
   npm ci
   npm run check
   npm test
   npm start
 
-4. Hosted backend
-Provider: Render
-Public API: https://united-delhi-api.onrender.com
-Health check: https://united-delhi-api.onrender.com/health
-Service root: server
-Build command: npm ci
-Start command: npm start
+Production architecture target
+- Website: Vercel
+- Database: Neon PostgreSQL
+- Backend: Ubuntu/Debian VPS running Node.js 22 with systemd
+- Automatic backend deployment: GitHub Actions, path-filtered to server/**, with a 20-second quiet-period debounce
+- Legacy Render service: remains running as a fallback while the VPS is provisioned; its repository blueprint now sets autoDeploy to false to avoid duplicate Render builds.
 
-Required Render environment variables:
-- DATABASE_URL
+VPS deployment is intentionally disabled until the VPS has been provisioned, the server environment configured and HTTPS/API routing ready. See server/deploy/SETUP.txt. Do not set the VPS_DEPLOY_ENABLED repository variable until that setup is complete.
+
+Until the VPS has a public HTTPS API hostname and has been tested, the app and website continue using the existing Render API:
+  https://united-delhi-api.onrender.com
+
+VPS environment variables
+- DATABASE_URL (Neon connection string)
 - TRANSPORT_STACK_API_KEY
-- APP_ORIGINS
-Optional:
-- TRANSPORT_STACK_REALTIME_URL
+- APP_ORIGINS (include https://united-delhi.vercel.app)
+- PORT=10000
+- TRANSPORT_STACK_REALTIME_URL (optional; defaults to the approved Transport Stack endpoint)
 
-Never put DATABASE_URL or TRANSPORT_STACK_API_KEY in app/ or web/. Both clients use the public API only.
+Keep DATABASE_URL and TRANSPORT_STACK_API_KEY only in /etc/united-delhi/server.env on the VPS. Never commit these values or add them to web/ or app/.
 
-5. Live vehicle colours
-The app displays only valid per-vehicle serviceColor values supplied by the live API or an individually verified physical-livery record. Standard GTFS-Realtime does not define a vehicle-livery colour field. Unknown physical colours remain neutral grey and are not guessed from route colour, vehicle type or registration prefix.
+Vehicle colours
+Only a valid upstream per-vehicle serviceColor is shown as the bus colour. If the live feed does not provide one, the marker stays neutral and is labelled unknown. Do not infer physical livery from route colours, vehicle type or registration prefix.

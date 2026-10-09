@@ -1,0 +1,28 @@
+[Unit]
+Description=United Delhi API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=united-delhi
+Group=united-delhi
+WorkingDirectory=/opt/united-delhi/current
+EnvironmentFile=/etc/united-delhi/server.env
+Environment=NODE_ENV=production
+Environment=NODE_OPTIONS=--max-old-space-size=2048
+ExecStart=/usr/bin/node /opt/united-delhi/current/src/index.js
+Restart=on-failure
+RestartSec=4
+KillSignal=SIGTERM
+TimeoutStopSec=25
+UMask=0027
+LimitNOFILE=65535
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
