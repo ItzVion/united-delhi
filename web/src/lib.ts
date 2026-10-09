@@ -9,61 +9,14 @@ export const BOUNDS:[[number,number],[number,number]]=[[28.40,76.84],[28.88,77.3
 export const storageGet=(k:string)=>{try{return window.localStorage.getItem(k)}catch{return null}};
 export const storageSet=(k:string,v:string)=>{try{window.localStorage.setItem(k,v);return true}catch{return false}};
 
-export const SERVICE_COLORS:Record<string,string>={electricAc:'#0E7490',electricDevi:'#16A34A',cngAc:'#1D4ED8',cngNonAc:'#F97316',unknown:'#64748B'};
-export const ROUTE_COLORS:Record<string,string>={}
 export const METRO_LINE_COLORS={RED:'#D83B3B',YELLOW:'#E5B12C',BLUE:'#2F63B7',GREEN:'#2F9B62',VIOLET:'#7A4FB5',MAGENTA:'#B044A6',PINK:'#D65A9A',ORANGE:'#E06B2C',GRAY:'#6B7280',RAPID:'#3A8D8D',AQUA:'#159A9C'};
 export const metroColor=(value)=>{const t=String(value||'').toUpperCase();for(const k of Object.keys(METRO_LINE_COLORS))if(t.includes(k))return METRO_LINE_COLORS[k];return '#1F3D36';};
 
 export const isHex=(v:unknown):v is string=>/^#[0-9a-f]{6}$/i.test(String(v||''));
-type FleetLike={id?:string|null;licensePlate?:string|null;vehicleLabel?:string|null;vehicleId?:string|null;serviceColor?:string|null;serviceType?:string|null;busType?:string|null;fleetColorSource?:string|null;routeShortName?:string|null;routeId?:string|null;routeName?:string|null;routeColor?:string|null};
-const fleetIdentity=(v:FleetLike)=>{
-  const ids=[v?.id,v?.vehicleId,v?.licensePlate,v?.vehicleLabel].map(x=>String(x||'').toUpperCase().replace(/[-_\s]/g,''));
-  return ids.find(x=>/^(DL51EV|DL51GD|DL1PD|DL1PE|DL1PB|DL1PC)/.test(x))||'';
-};
-export const vehicleFleetKind=(v:FleetLike)=>{
-  if(v.fleetColorSource==='registry'){
-    const exact=String(v.busType||'').trim().toUpperCase();
-    if(exact.startsWith('EV DEVI'))return 'ev-devi';
-    if(exact.startsWith('EV AC'))return 'ev-ac';
-    if(exact.startsWith('CNG NONAC')||exact.startsWith('CNG NON-AC'))return 'cng-nonac';
-    if(exact.startsWith('CNG AC'))return 'cng-ac';
-    return 'unknown';
-  }
-  const id=fleetIdentity(v);
-  if(id.startsWith('DL51EV'))return 'ev-ac';
-  if(id.startsWith('DL51GD'))return 'ev-devi';
-  if(id.startsWith('DL1PB')||id.startsWith('DL1PC')||id.startsWith('DL1PD'))return 'cng-nonac';
-  if(id.startsWith('DL1PE'))return 'cng-ac';
-  const t=String(v?.busType||'').trim().toUpperCase();
-  if(t.startsWith('EV DEVI'))return 'ev-devi';
-  if(t.startsWith('EV AC'))return 'ev-ac';
-  if(t.startsWith('CNG NONAC')||t.startsWith('CNG NON-AC'))return 'cng-nonac';
-  if(t.startsWith('CNG AC'))return 'cng-ac';
-  if(v?.serviceType==='electric')return 'ev-ac';
-  if(v?.serviceType==='dtc')return 'cng-ac';
-  return 'unknown';
-};
-export const busColor=(v:FleetLike,route?:unknown)=>{
-  const stored=String(v?.serviceColor||'').trim();
-  if(v.fleetColorSource==='registry'&&isHex(stored))return stored;
-  // If there is no per-vehicle registry row, use legacy fleet inference.
-  const id=fleetIdentity(v);
-  if(id.startsWith('DL51EV'))return SERVICE_COLORS.electricAc;
-  if(id.startsWith('DL51GD'))return SERVICE_COLORS.electricDevi;
-  if(id.startsWith('DL1PB')||id.startsWith('DL1PC')||id.startsWith('DL1PD'))return SERVICE_COLORS.cngNonAc;
-  if(id.startsWith('DL1PE'))return SERVICE_COLORS.cngAc;
-  const t=String(v?.busType||'').trim().toUpperCase();
-  if(t.startsWith('EV DEVI'))return SERVICE_COLORS.electricDevi;
-  if(t.startsWith('EV AC'))return SERVICE_COLORS.electricAc;
-  if(t.startsWith('CNG NONAC')||t.startsWith('CNG NON-AC'))return SERVICE_COLORS.cngNonAc;
-  if(t.startsWith('CNG AC'))return SERVICE_COLORS.cngAc;
-  const service=String(v?.serviceColor||'').trim();
-  if(isHex(service))return service;
-  if(v?.serviceType==='electric')return SERVICE_COLORS.electricAc;
-  if(v?.serviceType==='dtc')return SERVICE_COLORS.cngAc;
-  const routeFallback=String(v?.routeColor||'').trim();
-  if(isHex(routeFallback))return routeFallback;
-  return SERVICE_COLORS.unknown;
+// Vehicle colours are API data. Never infer a colour from registration, route or bus type.
+export const busColor=(v:{serviceColor?:string|null})=>{
+  const color=String(v?.serviceColor||'').trim();
+  return isHex(color)?color:'transparent';
 };
 export const textOn=(bg:string)=>{const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.179?'#14211B':'#FFFFFF'};
 

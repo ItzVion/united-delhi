@@ -1,18 +1,11 @@
 import type { Vehicle, Arrival } from '../api/client';
 
 export type VehicleColor={background:string;text:string};
+type ApiVehicleColor={serviceColor?:string|null;busType?:string|null};
 
-const COLORS={
-  evAc:'#0E7490',
-  evDevi:'#16A34A',
-  cngAc:'#1D4ED8',
-  cngNonAc:'#F97316',
-  unknown:'#64748B'
-} as const;
-
-function validHex(value:string|null|undefined):string|null{
-  const v=String(value??'').trim().replace(/^#/,'');
-  return /^[0-9a-f]{6}$/i.test(v)?'#'+v.toUpperCase():null;
+function validApiColor(value:string|null|undefined):string|null{
+  const color=String(value??'').trim();
+  return /^#[0-9a-f]{6}$/i.test(color)?color:null;
 }
 
 function textFor(bg:string){
@@ -23,27 +16,33 @@ function textFor(bg:string){
   return y>.179?'#17313B':'#FFFFFF';
 }
 
+const legendCategories=[
+  {key:'ev-ac',label:'EV AC (12 mtr)',matches:(type:string)=>type.startsWith('EV AC')},
+  {key:'ev-devi',label:'EV DEVI AC (9 mtr)',matches:(type:string)=>type.startsWith('EV DEVI')},
+  {key:'cng-ac',label:'CNG AC (12 mtr)',matches:(type:string)=>type.startsWith('CNG AC')},
+  {key:'cng-nonac',label:'CNG NonAC (12 mtr)',matches:(type:string)=>type.startsWith('CNG NONAC')||type.startsWith('CNG NON-AC')}
+] as const;
+
+export function apiFleetLegendRows(vehicles:ApiVehicleColor[]){
+  const tallies=new Map<string,Map<string,number>>();
+  for(const vehicle of vehicles){
+    const type=String(vehicle.busType||'').trim().toUpperCase();
+    const category=legendCategories.find(item=>item.matches(type));
+    const color=validApiColor(vehicle.serviceColor);
+    if(!category||!color)continue;
+    const colors=tallies.get(category.key)||new Map<string,number>();
+    colors.set(color,(colors.get(color)||0)+1);
+    tallies.set(category.key,colors);
+  }
+  return legendCategories.map(category=>{
+    const colors=[...(tallies.get(category.key)||new Map<string,number>())].sort((a,b)=>b[1]-a[1]);
+    return colors.length?{key:category.key,label:category.label,color:colors[0][0]}:null;
+  }).filter((row):row is {key:string;label:string;color:string}=>row!==null);
+}
+
 export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{
-  const direct=validHex(v.serviceColor);
-  if((v as any).fleetColorSource==='registry'&&direct)return{background:direct,text:textFor(direct)};
-  // Prefix inference is only a fallback when there is no exact registry row. DL1PD/PB/PC are part of the orange Non-AC fleet.
-  const ids=[(v as any).id,(v as any).vehicleId,(v as any).licensePlate,(v as any).vehicleLabel]
-    .map(x=>String(x??'').toUpperCase().replace(/[-_\\s]/g,''));
-  const id=ids.find(x=>/^(DL51EV|DL51GD|DL1PD|DL1PE|DL1PB|DL1PC)/.test(x))||'';
-  if(id.startsWith('DL51EV'))return{background:COLORS.evAc,text:textFor(COLORS.evAc)};
-  if(id.startsWith('DL51GD'))return{background:COLORS.evDevi,text:textFor(COLORS.evDevi)};
-  if(id.startsWith('DL1PB')||id.startsWith('DL1PC')||id.startsWith('DL1PD'))return{background:COLORS.cngNonAc,text:textFor(COLORS.cngNonAc)};
-  if(id.startsWith('DL1PE'))return{background:COLORS.cngAc,text:textFor(COLORS.cngAc)};
-
-  const busType=String((v as any).busType||'').trim().toUpperCase();
-  if(busType.startsWith('EV DEVI'))return{background:COLORS.evDevi,text:textFor(COLORS.evDevi)};
-  if(busType.startsWith('EV AC'))return{background:COLORS.evAc,text:textFor(COLORS.evAc)};
-  if(busType.startsWith('CNG NONAC')||busType.startsWith('CNG NON-AC'))return{background:COLORS.cngNonAc,text:textFor(COLORS.cngNonAc)};
-  if(busType.startsWith('CNG AC'))return{background:COLORS.cngAc,text:textFor(COLORS.cngAc)};
-
-  if(v.serviceType==='electric')return{background:COLORS.evAc,text:textFor(COLORS.evAc)};
-  if(v.serviceType==='dtc')return{background:COLORS.cngAc,text:textFor(COLORS.cngAc)};
-  const route=validHex(v.routeColor);
-  if(route)return{background:route,text:textFor(route)};
-  return{background:COLORS.unknown,text:'#FFFFFF'};
+  const color=validApiColor(v.serviceColor);
+  return color
+    ?{background:color,text:textFor(color)}
+    :{background:'transparent',text:'#14211B'};
 }

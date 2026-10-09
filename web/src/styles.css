@@ -147,23 +147,20 @@ body,#root{background:var(--bg)}
 .legend-modal{background:rgba(15,21,25,.48)!important}
 .legend-exact{width:min(560px,calc(100vw - 32px));padding:22px 22px 20px!important;background:#fff!important;border:1px solid #d8dddd!important;box-shadow:0 12px 40px rgba(0,0,0,.18)}
 .legend-exact h2{font-size:25px!important;line-height:1.1;margin:0 0 22px!important;color:#263238!important}
-.legend-head-exact{display:grid;grid-template-columns:150px 1fr;align-items:center;color:#98a1a4;font-size:14px;padding:0 0 8px}
-.legend-exact-row{display:grid;grid-template-columns:76px 1fr;align-items:center;min-height:70px}
-.legend-exact-icons{display:flex;gap:8px;align-items:center;justify-content:center;min-height:34px}
-.legend-map-dot{display:block;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #334155}
-.legend-map-dot.ev-ac{width:18px;height:18px;border:2px solid #064E5B}
-.legend-map-dot.ev-devi{width:16px;height:16px;border:2px solid #14532D}
-.legend-map-dot.cng-ac{width:10px;height:10px;border:1.5px solid #EFF6FF}
-.legend-map-dot.cng-nonac{width:16px;height:16px;border:2px solid #7C2D12;border-radius:2px;transform:rotate(45deg)}
-.legend-exact-type{font-size:15px;line-height:19px;color:#263238}
-.legend-understood{width:100%;height:48px;margin-top:14px;border:0;background:#0F6657;color:#fff;font-size:17px;font-weight:900;cursor:pointer}
+.legend-head-exact{display:grid;grid-template-columns:92px 1fr;align-items:center;color:#98a1a4;font-size:14px;padding:0 0 8px}
+.legend-exact-row{display:grid;grid-template-columns:92px 1fr;align-items:center;min-height:66px}
+.legend-exact-icons{display:flex;align-items:center;justify-content:flex-start;min-height:40px}
+.legend-exact-bus{width:52px;height:36px;display:grid;place-items:center;color:#fff;border:1px solid rgba(20,33,43,.12)}
+.legend-exact-bus .ic{width:26px!important;height:26px!important;stroke-width:1.7}
+.legend-exact-type{font-size:15px;line-height:20px;color:#263238;font-weight:500}
+.legend-understood{width:100%;height:48px;margin-top:14px;border:0;background:#0F6657;color:#fff;font-size:16px;font-weight:750;cursor:pointer}
 @media(max-width:600px){
 .legend-exact{width:calc(100vw - 32px);padding:20px 20px 18px!important}
 .legend-exact h2{font-size:24px!important;margin-bottom:20px!important}
-.legend-head-exact{grid-template-columns:124px 1fr;font-size:13px}
-.legend-exact-row{grid-template-columns:64px 1fr;min-height:64px}
-.legend-exact-icons{gap:6px}
-.legend-exact-bus{width:54px;height:40px}
+.legend-head-exact,.legend-exact-row{grid-template-columns:76px 1fr}
+.legend-head-exact{font-size:13px}
+.legend-exact-row{min-height:64px}
+.legend-exact-bus{width:44px;height:32px}
 .legend-exact-bus .ic{width:23px!important;height:23px!important}
 .legend-exact-type{font-size:14px;line-height:18px}
 .legend-understood{height:46px;margin-top:12px;font-size:16px}
