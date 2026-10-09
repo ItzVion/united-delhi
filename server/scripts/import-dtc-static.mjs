@@ -12,8 +12,8 @@ const STATIC_URLS = STATIC_URL_OVERRIDE
       'https://files.mobilitydatabase.org/mdb-3139/latest.zip'
     ];
 const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'mobilitydb-mdb-1262-latest').trim();
-const MAX_COMPRESSED_BYTES = 50 * 1024 * 1024;
-const MAX_UNCOMPRESSED_BYTES = 250 * 1024 * 1024;
+const MAX_COMPRESSED_BYTES = 100 * 1024 * 1024;
+const MAX_UNCOMPRESSED_BYTES = 300 * 1024 * 1024;
 
 const parseCsvLine = (line) => {
   const cells = [];
