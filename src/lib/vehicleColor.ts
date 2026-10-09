@@ -37,7 +37,7 @@ export function apiFleetLegendRows(vehicles:ApiVehicleColor[]){
   return legendCategories.map(category=>{
     const colors=[...(tallies.get(category.key)||new Map<string,number>())].sort((a,b)=>b[1]-a[1]);
     return colors.length?{key:category.key,label:category.label,color:colors[0][0]}:null;
-  }).filter((row):row is {key:string;label:string;color:string}=>row!==null);
+  }).filter((row)=>row!==null);
 }
 
 export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{
