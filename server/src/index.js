@@ -6,6 +6,8 @@ import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { rateLimit } from 'express-rate-limit';
 import { spawn } from 'node:child_process';
 import {syncMetroStatic} from './metro-sync.js';
+import {validHexColor,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
+const COLOR_FIELD=parseColorFieldSpec(process.env.TRANSPORT_STACK_COLOR_FIELD);
 
 const {Pool}=pg,app=express();
 const PORT=Number(process.env.PORT)||10000;
@@ -239,18 +241,18 @@ async function ensureRuntimeSchema(){if(!pool)return;const c=await pool.connect(
 
 
 /* Static GTFS is DB-only: the current feed is imported into Neon outside the web service. */
-function parseVehicle(e,feedTs){
+function parseVehicle(e,feedTs,colors){
  const v=e?.vehicle,p=v?.position;if(!p)return null;
  const lat=coord(p.latitude,-90,90),lon=coord(p.longitude,-180,180),id=str(v?.vehicle?.id||v?.id||e?.id);if(lat===null||lon===null||!id)return null;
  const ts=num(v?.timestamp||feedTs);if(!ts)return null;
  const ageMs=Date.now()-(ts*1000);if(ageMs>90000||ageMs<-60000)return null;
- const serviceColor=validHexColor(v?.serviceColor??v?.color??v?.vehicle?.serviceColor??v?.vehicle?.color??v?.vehicle?.colorHex);
+ const serviceColor=validHexColor(colors?.get(id)??colors?.get(String(e?.id||'')));
  return{id,routeId:str(v?.trip?.routeId),tripId:str(v?.trip?.tripId),stopId:str(v?.stopId),vehicleLabel:str(v?.vehicle?.label),licensePlate:str(v?.vehicle?.licensePlate),serviceColor,latitude:lat,longitude:lon,bearing:num(p.bearing),observedAt:new Date(ts*1000).toISOString()};
 }
 async function fetchLive(){
  if(!TRANSPORT_STACK_KEY)throw new Error('TRANSPORT_STACK_API_KEY is not configured');
  const u=new URL(TRANSPORT_STACK_FEED);const ac=new AbortController(),t=setTimeout(()=>ac.abort(),12000);
- try{const r=await fetch(u,{signal:ac.signal,headers:{'x-api-key':TRANSPORT_STACK_KEY,accept:'*/*','user-agent':'United-Delhi/2.0'}});if(!r.ok)throw new Error('Transport Stack realtime HTTP '+r.status);const b=new Uint8Array(await r.arrayBuffer());if(b.length>10*1024*1024)throw new Error('Realtime feed exceeds safety limit');const f=GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(b),m=new Map();for(const e of f.entity||[]){const v=parseVehicle(e,Number(f.header?.timestamp||0));if(v)m.set(v.id,v)}return[...m.values()]}catch(e){if(e?.name==='AbortError')throw new Error('Transport Stack realtime request timed out');throw e}finally{clearTimeout(t)}
+ try{const r=await fetch(u,{signal:ac.signal,headers:{'x-api-key':TRANSPORT_STACK_KEY,accept:'*/*','user-agent':'United-Delhi/2.0'}});if(!r.ok)throw new Error('Transport Stack realtime HTTP '+r.status);const b=new Uint8Array(await r.arrayBuffer());if(b.length>10*1024*1024)throw new Error('Realtime feed exceeds safety limit');const f=GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(b),m=new Map(),colors=COLOR_FIELD?extractColorsByVehicle(b,COLOR_FIELD):null;for(const e of f.entity||[]){const v=parseVehicle(e,Number(f.header?.timestamp||0),colors);if(v)m.set(v.id,v)}return[...m.values()]}catch(e){if(e?.name==='AbortError')throw new Error('Transport Stack realtime request timed out');throw e}finally{clearTimeout(t)}
 }
 async function enrich(vs){
  if(!pool||!vs.length)return vs.map(v=>{const svc=service(v.id,null,v.routeShortName,v.routeId,v.licensePlate,v.vehicleLabel);return applyFleetRegistry({...v,routeColor:null,routeLongName:null,...svc})});
