@@ -28,6 +28,10 @@ export function apiFleetLegendRows(vehicles:ApiVehicleColor[]){
     .map(([color,count])=>({key:color,label:color+' ('+count+')',color}));
 }
 
+export function hasApiVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):boolean{
+  return validApiColor(v.serviceColor)!==null;
+}
+
 export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{
   const color=validApiColor(v.serviceColor);
   return color
