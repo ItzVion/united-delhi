@@ -15,6 +15,37 @@ function textFor(bg:string){
   const y=.2126*lin[0]+.7152*lin[1]+.0722*lin[2];
   return y>.179?'#17313B':'#FFFFFF';
 }
+// Match API colours to the reference legend by shade only. Never change hue families.
+const LEGEND_BUS_SWATCHES:{match:(type:string)=>boolean;colors:string[]}[]=[
+ {match:type=>type.startsWith('EV AC'),colors:['#54C4D8']},
+ {match:type=>type.startsWith('EV DEVI'),colors:['#FF7F21','#219653']},
+ {match:type=>type.startsWith('CNG AC'),colors:['#2F80ED','#EB4B4B']},
+ {match:type=>type.startsWith('CNG NONAC')||type.startsWith('CNG NON-AC'),colors:['#F2A76D','#62E099']}
+];
+function colorHue(hex:string):number{
+ const h=hex.replace('#','');
+ const [r,g,b]=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255);
+ const max=Math.max(r,g,b),min=Math.min(r,g,b),delta=max-min;
+ if(delta===0)return 0;
+ let hue=max===r?60*(((g-b)/delta)%6):max===g?60*((b-r)/delta+2):60*((r-g)/delta+4);
+ return (hue+360)%360;
+}
+function hueDistance(a:number,b:number){const d=Math.abs(a-b);return Math.min(d,360-d)}
+export function legendBusColor(apiColor:string|null|undefined,busType:string|null|undefined):string{
+ const color=String(apiColor??'').trim();
+ if(!/^#[0-9a-f]{6}$/i.test(color))return color;
+ const type=String(busType??'').trim().toUpperCase();
+ const category=LEGEND_BUS_SWATCHES.find(row=>row.match(type));
+ if(!category)return color;
+ const hue=colorHue(color);
+ let closest:{color:string;distance:number}|null=null;
+ for(const swatch of category.colors){
+  const distance=hueDistance(hue,colorHue(swatch));
+  if(!closest||distance<closest.distance)closest={color:swatch,distance};
+ }
+ // If API hue disagrees with the type's legend palette, trust the API exactly.
+ return closest&&closest.distance<=24?closest.color:color;
+}
 
 const legendCategories=[
   {key:'ev-ac',label:'EV AC (12 mtr)',matches:(type:string)=>type.startsWith('EV AC')},
@@ -41,7 +72,8 @@ export function apiFleetLegendRows(vehicles:ApiVehicleColor[]){
 }
 
 export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{
-  const color=validApiColor(v.serviceColor);
+  const apiColor=validApiColor(v.serviceColor);
+  const color=apiColor?legendBusColor(apiColor,v.busType):null;
   return color
     ?{background:color,text:textFor(color)}
     :{background:'transparent',text:'#14211B'};
