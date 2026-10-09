@@ -1,1 +1,1 @@
-export type RootStackParamList={Home:undefined;Planner:undefined;StopDetails:{stopId:string;stopName?:string};RouteDetails:{routeId:string;label?:string};Legal:undefined;Settings:undefined;Metro:undefined;};
+export type RootStackParamList={Home:undefined;Planner:undefined;StopDetails:{stopId:string;stopName?:string};RouteDetails:{routeId:string;label?:string};Legal:undefined;About:undefined;Help:undefined;Settings:undefined;Metro:undefined;};
