@@ -56,10 +56,16 @@ try {
   npm test
   if ($LASTEXITCODE -ne 0) { throw "Unit tests failed." }
 
-  Write-Host "[4/7] Backend syntax"
+  Write-Host "[4/7] Backend install, syntax and tests"
   Push-Location (Join-Path $project "server")
+  npm ci
+  if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Backend dependency install failed." }
   node --check src/index.js
-  if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Backend syntax check failed." }
+  if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Backend index syntax check failed." }
+  node --check src/vehicle-color.js
+  if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Backend vehicle colour parser syntax check failed." }
+  npm test
+  if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Backend unit tests failed." }
   Pop-Location
 
   Write-Host "[5/7] Web install/typecheck/build"
