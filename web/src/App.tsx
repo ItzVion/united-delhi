@@ -135,7 +135,7 @@ export default function App(){
     <nav className="nav" aria-label="Main">
       {nav.map(([k,path,ic,label])=><button key={k} className={tab===k?'on':''} aria-current={tab===k?'page':undefined} onClick={()=>go(path)}><Icon n={ic}/><span>{label}</span></button>)}
     </nav>
-    <Legend open={legend} onClose={()=>setLegend(false)}/>
+    <Legend open={legend} onClose={()=>setLegend(false)} vehicles={vehicles}/>
   </div>;
 }
 
