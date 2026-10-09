@@ -18,6 +18,13 @@ import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type MapBounds = { south:number; west:number; north:number; east:number };
 const DELHI={latitude:28.6139,longitude:77.209};
+// Fixed One Delhi legend samples; map markers themselves continue to use API colours.
+const LEGEND_DIALOG_ROWS=[
+  {key:'ev-ac',label:'EV AC (12 mtr)',color:'#0C7A94'},
+  {key:'ev-devi',label:'EV DEVI AC (9 mtr)',color:'#0BA34F'},
+  {key:'cng-ac',label:'CNG AC (12 mtr)',color:'#2451E8'},
+  {key:'cng-nonac',label:'CNG NonAC (12 mtr)',color:'#FF720D'}
+];
 export default function HomeScreen(){
   const navigation=useNavigation<Nav>();
   const { width:windowWidth }=useWindowDimensions();
@@ -230,9 +237,8 @@ export default function HomeScreen(){
             <Pressable style={styles.legendDialog} onPress={event=>event.stopPropagation()}>
               <Text style={styles.legendTitle}>Bus Color Legend</Text>
               <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Type</Text></View>
-              {legendRows.map(row=><View key={row.key} style={styles.legendRow}><View style={styles.legendIcons}><View style={[styles.legendBus,{backgroundColor:row.color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View></View><Text style={styles.legendType}>{row.label}</Text></View>)}
-              {!legendRows.length?<Text style={styles.legendType}>Live colour data is unavailable.</Text>:null}
-              <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Understood</Text></Pressable>
+              {LEGEND_DIALOG_ROWS.map(row=><View key={row.key} style={styles.legendRow}><View style={styles.legendIcons}><View style={[styles.legendBus,{backgroundColor:row.color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View></View><Text style={styles.legendType}>{row.label}</Text></View>)}
+              <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Got it</Text></Pressable>
             </Pressable>
           </Pressable>
         </Modal>
@@ -373,20 +379,20 @@ const styles=StyleSheet.create({
  sectionLine:{display:'none'},sectionKicker:{fontSize:10,fontWeight:'900',letterSpacing:1.1,color:colors.textMuted},locationLink:{fontSize:11,fontWeight:'900',color:colors.accent},
  mapCard:{borderRadius:0,overflow:'hidden',borderWidth:1,borderColor:colors.border,backgroundColor:'#DDE4E5',marginTop:12,marginHorizontal:0},map:{flex:1},
  legendOverlay:{flex:1,backgroundColor:'rgba(23,49,47,.42)',alignItems:'center',justifyContent:'center',padding:16},
- legendDialog:{width:'100%',maxWidth:520,maxHeight:'85%',backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,padding:16},
- legendTitle:{fontSize:28,fontWeight:'900',color:colors.text,marginBottom:20},
- legendHeader:{flexDirection:'row',justifyContent:'space-between',paddingBottom:7,borderBottomWidth:1,borderBottomColor:colors.border},
- legendHeaderText:{fontSize:15,fontWeight:'500',color:colors.textMuted},
- legendRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingVertical:12,borderBottomWidth:0},
- legendIcons:{flexDirection:'row',gap:7,flex:1},
- legendBus:{width:54,height:38,borderRadius:0,alignItems:'center',justifyContent:'center'},
- legendBusWindow:{position:'absolute',left:6,right:6,top:5,height:6,backgroundColor:'rgba(255,255,255,.22)'},
- legendBusWindshield:{position:'absolute',left:7,right:7,top:13,height:4,backgroundColor:'rgba(255,255,255,.9)'},
- legendBusLightRow:{position:'absolute',left:6,right:6,bottom:3,flexDirection:'row',justifyContent:'space-between'},
+ legendDialog:{width:'100%',maxWidth:400,maxHeight:'85%',backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,padding:14},
+ legendTitle:{fontSize:20,fontWeight:'800',color:colors.text,marginBottom:12},
+ legendHeader:{flexDirection:'row',justifyContent:'flex-start',paddingBottom:5,borderBottomWidth:0,borderBottomColor:colors.border},
+ legendHeaderText:{width:58,fontSize:11,fontWeight:'500',color:colors.textMuted},
+ legendRow:{flexDirection:'row',alignItems:'center',justifyContent:'flex-start',paddingVertical:4,borderBottomWidth:0},
+ legendIcons:{flexDirection:'row',gap:7,width:58,flexGrow:0,flexShrink:0},
+ legendBus:{width:40,height:27,borderRadius:0,alignItems:'center',justifyContent:'center'},
+ legendBusWindow:{position:'absolute',left:5,right:5,top:4,height:5,backgroundColor:'rgba(255,255,255,.22)'},
+ legendBusWindshield:{position:'absolute',left:6,right:6,top:10,height:3,backgroundColor:'rgba(255,255,255,.9)'},
+ legendBusLightRow:{position:'absolute',left:5,right:5,bottom:2,flexDirection:'row',justifyContent:'space-between'},
  legendBusLight:{width:4,height:3,borderRadius:0,backgroundColor:'#fff'},
- legendType:{flex:1,fontSize:15,fontWeight:'500',color:colors.text,textAlign:'right'},
- legendClose:{marginTop:14,minHeight:52,alignItems:'center',justifyContent:'center',backgroundColor:colors.accent,paddingHorizontal:16},
- legendCloseText:{fontSize:15,fontWeight:'900',color:'#fff'},
+ legendType:{flex:1,fontSize:12,fontWeight:'500',color:colors.text,textAlign:'left'},
+ legendClose:{marginTop:8,minHeight:34,alignItems:'center',justifyContent:'center',backgroundColor:'#C7352C',paddingHorizontal:16},
+ legendCloseText:{fontSize:12,fontWeight:'800',color:'#fff'},
  mapTop:{position:'absolute',left:10,top:10,flexDirection:'row',alignItems:'center',backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:9,paddingVertical:6,borderRadius:0},liveDot:{width:7,height:7,borderRadius:0,backgroundColor:colors.success,marginRight:6},mapTopText:{fontSize:10,fontWeight:'900',color:colors.text},mapAttribution:{position:'absolute',right:7,bottom:6,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:5,paddingVertical:2,borderRadius:0},mapAttributionText:{fontSize:7,color:'#52625f'},mapLegend:{position:'absolute',left:7,bottom:7,flexDirection:'row',gap:7,backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:7,paddingVertical:5,borderRadius:0,borderWidth:1,borderColor:colors.border},legendItem:{flexDirection:'row',alignItems:'center',gap:3},legendDot:{width:7,height:7,borderRadius:0},legendText:{fontSize:8,fontWeight:'800',color:colors.text},
  locationNotice:{position:'absolute',left:10,right:10,bottom:10,padding:9,borderRadius:0,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,flexDirection:'row',justifyContent:'space-between'},
  busPreview:{position:'absolute',left:9,right:9,bottom:9,borderRadius:0,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,shadowColor:'#17312F',shadowOpacity:.14,shadowRadius:12,shadowOffset:{width:0,height:4},elevation:6},
