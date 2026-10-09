@@ -4,6 +4,12 @@ import { API_BASE_URL } from '../config';
 export interface Stop { stop_id:string; name:string; latitude:number; longitude:number; distance_m?:number; distanceMeters?:number; }
 export interface Route { route_id:string; short_name:string|null; long_name:string|null; route_color?:string|null; route_text_color?:string|null; stop_sequence?:number; publicRouteName?:string|null; fromStop?:string|null; toStop?:string|null; }
 export interface Vehicle { id:string; routeId:string|null; routeShortName:string|null; routeColor?:string|null; routeTextColor?:string|null; tripId:string|null; stopId:string|null; vehicleLabel?:string|null; licensePlate?:string|null; operator?:string|null; serviceType?:'dtc'|'electric'|'unknown'; serviceColor?:string|null; busType?:string|null;  fromStop?:string|null; toStop?:string|null; latitude:number; longitude:number; bearing:number|null; observedAt:string; }
+export interface MetroRoute { route_id:string; agency_id?:string|null; short_name:string|null; long_name:string|null; route_type?:number; route_color?:string|null; route_text_color?:string|null; }
+export interface MetroStop { stop_id:string; name:string; latitude:number; longitude:number; stop_sequence?:number; }
+export interface MetroDirection { directionId:string|number; fromStop?:string|null; toStop?:string|null; stops:MetroStop[]; }
+export interface MetroFeedMeta { imported_at?:string|null; route_count?:number; stop_count?:number; route_stop_count?:number; }
+export interface MetroResponse { status:string; routes:MetroRoute[]; stops:MetroStop[]; meta?:MetroFeedMeta|null; reason?:string; }
+export interface MetroRouteResponse { status:string; route:MetroRoute; directions:MetroDirection[]; stops:MetroStop[]; reason?:string; }
 export interface SearchResult { type:'stop'|'route'; id:string; label:string; fromStop?:string|null; toStop?:string|null; routeColor?:string|null; routeTextColor?:string|null; stopContext?:string|null; routeCount?:number; }
 export interface TripPlanOption { type:'direct'|'transfer'|'one-transfer'; durationMinutes:number; walkingMinutes:number|null; legs:Array<{routeId:string;routeName:string;routeColor?:string|null;routeTextColor?:string|null;fromStop:string;toStop:string;fromStopId:string;toStopId:string}>; transferStop?:string|null; }
 export interface TripPlanStop { stop_id:string; name:string; latitude:number; longitude:number; }
@@ -23,6 +29,8 @@ export const api={
  stop:(id:string)=>request<{status:string;stop:Stop;routes:Route[]}>(`/api/stops/${encodeURIComponent(id)}`),
  route:(id:string)=>request<{status:string;route:Route;stops:Stop[];vehicles:Vehicle[]}>(`/api/routes/${encodeURIComponent(id)}`),
  arrivals:(stopId:string)=>request<{status:string;arrivals:Arrival[];reason?:string}>(`/api/stops/${encodeURIComponent(stopId)}/arrivals`),
+ metro:()=>request<MetroResponse>('/api/metro',12000),
+ metroRoute:(routeId:string)=>request<MetroRouteResponse>(`/api/metro/routes/${encodeURIComponent(routeId)}`,12000),
  plan:(from:string,to:string,fromStopId?:string,toStopId?:string)=>{const params=new URLSearchParams({from,to});if(fromStopId)params.set('fromStopId',fromStopId);if(toStopId)params.set('toStopId',toStopId);return request<TripPlanResponse>('/api/plan?'+params.toString(),15000);}
 };
 export { ApiError, readVehicleCache };
