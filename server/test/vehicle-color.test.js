@@ -70,7 +70,7 @@ test('auto-detects exact colour in VehiclePosition extensions', () => {
   assert.equal(extractColorsByVehicle(feed({ where: 'position' })).get('DL1PD4669'), '#F97316');
 });
 
-test('explicit extension configuration is respected exactly', () => {
+test('auto-detects exact colour in FeedEntity extensions', () => {\n  assert.equal(extractColorsByVehicle(feed({ where: 'entity' })).get('DL1PD4669'), '#F97316');\n});\n\ntest('explicit extension configuration is respected exactly', () => {
   assert.equal(extractColorsByVehicle(feed(), 'VehicleDescriptor:1001').get('DL1PD4669'), '#F97316');
   assert.equal(extractColorsByVehicle(feed(), 'VehicleDescriptor:1002').size, 0);
   assert.equal(extractColorsByVehicle(feed({ where: 'position' }), 'VehicleDescriptor:1001').size, 0);
