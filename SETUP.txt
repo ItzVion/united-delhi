@@ -12,7 +12,7 @@ UNITED DELHI SETUP
    npm start
 
 3. Backend environment
-   Set DATABASE_URL and DTC_API_KEY in the server environment.
+   Set DATABASE_URL and TRANSPORT_STACK_API_KEY in the server environment.
    Never put either secret in frontend source or the mobile bundle.
 
 4. Current hosted backend
@@ -25,9 +25,10 @@ UNITED DELHI SETUP
    API base URL: https://united-delhi.onrender.com
 
    Required environment variables:
-   - DTC_API_KEY
+   - TRANSPORT_STACK_API_KEY
    - DATABASE_URL
    - APP_ORIGINS
+   - TRANSPORT_STACK_REALTIME_URL (optional; defaults to the approved Transport Stack endpoint)
 5. Static GTFS data
    The repository uses its pinned GTFS snapshot unless a newer compatible source is
    verified against the realtime route IDs.

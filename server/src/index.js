@@ -10,9 +10,8 @@ import {syncMetroStatic} from './metro-sync.js';
 const {Pool}=pg,app=express();
 const PORT=Number(process.env.PORT)||10000;
 const DB=String(process.env.DATABASE_URL||'').trim();
-const KEY=String(process.env.DTC_API_KEY||'').trim();
-const FEED=String(process.env.DTC_REALTIME_URL||'https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb').trim();
-const KEY_PARAM=String(process.env.DTC_API_KEY_PARAM||'key').trim()||'key';
+const TRANSPORT_STACK_KEY=String(process.env.TRANSPORT_STACK_API_KEY||'').trim();
+const TRANSPORT_STACK_FEED=String(process.env.TRANSPORT_STACK_REALTIME_URL||'https://dts-backend.transportstack.in/api/dataset/otd/get-file?agency=delhi-buses&category=realtime_gtfs&filename=VehiclePositions.pb').trim();
 const REALTIME_PERSIST_INTERVAL_MS=Math.max(15000,Number(process.env.REALTIME_PERSIST_INTERVAL_MS)||60000);
 let DB_CONNECTION=DB;try{if(DB){const u=new URL(DB);u.searchParams.delete('sslmode');DB_CONNECTION=u.toString()}}catch{} const pool=DB?new Pool({connectionString:DB_CONNECTION,max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000,ssl:/localhost|127(?:\.\d+){3}|::1/i.test(DB)?false:{rejectUnauthorized:true}}):null;
 
@@ -37,7 +36,7 @@ const classifyFleet=(id,...aliases)=>{
  return{serviceType:'unknown',busType:'Unknown',serviceColor:SERVICE_COLORS.unknown};
 };
 const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>classifyFleet(id,licensePlate,vehicleLabel);
-const cache={vehicles:[],status:KEY?'STARTING':'UNAVAILABLE',reason:KEY?'Render API is starting':'DTC_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
+const cache={vehicles:[],status:TRANSPORT_STACK_KEY?'STARTING':'UNAVAILABLE',reason:TRANSPORT_STACK_KEY?'Render API is starting':'TRANSPORT_STACK_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
 let refreshing=null,poll=null,routeMetaLoadedAt=0,persistPromise=null,lastPersistAt=0,dtcAutoImportRunning=false;
 const routeMeta=new Map();
 const fleetRegistry=new Map();
@@ -244,9 +243,9 @@ function parseVehicle(e,feedTs){
  return{id,routeId:str(v?.trip?.routeId),tripId:str(v?.trip?.tripId),stopId:str(v?.stopId),vehicleLabel:str(v?.vehicle?.label),licensePlate:str(v?.vehicle?.licensePlate),latitude:lat,longitude:lon,bearing:num(p.bearing),observedAt:new Date(ts*1000).toISOString()};
 }
 async function fetchLive(){
- if(!KEY)throw new Error('DTC_API_KEY is not configured');
- const u=new URL(FEED);u.searchParams.set(KEY_PARAM,KEY);const ac=new AbortController(),t=setTimeout(()=>ac.abort(),12000);
- try{const r=await fetch(u,{signal:ac.signal,headers:{accept:'application/x-protobuf, application/octet-stream','user-agent':'United-Delhi/2.0'}});if(!r.ok)throw new Error('DTC realtime HTTP '+r.status);const b=new Uint8Array(await r.arrayBuffer());if(b.length>10*1024*1024)throw new Error('Realtime feed exceeds safety limit');const f=GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(b),m=new Map();for(const e of f.entity||[]){const v=parseVehicle(e,Number(f.header?.timestamp||0));if(v)m.set(v.id,v)}return[...m.values()]}catch(e){if(e?.name==='AbortError')throw new Error('DTC realtime request timed out');throw e}finally{clearTimeout(t)}
+ if(!TRANSPORT_STACK_KEY)throw new Error('TRANSPORT_STACK_API_KEY is not configured');
+ const u=new URL(TRANSPORT_STACK_FEED);const ac=new AbortController(),t=setTimeout(()=>ac.abort(),12000);
+ try{const r=await fetch(u,{signal:ac.signal,headers:{'x-api-key':TRANSPORT_STACK_KEY,accept:'application/x-protobuf, application/octet-stream','user-agent':'United-Delhi/2.0'}});if(!r.ok)throw new Error('Transport Stack realtime HTTP '+r.status);const b=new Uint8Array(await r.arrayBuffer());if(b.length>10*1024*1024)throw new Error('Realtime feed exceeds safety limit');const f=GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(b),m=new Map();for(const e of f.entity||[]){const v=parseVehicle(e,Number(f.header?.timestamp||0));if(v)m.set(v.id,v)}return[...m.values()]}catch(e){if(e?.name==='AbortError')throw new Error('Transport Stack realtime request timed out');throw e}finally{clearTimeout(t)}
 }
 async function enrich(vs){
  if(!pool||!vs.length)return vs.map(v=>{const svc=service(v.id,null,v.routeShortName,v.routeId,v.licensePlate,v.vehicleLabel);return applyFleetRegistry({...v,routeColor:null,routeLongName:null,...svc})});
@@ -271,13 +270,13 @@ async function refresh(){
    if(pool)try{await registerFleetVehicles(raw)}catch(error){console.error('Fleet registry seed failed:',error?.message||error)}
    cache.vehicles=raw.map(applyRouteMeta);
    cache.status='OK';cache.reason=null;cache.fetchedAt=new Date().toISOString();
-   cache.source='dtc-live';
+   cache.source='transport-stack-live';
    queuePersist(cache.vehicles);
-   console.log('Realtime feed decoded: '+raw.length+' vehicles; Neon/client caches refreshed.');
+   console.log('Transport Stack realtime feed decoded: '+raw.length+' vehicles; Neon/client caches refreshed.');
   }catch(e){
    cache.status=cache.fetchedAt?'STALE':'UNAVAILABLE';
    const message=e instanceof Error?e.message:String(e||'Realtime request failed');
-   cache.reason=cache.vehicles.length?'Live DTC data is temporarily unavailable; showing the last known bus positions.':message;
+   cache.reason=cache.vehicles.length?'Live Transport Stack data is temporarily unavailable; showing the last known bus positions.':message;
    console.error('Realtime poll failed:',message);
   }
  })().finally(()=>{refreshing=null});
@@ -291,7 +290,7 @@ app.get('/ready',(_q,r)=>r.json({status:'OK',database:Boolean(pool),realtime:cac
 app.get('/api/status',async(_q,r)=>{let database='NOT_CONFIGURED';if(pool){try{await pool.query('SELECT 1');database='OK'}catch{database='ERROR'}}r.json({status:'OK',database,realtime:cache.status,realtimeVehicles:cache.vehicles.length,fetchedAt:cache.fetchedAt,source:cache.source,persistedAt:cache.persistedAt,reason:cache.reason})});
 app.get('/api/realtime/vehicles',async(_q,r)=>{
  let stale=!cache.fetchedAt||Date.now()-Date.parse(cache.fetchedAt)>90000;
- if(stale&&KEY)await refresh().catch(()=>{});
+ if(stale&&TRANSPORT_STACK_KEY)await refresh().catch(()=>{});
  stale=!cache.fetchedAt||Date.now()-Date.parse(cache.fetchedAt)>90000;
  const hasData=cache.vehicles.length>0;
  r.setHeader('Cache-Control','no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -349,7 +348,7 @@ function runMetroStaticSync(){
 }
 app.use((_q,r)=>r.status(404).json({status:'NOT_FOUND',reason:'Endpoint not found'}));
 app.use((e,_q,r,_n)=>{console.error('Unhandled request error:',e?.message||e);if(!r.headersSent)r.status(500).json({status:'ERROR',reason:'Internal server error'})});
-const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(async()=>{try{if(pool){await ensureRuntimeSchema();await loadFleetRegistry(true);await loadRouteMeta();await loadDatabaseVehicleCache();autoImportDtcStaticIfEmpty()}}catch(e){console.error('Database bootstrap failed:',e?.message||e)}if(KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}if(pool&&String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()!=='false'){setTimeout(runMetroStaticSync,5000);setInterval(runMetroStaticSync,24*60*60*1000)}},1500)});
+const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(async()=>{try{if(pool){await ensureRuntimeSchema();await loadFleetRegistry(true);await loadRouteMeta();await loadDatabaseVehicleCache();autoImportDtcStaticIfEmpty()}}catch(e){console.error('Database bootstrap failed:',e?.message||e)}if(TRANSPORT_STACK_KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}if(pool&&String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()!=='false'){setTimeout(runMetroStaticSync,5000);setInterval(runMetroStaticSync,24*60*60*1000)}},1500)});
 server.requestTimeout=30000;server.headersTimeout=40000;server.keepAliveTimeout=65000;
 process.on('unhandledRejection',e=>console.error('Unhandled rejection:',e));process.on('uncaughtException',e=>console.error('Uncaught exception:',e));
 for(const sig of ['SIGTERM','SIGINT'])process.on(sig,async()=>{if(poll)clearInterval(poll);server.close();await pool?.end().catch(()=>{});process.exit(0)});

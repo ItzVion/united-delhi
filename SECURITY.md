@@ -10,10 +10,10 @@ For a suspected security vulnerability in United Delhi, use a private GitHub sec
 
 The following values must remain server-side and must never be committed:
 
-- `DTC_API_KEY`
+- `TRANSPORT_STACK_API_KEY`
 - `DATABASE_URL`
 
-The mobile app and website receive only the public API base URL. There is no realtime relay secret in the current architecture.
+The mobile app and website receive only the public API base URL. The Transport Stack realtime API key is used only by the backend relay and must never be bundled into client apps.
 
 ## Scope
 

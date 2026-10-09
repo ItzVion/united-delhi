@@ -6,13 +6,10 @@ Delhi DTC bus tracking app built with Expo React Native.
 
 The repository is intentionally kept free of private credentials. The mobile app can request location permission, while the DTC API integration belongs in the backend.
 
-Official Delhi Open Transit Data documentation:
-https://otd.delhi.gov.in/documentation/
+Live bus positions are retrieved server-side from the approved Delhi Transport Stack GTFS-Realtime feed:
+https://dts-backend.transportstack.in/api/dataset/otd/get-file?agency=delhi-buses&category=realtime_gtfs&filename=VehiclePositions.pb
 
-The official realtime endpoint is documented as:
-https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb?key=YOUR_PRIVATE_KEY
-
-Static GTFS data and realtime access require the relevant OTD access steps. The official documentation warns that stop_times.txt is only a rough constant-speed estimate, so the app must label scheduled ETAs as estimates.
+The API key is sent in the `x-api-key` request header and must be configured only as `TRANSPORT_STACK_API_KEY` on the backend. The website and mobile app never receive this secret. Static route/stop metadata remains in Neon and is managed independently from the live positions feed. Scheduled arrival estimates should be labelled as estimates.
 
 ## Legal
 

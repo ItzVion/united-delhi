@@ -110,7 +110,7 @@ Repository configuration was checked for the expected secret boundary.
 
 The repository contains only placeholders in .env.example:
 
-- DTC_API_KEY=YOUR_PRIVATE_DTC_KEY
+- TRANSPORT_STACK_API_KEY=YOUR_PRIVATE_TRANSPORT_STACK_KEY
 - DATABASE_URL=YOUR_NEON_POSTGRES_CONNECTION_STRING
 
 No real values were added to the repository.

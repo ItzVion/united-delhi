@@ -1,10 +1,10 @@
 # United Delhi API v2
 
-The server exposes HTTP immediately. Realtime polling and DMRC Metro static refresh run in the background after startup, so Render health checks never wait for Neon or the DTC feed. DTC static route/stop data is canonical in Neon and is not bundled into the server.
+The server exposes HTTP immediately. Realtime polling and DMRC Metro static refresh run in the background after startup, so Render health checks never wait for Neon or the Transport Stack feed. DTC static route/stop data is canonical in Neon and is not bundled into the server.
 
-Secrets are server-only: DATABASE_URL and DTC_API_KEY must never be bundled into the web app or APK.
+Secrets are server-only: DATABASE_URL and TRANSPORT_STACK_API_KEY must never be bundled into the web app or APK.
 
-DTC route/stop metadata is loaded from the canonical Neon PostgreSQL database. Live DTC vehicles come from the configured GTFS-Realtime endpoint. Metro static data is refreshed separately by the DMRC GTFS synchronizer.
+DTC route/stop metadata is loaded from the canonical Neon PostgreSQL database. Live vehicle positions come from the Delhi Transport Stack GTFS-Realtime VehiclePositions.pb endpoint using the x-api-key request header. Set TRANSPORT_STACK_API_KEY in Render; TRANSPORT_STACK_REALTIME_URL defaults to the approved endpoint. Metro static data is refreshed separately by the DMRC GTFS synchronizer.
 
 Endpoints:
 GET /health
@@ -30,7 +30,7 @@ DATABASE_URL="..." npm run import:dtc
 
 The importer uses the current public Mobility Database snapshot by default. Override it with `DTC_STATIC_URL` when a newer verified GTFS ZIP becomes available. Run `server/sql/001_reset_and_schema.sql` first when a full database reset/rebuild is intended.
 
-The realtime service refreshes its in-memory DTC route metadata when the database was previously empty and then periodically (at most every 15 minutes), so a completed one-time static import is picked up without requiring a database-side restart.
+The realtime service refreshes its in-memory route metadata when the database was previously empty and then periodically (at most every 15 minutes), so a completed one-time static import is picked up without requiring a database-side restart.
 
 ### Exact per-vehicle fleet colours
 
