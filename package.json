@@ -7,11 +7,11 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "node web/serve.mjs",
+    "web": "npm --prefix web install && npm --prefix web run dev -- --host 0.0.0.0 --port 8080",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test \"src/lib/__tests__/*.test.ts\"",
     "build:apk": "powershell -ExecutionPolicy Bypass -File scripts/build-local-v1.ps1",
-    "web:check": "node web/check.mjs",
+    "web:check": "npm --prefix web install && npm --prefix web run typecheck && npm --prefix web run build",
     "build": "npm --prefix web install && npm --prefix web run build",
     "build:web": "npm --prefix web install && npm --prefix web run build",
     "build:android:local": "powershell -ExecutionPolicy Bypass -File scripts/build-local-v1.ps1"
