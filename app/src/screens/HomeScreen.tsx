@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
 import { useNavigation } from '@react-navigation/native';
@@ -21,6 +21,9 @@ const DELHI={latitude:28.6139,longitude:77.209};
 const UNKNOWN_BUS_MARKER_COLOR='#64748B';
 export default function HomeScreen(){
   const navigation=useNavigation<Nav>();
+  const insets=useSafeAreaInsets();
+  // Keep app tabs above Android system navigation buttons.
+  const bottomInset=Math.max(insets.bottom,Platform.OS==='android'?24:0);
   const { width:windowWidth }=useWindowDimensions();
   const contentWidth=Math.min(windowWidth,760);
   const mapHeight=Math.min(380,Math.max(275,contentWidth*0.36));
@@ -34,6 +37,7 @@ export default function HomeScreen(){
   const [fresh,setFresh]=useState<'loading'|'ok'|'stale'|'unavailable'>('loading');
   const [lastRealtimeAt,setLastRealtimeAt]=useState<string|null>(null);
   const [mapReady,setMapReady]=useState(false);
+  const [mapError,setMapError]=useState(false);
   const [bounds,setBounds]=useState<MapBounds|null>(null);
   const [selectedBus,setSelectedBus]=useState<Vehicle|null>(null);
   const [searchQuery,setSearchQuery]=useState('');
@@ -147,8 +151,8 @@ export default function HomeScreen(){
   const realtimeAgeLabel=realtimeAge===null?'':realtimeAge<60?'just now':`${Math.floor(realtimeAge/60)} min ago`;
   const liveLabel=fresh==='ok'?(`${vehicles.length} live buses`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='loading'?'Checking live buses':vehicles.length?(`${vehicles.length} buses · connection lost`):'Live data unavailable';
 
-  return <SafeAreaView style={styles.safe}>
-    <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+  return <SafeAreaView style={styles.safe} edges={['top','left','right']}>
+    <ScrollView contentContainerStyle={[styles.scroll,{paddingBottom:118+bottomInset}] showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={styles.brandRow}><UnitedDelhiMark size={50}/><View style={styles.brandCopy}><Text style={styles.brand}>UNITED DELHI</Text><Text style={styles.tagline}>Delhi transit</Text></View></View>
         <StatusPill label={liveLabel} tone={fresh==='ok'?'ok':fresh==='unavailable'?'danger':fresh==='stale'?'muted':'muted'}/>
@@ -182,11 +186,14 @@ export default function HomeScreen(){
           cacheEnabled
           userAgent="UnitedDelhi/1.0 (+https://github.com/ItzVion/united-delhi)"
           source={mapSource}
-          onLoadEnd={()=>setMapReady(true)}
+          onError={()=>{setMapReady(false);setMapError(true);}}
           onMessage={event=>{
             try{
               const m=JSON.parse(event.nativeEvent.data);
-              if(m.type==='stop'){
+              if(m.type==='map-ready'){setMapReady(true);setMapError(false);}
+              else if(m.type==='map-error'||m.type==='map-tile-error'){setMapReady(false);setMapError(true);}
+              else if(m.type==='map-tiles-ok'){setMapError(false);}
+              else if(m.type==='stop'){
                 const stop=nearbyStops.find(s=>s.stop_id===m.stopId);
                 if(stop)navigation.navigate('StopDetails',{stopId:stop.stop_id,stopName:stop.name});
               }else if(m.type==='bus'){
@@ -202,6 +209,7 @@ export default function HomeScreen(){
           <View style={styles.liveDot}/>
           <Text style={styles.mapTopText}>{fresh==='ok'?(`${vehicles.length} buses live`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='unavailable'?'Live data unavailable':'Checking live buses'}</Text>
         </View>
+        {mapError?<View style={styles.mapErrorOverlay}><Text style={styles.mapErrorTitle}>Map couldn't load</Text><Text style={styles.mapErrorText}>Check your connection and try loading the map again.</Text><Pressable style={styles.mapRetry} onPress={()=>{setMapReady(false);setMapError(false);mapRef.current?.reload();}}><Text style={styles.mapRetryText}>Retry map</Text></Pressable></View>:null}
         <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}>{legendRows.map(row=><View key={row.key} style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:row.color}]}/><Text style={styles.legendText}>{row.label}</Text></View>)}</View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
@@ -257,12 +265,13 @@ export default function HomeScreen(){
       <Pressable style={styles.legal} onPress={()=>navigation.navigate('Legal')}><Text style={styles.legalText}>Legal & privacy</Text></Pressable>
     </ScrollView>
 
-    <View style={styles.bottomNav}>
+    <View style={[styles.bottomNav,{bottom:bottomInset}]}>
       <BottomItem icon="⌂" label="Bus" active onPress={()=>{}}/>
       <BottomItem icon="↗" label="Trip Plan" onPress={()=>navigation.navigate('Planner')}/>
       <BottomItem icon="◎" label="Metro" onPress={()=>navigation.navigate('Metro')}/>
       <BottomItem icon="☰" label="Settings" onPress={()=>navigation.navigate('Settings')}/>
     </View>
+    {Platform.OS==='android'?<View pointerEvents="none" style={[styles.systemNavBackground,{height:bottomInset}]}/>:null}
   </SafeAreaView>;
 }
 
@@ -279,16 +288,18 @@ html,body,#map{margin:0;width:100%;height:100%;background:#eef2f1}.leaflet-contr
 .leaflet-control-locate{margin:0 8px 32px 0}.leaflet-control-locate button{width:40px;height:40px;border:1px solid #d8e4e0;border-radius:0;background:#fff;color:#0b746b;font:900 21px system-ui;line-height:40px;box-shadow:0 3px 14px rgba(23,49,47,.18);cursor:pointer}.leaflet-control-locate button:active{transform:scale(.96)}
 .stop-label{width:10px;height:10px;border-radius:0;background:#0b746b;border:2px solid #fff;box-shadow:0 2px 6px rgba(23,49,47,.28)}.ud-mobile-bus{position:relative;width:44px;height:26px;border:0;box-shadow:0 3px 9px rgba(23,49,47,.30);display:flex;align-items:center;justify-content:center;gap:2px;box-sizing:border-box;font:900 7px/1 system-ui,sans-serif;overflow:hidden;white-space:nowrap}.ud-mobile-bus.unknown-colour{outline:1px dashed rgba(255,255,255,.95);outline-offset:1px;box-shadow:0 0 0 1px #64748b,0 3px 9px rgba(23,49,47,.30)}.ud-colour-unknown{position:absolute;top:1px;right:1px;z-index:2;width:10px;height:10px;display:grid;place-items:center;border:1px solid #475569;border-radius:50%;background:#fff;color:#475569;font:900 8px/8px system-ui,sans-serif}.ud-mobile-bus-glyph{width:17px;height:17px;display:grid;place-items:center;flex:0 0 auto}.ud-mobile-bus-glyph svg{width:17px;height:17px;display:block}.ud-mobile-bus-label{max-width:20px;overflow:hidden;text-overflow:clip}
 </style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script>
+function notifyNative(message){try{window.ReactNativeWebView?.postMessage?.(JSON.stringify(message))}catch{}}
+window.onerror=function(message){notifyNative({type:'map-error',message:String(message||'Map script error')});return false;};
 let currentLocation=null;let autoFocused=false;let lastBusData=[];
-const saved=localStorage.getItem('ud-map-center');
+let saved=null;try{saved=window.localStorage.getItem('ud-map-center')}catch{}
 let initialCenter=[28.6139,77.209],initialZoom=10.5;
 try{if(saved){const p=JSON.parse(saved);if(Number.isFinite(p.lat)&&Number.isFinite(p.lon)){initialCenter=[p.lat,p.lon];initialZoom=14;}}}catch{}
 const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:false,zoomSnap:.5,minZoom:9,maxBounds:[[28.40,76.84],[28.88,77.35]],maxBoundsViscosity:.18,inertia:true,inertiaDeceleration:1800,inertiaMaxSpeed:1800,bounceAtZoomLimits:false}).setView(initialCenter,initialZoom);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);
+const tileLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);let failedTiles=0;tileLayer.on('tileerror',()=>{failedTiles++;if(failedTiles>=3)notifyNative({type:'map-tile-error'})});tileLayer.on('tileload',()=>{failedTiles=0;notifyNative({type:'map-tiles-ok'})});
 const stopLayer=L.layerGroup().addTo(map),busLayer=L.layerGroup().addTo(map),userLayer=L.layerGroup().addTo(map),busMarkers=new Map(),busAnimations=new Map();
-const legendControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-legend'),button=L.DomUtil.create('button','');button.type='button';button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';button.title='Bus color legend';button.setAttribute('aria-label','Bus color legend');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'legend'})));wrap.appendChild(button);return wrap;}});map.addControl(new legendControl());
-const locateControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-locate'),button=L.DomUtil.create('button','');button.type='button';button.textContent='◎';button.title='Center on my location';button.setAttribute('aria-label','Center on my location');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>{if(currentLocation){map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.0,easeLinearity:.2})}else{window.ReactNativeWebView.postMessage(JSON.stringify({type:'locate'}));}});wrap.appendChild(button);return wrap;}});map.addControl(new locateControl());
-function reportBounds(){const b=map.getBounds();const c=map.getCenter();try{localStorage.setItem('ud-map-center',JSON.stringify({lat:c.lat,lon:c.lng}));}catch{}window.ReactNativeWebView.postMessage(JSON.stringify({type:'bounds',bounds:{south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()}}));}
+const legendControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-legend'),button=L.DomUtil.create('button','');button.type='button';button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';button.title='Bus color legend';button.setAttribute('aria-label','Bus color legend');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>notifyNative({type:'legend'}));wrap.appendChild(button);return wrap;}});map.addControl(new legendControl());
+const locateControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-locate'),button=L.DomUtil.create('button','');button.type='button';button.textContent='◎';button.title='Center on my location';button.setAttribute('aria-label','Center on my location');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>{if(currentLocation){map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.0,easeLinearity:.2})}else{notifyNative({type:'locate'});}});wrap.appendChild(button);return wrap;}});map.addControl(new locateControl());
+function reportBounds(){const b=map.getBounds();const c=map.getCenter();try{localStorage.setItem('ud-map-center',JSON.stringify({lat:c.lat,lon:c.lng}));}catch{}notifyNative({type:'bounds',bounds:{south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()}});}
 map.on('moveend',reportBounds);map.on('zoomend',reportBounds);setTimeout(reportBounds,250);
 function markerFor(v){
  const bg=validColor(v.color)?v.color:'transparent';
@@ -346,17 +357,18 @@ window.updateMap=function(data){
  currentLocation=data.location||null;if(!currentLocation)autoFocused=false;lastBusData=Array.isArray(data.buses)?data.buses:[];
  stopLayer.clearLayers();userLayer.clearLayers();
  const stopIcon=L.divIcon({className:'',html:'<div class="stop-label"></div>',iconSize:[14,14],iconAnchor:[7,7]});
- data.stops.forEach(s=>{const popup=document.createElement('div'),title=document.createElement('b'),button=document.createElement('button');title.textContent=s.name;button.textContent='View stop';button.type='button';button.style.marginTop='6px';button.onclick=()=>openStop(s.id);popup.append(title,document.createElement('br'),button);L.marker([s.lat,s.lon],{icon:stopIcon,zIndexOffset:300}).addTo(stopLayer).bindPopup(popup);});
+ (Array.isArray(data.stops)?data.stops:[]).forEach(s=>{const popup=document.createElement('div'),title=document.createElement('b'),button=document.createElement('button');title.textContent=s.name;button.textContent='View stop';button.type='button';button.style.marginTop='6px';button.onclick=()=>openStop(s.id);popup.append(title,document.createElement('br'),button);L.marker([s.lat,s.lon],{icon:stopIcon,zIndexOffset:300}).addTo(stopLayer).bindPopup(popup);});
  if(currentLocation&&!autoFocused){autoFocused=true;setTimeout(()=>map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.2,easeLinearity:.2}),80);}
  renderBuses();
  if(currentLocation)L.circleMarker([currentLocation.lat,currentLocation.lon],{radius:9,color:'#fff',weight:3,fillColor:'#0b746b',fillOpacity:1}).addTo(userLayer);
 };
+notifyNative({type:'map-ready'});
 function centerOnUser(){if(currentLocation)map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.2,easeLinearity:.2});}
-function openStop(id){window.ReactNativeWebView.postMessage(JSON.stringify({type:'stop',stopId:id}));}
+function openStop(id){notifyNative({type:'stop',stopId:id});}
 function openBus(id){
  const marker=busMarkers.get(id);
  if(marker){map.stop();map.flyTo(marker.getLatLng(),18,{duration:.45,easeLinearity:.25});}
- window.ReactNativeWebView.postMessage(JSON.stringify({type:'bus',busId:id}));
+ notifyNative({type:'bus',busId:id});
 }
 function validColor(x){return /^#[0-9a-f]{6}$/i.test(String(x));}
 function textColorFor(apiColor){if(!validColor(apiColor))return '#14211B';const h=String(apiColor).slice(1),rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255),lin=rgb.map(c=>c<=.03928?c/12.92:Math.pow((c+.055)/1.055,2.4));return .2126*lin[0]+.7152*lin[1]+.0722*lin[2]>.179?'#14211B':'#FFFFFF';}
@@ -373,6 +385,7 @@ const styles=StyleSheet.create({
  searchResults:{marginTop:7,borderRadius:0,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,overflow:'hidden'},searchResult:{minHeight:52,paddingHorizontal:12,paddingVertical:9,flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderBottomColor:colors.border},searchBadge:{minWidth:48,height:30,borderRadius:0,alignItems:'center',justifyContent:'center',paddingHorizontal:6},searchBadgeText:{fontSize:10,fontWeight:'900'},searchStopIcon:{width:30,height:30,borderRadius:0,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},searchStopDot:{fontSize:9,color:colors.accent},searchCopy:{flex:1,marginLeft:9},searchTitle:{fontSize:11,fontWeight:'900',color:colors.text},searchMeta:{fontSize:9,color:colors.textMuted,marginTop:2},searchArrow:{fontSize:21,color:colors.textMuted},searchEmpty:{padding:13,fontSize:10,color:colors.textMuted},searchError:{padding:13,fontSize:10,color:colors.danger},
  sectionLine:{display:'none'},sectionKicker:{fontSize:10,fontWeight:'900',letterSpacing:1.1,color:colors.textMuted},locationLink:{fontSize:11,fontWeight:'900',color:colors.accent},
  mapCard:{borderRadius:0,overflow:'hidden',borderWidth:1,borderColor:colors.border,backgroundColor:'#DDE4E5',marginTop:12,marginHorizontal:0},map:{flex:1},
+ mapErrorOverlay:{position:'absolute',left:10,right:10,top:10,bottom:10,alignItems:'center',justifyContent:'center',padding:18,backgroundColor:'rgba(255,254,250,.97)',borderWidth:1,borderColor:colors.border,zIndex:10},mapErrorTitle:{fontSize:16,fontWeight:'900',color:colors.text},mapErrorText:{fontSize:12,lineHeight:18,textAlign:'center',color:colors.textMuted,marginTop:6},mapRetry:{marginTop:12,paddingHorizontal:18,paddingVertical:10,backgroundColor:colors.accentDark},mapRetryText:{fontSize:12,fontWeight:'900',color:'#FFFFFF'},
  legendOverlay:{flex:1,backgroundColor:'rgba(23,49,47,.42)',alignItems:'center',justifyContent:'center',padding:16},
  legendDialog:{width:'100%',maxWidth:440,maxHeight:'85%',backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,padding:18},
  legendTitle:{fontSize:24,fontWeight:'800',color:colors.text,marginBottom:18},
@@ -406,5 +419,6 @@ const styles=StyleSheet.create({
  stopCard:{flexDirection:'row',alignItems:'center',paddingHorizontal:14,paddingVertical:11,borderRadius:0,backgroundColor:colors.surface,borderWidth:0,borderTopWidth:1,borderColor:'#EDF0F1',marginBottom:0},stopIcon:{width:30,height:30,borderRadius:0,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},stopIconText:{fontSize:10,color:colors.accent},stopCopy:{flex:1,marginLeft:10},stopName:{fontSize:13,fontWeight:'800',color:colors.text},stopDistance:{fontSize:10,color:colors.textMuted,marginTop:2},arrow:{fontSize:24,color:colors.textMuted,marginLeft:7},
  emptyCard:{padding:18,borderRadius:0,backgroundColor:colors.surface,borderWidth:0,borderTopWidth:1,borderColor:'#EDF0F1'},emptyTitle:{fontSize:13,fontWeight:'900',color:colors.text},emptyText:{fontSize:11,color:colors.textMuted,marginTop:3},
  legal:{alignItems:'center',paddingVertical:18},legalText:{fontSize:10,fontWeight:'800',color:colors.textMuted},
+ systemNavBackground:{position:'absolute',left:0,right:0,bottom:0,backgroundColor:'#000000',zIndex:20},
  bottomNav:{position:'absolute',left:0,right:0,bottom:0,maxWidth:760,alignSelf:'center',height:62,borderRadius:0,backgroundColor:colors.accentDark,flexDirection:'row',alignItems:'center',justifyContent:'space-around',paddingBottom:0,elevation:10,shadowColor:'#071019',shadowOpacity:.25,shadowRadius:16,shadowOffset:{width:0,height:7}},bottomItem:{width:78,height:52,borderRadius:0,alignItems:'center',justifyContent:'center'},bottomIcon:{fontSize:19,fontWeight:'900'},bottomLabel:{fontSize:9,fontWeight:'800',marginTop:3}
 });
