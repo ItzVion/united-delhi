@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {busColor} from '../../../web/src/lib.ts';
+import {busColor} from '../../../../web/src/lib.ts';
 
 test('web marker preserves the exact API colour regardless of bus type',()=>{
   assert.equal(busColor({id:'DL1PD4669',busType:'CNG AC (12 mtr)',serviceColor:'#F97316'}),'#F97316');
