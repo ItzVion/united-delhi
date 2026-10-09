@@ -21,11 +21,11 @@ const num=v=>{const x=Number(v);return Number.isFinite(x)?x:null};
 const coord=(v,a,b)=>{const x=num(v);return x!==null&&x>=a&&x<=b?x:null};
 const dist=(a,b,c,d)=>{const R=6371000,r=Math.PI/180,la=(c-a)*r,lo=(d-b)*r,x=Math.sin(la/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(lo/2)**2;return 2*R*Math.asin(Math.sqrt(x))};
 const SERVICE_COLORS={
- electricAc:'#58B8C7',
- electricDevi:'#42A968',
- cngAc:'#4D8FD0',
- cngNonAc:'#E8B083',
- unknown:'#8B959B'
+ electricAc:'#0E7490',
+ electricDevi:'#16A34A',
+ cngAc:'#1D4ED8',
+ cngNonAc:'#F97316',
+ unknown:'#64748B'
 };
 const classifyFleet=(id,...aliases)=>{
  const candidates=[id,...aliases].map(x=>String(x||'').toUpperCase().replace(/[-_\s]/g,'')).filter(Boolean);

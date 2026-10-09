@@ -200,7 +200,7 @@ export default function HomeScreen(){
           <View style={styles.liveDot}/>
           <Text style={styles.mapTopText}>{fresh==='ok'?(`${vehicles.length} buses live`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='unavailable'?'Live data unavailable':'Checking live buses'}</Text>
         </View>
-        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#58B8C7'}]}/><Text style={styles.legendText}>EV AC (12 mtr)</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#42A968'}]}/><Text style={styles.legendText}>EV DEVI AC (9 mtr)</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#4D8FD0'}]}/><Text style={styles.legendText}>CNG AC (12 mtr)</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#E8B083'}]}/><Text style={styles.legendText}>CNG NonAC (12 mtr)</Text></View></View>
+        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#0E7490'}]}/><Text style={styles.legendText}>EV AC (12 mtr)</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#16A34A'}]}/><Text style={styles.legendText}>EV DEVI AC (9 mtr)</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#1D4ED8'}]}/><Text style={styles.legendText}>CNG AC (12 mtr)</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#F97316'}]}/><Text style={styles.legendText}>CNG NonAC (12 mtr)</Text></View></View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
           const name=displayRouteName(selectedBus.routeShortName) || displayRouteName(selectedBus.routeId) || 'Bus';
@@ -230,10 +230,10 @@ export default function HomeScreen(){
               <Text style={styles.legendTitle}>Bus Color Legend</Text>
               <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Type</Text></View>
               {[
-                [['#58B8C7','EV AC (12 mtr)']],
-                [['#42A968','EV DEVI AC (9 mtr)']],
-                [['#4D8FD0','CNG AC (12 mtr)']],
-                [['#E8B083','CNG NonAC (12 mtr)']]
+                [['#0E7490','EV AC (12 mtr)']],
+                [['#16A34A','EV DEVI AC (9 mtr)']],
+                [['#1D4ED8','CNG AC (12 mtr)']],
+                [['#F97316','CNG NonAC (12 mtr)']]
               ].map((row,index)=><View key={index} style={styles.legendRow}><View style={styles.legendIcons}>{row.map(([color],j)=><View key={j} style={[styles.legendBus,{backgroundColor:color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View>)}</View><Text style={styles.legendType}>{row[0][1]}</Text></View>)}
               <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Understood</Text></Pressable>
             </Pressable>
