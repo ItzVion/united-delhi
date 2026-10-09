@@ -1,9 +1,13 @@
 UNITED DELHI SETUP
 
 1. Frontend
-   In the project directory:
+   From the repository root:
    npm install
    npx expo start
+
+   For the web client:
+   npm --prefix web install
+   npm --prefix web run dev
 
 2. Backend
    From the server directory:
@@ -17,18 +21,19 @@ UNITED DELHI SETUP
 
 4. Current hosted backend
    Provider: Render
-   Service: https://united-delhi.onrender.com
+   Service: https://united-delhi-api.onrender.com
    Service root: ./server
    Build command: npm ci
    Start command: npm start
-   Health endpoint: https://united-delhi.onrender.com/health
-   API base URL: https://united-delhi.onrender.com
+   Health endpoint: https://united-delhi-api.onrender.com/health
+   API base URL: https://united-delhi-api.onrender.com
 
    Required environment variables:
    - TRANSPORT_STACK_API_KEY
    - DATABASE_URL
    - APP_ORIGINS
    - TRANSPORT_STACK_REALTIME_URL (optional; defaults to the approved Transport Stack endpoint)
+
 5. Static GTFS data
    The repository uses its pinned GTFS snapshot unless a newer compatible source is
    verified against the realtime route IDs.
