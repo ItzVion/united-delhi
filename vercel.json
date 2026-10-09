@@ -48,19 +48,6 @@
           "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; connect-src 'self' https://united-delhi.onrender.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:"
         }
       ]
-    },
-    {
-      "source": "/api/realtime/vehicles",
-      "headers": [
-        {
-          "key": "CDN-Cache-Control",
-          "value": "public, max-age=10, stale-while-revalidate=60, stale-if-error=300"
-        },
-        {
-          "key": "Vercel-Cache-Tag",
-          "value": "realtime-vehicles"
-        }
-      ]
     }
   ],
   "rewrites": [
