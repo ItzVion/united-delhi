@@ -24,3 +24,7 @@ test('web preserves API colour when the hue conflicts with the type legend',()=>
   assert.equal(busColor({busType:'CNG AC (12 mtr)',serviceColor:'#F97316'}),'#F97316');
   assert.equal(busColor({busType:'EV AC (12 mtr)',serviceColor:'#1D4ED8'}),'#1D4ED8');
 });
+
+test('web preserves low-saturation API colours instead of treating grey as red',()=>{
+  assert.equal(busColor({busType:'CNG AC (12 mtr)',serviceColor:'#777777'}),'#777777');
+});

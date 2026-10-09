@@ -20,11 +20,11 @@ const LEGEND_BUS_SWATCHES:{match:(type:string)=>boolean;colors:string[]}[]=[
  {match:type=>type.startsWith('CNG AC'),colors:['#2F80ED','#EB4B4B']},
  {match:type=>type.startsWith('CNG NONAC')||type.startsWith('CNG NON-AC'),colors:['#F2A76D','#62E099']}
 ];
-function colorHue(hex:string):number{
+function colorHue(hex:string):number|null{
  const h=hex.replace('#','');
  const [r,g,b]=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255);
  const max=Math.max(r,g,b),min=Math.min(r,g,b),delta=max-min;
- if(delta===0)return 0;
+ if(delta<0.08)return null;
  let hue=max===r?60*(((g-b)/delta)%6):max===g?60*((b-r)/delta+2):60*((r-g)/delta+4);
  return (hue+360)%360;
 }
@@ -36,9 +36,12 @@ function legendBusColor(apiColor:string|null|undefined,busType:string|null|undef
  const category=LEGEND_BUS_SWATCHES.find(row=>row.match(type));
  if(!category)return color;
  const hue=colorHue(color);
+ if(hue===null)return color;
  let closest:{color:string;distance:number}|null=null;
  for(const swatch of category.colors){
-  const distance=hueDistance(hue,colorHue(swatch));
+  const swatchHue=colorHue(swatch);
+  if(swatchHue===null)continue;
+  const distance=hueDistance(hue,swatchHue);
   if(!closest||distance<closest.distance)closest={color:swatch,distance};
  }
  // If API hue disagrees with the type's legend palette, trust the API exactly.

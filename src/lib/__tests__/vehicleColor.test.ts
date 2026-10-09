@@ -20,3 +20,7 @@ test('native never changes an API colour to a different hue family',()=>{
   assert.equal(resolveVehicleColor({busType:'CNG AC (12 mtr)',serviceColor:'#F97316'} as any).background,'#F97316');
   assert.equal(resolveVehicleColor({busType:'EV AC (12 mtr)',serviceColor:'#1D4ED8'} as any).background,'#1D4ED8');
 });
+
+test('native preserves low-saturation API colours instead of treating grey as red',()=>{
+  assert.equal(resolveVehicleColor({busType:'CNG AC (12 mtr)',serviceColor:'#777777'} as any).background,'#777777');
+});
