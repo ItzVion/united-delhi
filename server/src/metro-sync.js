@@ -125,7 +125,7 @@ export async function syncMetroStatic(pool){
       const valid=routeStops.filter(x=>knownRoutes.has(x.routeId)&&knownStops.has(x.stopId));
       for(let i=0;i<valid.length;i+=500){
         const chunk=valid.slice(i,i+500),vals=[];
-        const sql=chunk.map((x,j)=>{const b=j*4;vals.push(x.routeId,x.directionId,x.stopId,x.seq);return `(${b+1},${b+2},${b+3},${b+4})`}).join(',');
+        const sql=chunk.map((x,j)=>{const b=j*4;vals.push(x.routeId,x.directionId,x.stopId,x.seq);return `($${b+1},$${b+2},$${b+3},$${b+4})`}).join(',');
         await c.query(`INSERT INTO metro_route_stops(route_id,direction_id,stop_id,stop_sequence) VALUES ${sql} ON CONFLICT DO NOTHING`,vals);
       }
       await c.query('CREATE INDEX IF NOT EXISTS idx_metro_stops_name ON metro_stops(lower(name))');
