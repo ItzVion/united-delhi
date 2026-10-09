@@ -67,14 +67,6 @@ jobs:
           EXPO_PUBLIC_API_BASE_URL: https://united-delhi-api.onrender.com
         run: npx expo prebuild --clean --platform android --no-install
 
-      - name: Enable Gradle caching
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
-          cache-dependency-path: app/android/gradle/wrapper/gradle-wrapper.properties
-
       - name: Build release APK
         working-directory: app/android
         run: ./gradlew --no-daemon --stacktrace app:assembleRelease
