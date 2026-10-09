@@ -6,6 +6,10 @@ export const validHexColor = value => {
   return /^#[0-9a-f]{6}$/i.test(color) ? color : null;
 };
 
+// Physical bus marker colours must come only from the realtime API field.
+// Do not substitute database livery records, route colours, bus type or registration data.
+export const apiVehicleColorOnly = serviceColor => validHexColor(serviceColor);
+
 const KNOWN = {
   FeedEntity: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
   VehiclePosition: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import {
   validHexColor,
+  apiVehicleColorOnly,
   scanEntities,
   extractColorsByVehicle,
   parseColorFieldSpec
@@ -48,6 +49,14 @@ test('standard GTFS-RT decoder does not expose private descriptor extensions', (
   const decoded = transit.FeedMessage.decode(feed()).entity[0].vehicle.vehicle;
   assert.equal(decoded.id, 'DL1PD4669');
   assert.equal(decoded.color, undefined);
+});
+
+test('displayed vehicle colour comes only from the API serviceColor field', () => {
+  assert.equal(apiVehicleColorOnly('#F97316'), '#F97316');
+  assert.equal(apiVehicleColorOnly('#2563eb'), '#2563eb');
+  assert.equal(apiVehicleColorOnly(null), null);
+  assert.equal(apiVehicleColorOnly(undefined), null);
+  assert.equal(apiVehicleColorOnly('orange'), null);
 });
 
 test('accepts exact six-digit hex and rejects guessed or malformed colours', () => {
