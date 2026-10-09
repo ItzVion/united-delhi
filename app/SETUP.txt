@@ -30,7 +30,7 @@ Vercel settings:
 - Install Command: npm install
 - Build Command: npm run build
 - Output Directory: dist
-- Enable "Skip deployments when there are no changes to the root directory or its dependencies" so server-only commits do not rebuild the website.
+- The Vercel "Skip deployments when there are no changes to the root directory or its dependencies" setting is enabled. Keep it enabled so server-only commits do not rebuild the website.
 
 Backend development
   cd server

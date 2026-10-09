@@ -166,9 +166,22 @@ jobs:
           npm test
 
           previous="$(readlink -f /opt/united-delhi/current 2>/dev/null || true)"
+          rollback() {
+            if [[ -n "$previous" && -d "$previous" ]]; then
+              ln -sfn "$previous" /opt/united-delhi/current.next
+              mv -Tf /opt/united-delhi/current.next /opt/united-delhi/current
+              sudo -n /usr/bin/systemctl restart united-delhi || true
+            else
+              sudo -n /usr/bin/systemctl stop united-delhi || true
+            fi
+          }
           ln -sfn "$release" /opt/united-delhi/current.next
           mv -Tf /opt/united-delhi/current.next /opt/united-delhi/current
-          sudo -n /usr/bin/systemctl restart united-delhi
+          if ! sudo -n /usr/bin/systemctl restart united-delhi; then
+            echo "New service failed to restart; rolling back." >&2
+            rollback
+            exit 1
+          fi
 
           healthy=false
           for attempt in $(seq 1 15); do
@@ -183,13 +196,7 @@ jobs:
 
           if [[ "$healthy" != "true" ]]; then
             echo "New release failed its local health/database check; rolling back." >&2
-            if [[ -n "$previous" && -d "$previous" ]]; then
-              ln -sfn "$previous" /opt/united-delhi/current.next
-              mv -Tf /opt/united-delhi/current.next /opt/united-delhi/current
-              sudo -n /usr/bin/systemctl restart united-delhi
-            else
-              sudo -n /usr/bin/systemctl stop united-delhi || true
-            fi
+            rollback
             exit 1
           fi
 
