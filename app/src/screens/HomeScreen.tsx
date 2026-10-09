@@ -152,7 +152,7 @@ export default function HomeScreen(){
   const liveLabel=fresh==='ok'?(`${vehicles.length} live · ${realtimeAgeLabel||'just now'}`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='loading'?'Checking live buses':vehicles.length?(`${vehicles.length} buses · connection lost`):'Live data unavailable';
 
   return <SafeAreaView style={styles.safe} edges={['top','left','right']}>
-    <ScrollView contentContainerStyle={[styles.scroll,{paddingBottom:118+bottomInset}] showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={[styles.scroll,{paddingBottom:118+bottomInset}]} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={styles.brandRow}><UnitedDelhiMark size={50}/><View style={styles.brandCopy}><Text style={styles.brand}>UNITED DELHI</Text><Text style={styles.tagline}>Delhi transit</Text></View></View>
         <StatusPill label={liveLabel} tone={fresh==='ok'?'ok':fresh==='unavailable'?'danger':fresh==='stale'?'muted':'muted'}/>
