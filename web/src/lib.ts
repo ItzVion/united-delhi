@@ -16,9 +16,12 @@ export const metroColor=(value)=>{const t=String(value||'').toUpperCase();for(co
 
 export const isHex=(v:unknown):v is string=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 type FleetLike={id?:string|null;licensePlate?:string|null;vehicleLabel?:string|null;vehicleId?:string|null;serviceColor?:string|null;serviceType?:string|null;busType?:string|null;routeShortName?:string|null;routeId?:string|null;routeName?:string|null;routeColor?:string|null};
+const fleetIdentity=(v:FleetLike)=>{
+  const ids=[v?.id,v?.vehicleId,v?.licensePlate,v?.vehicleLabel].map(x=>String(x||'').toUpperCase().replace(/[-_\s]/g,''));
+  return ids.find(x=>/^(DL51EV|DL51GD|DL1PD|DL1PE|DL1PB|DL1PC)/.test(x))||'';
+};
 export const vehicleFleetKind=(v:FleetLike)=>{
-  const ids=[v?.id,v?.vehicleId,v?.licensePlate,v?.vehicleLabel].map(x=>String(x||'').toUpperCase().replace(/[-_\\s]/g,''));
-  const id=ids.find(x=>/^(DL51EV|DL51GD|DL1PD|DL1PE|DL1PB|DL1PC)/.test(x))||'';
+  const id=fleetIdentity(v);
   if(id.startsWith('DL51EV'))return 'ev-ac';
   if(id.startsWith('DL51GD'))return 'ev-devi';
   if(id.startsWith('DL1PB')||id.startsWith('DL1PC')||id.startsWith('DL1PD'))return 'cng-nonac';
@@ -33,40 +36,24 @@ export const vehicleFleetKind=(v:FleetLike)=>{
   return 'unknown';
 };
 export const busColor=(v:FleetLike,route?:unknown)=>{
-  // The vehicle identity is authoritative: don't let an old cached serviceColor
-  // incorrectly paint a known orange-fleet bus blue.
-  const identity=[v?.id,v?.vehicleId,v?.licensePlate,v?.vehicleLabel].map(x=>String(x||'').toUpperCase().replace(/[-_\\s]/g,'')).find(x=>/^(DL51EV|DL51GD|DL1PD|DL1PE|DL1PB|DL1PC)/.test(x))||'';
-  if(identity.startsWith('DL51EV'))return SERVICE_COLORS.electricAc;
-  if(identity.startsWith('DL51GD'))return SERVICE_COLORS.electricDevi;
-  if(identity.startsWith('DL1PB')||identity.startsWith('DL1PC')||identity.startsWith('DL1PD'))return SERVICE_COLORS.cngNonAc;
-  if(identity.startsWith('DL1PE'))return SERVICE_COLORS.cngAc;
-  const type=vehicleFleetKind({...v,id:undefined,vehicleId:undefined,licensePlate:undefined,vehicleLabel:undefined});
-  if(type==='ev-ac')return SERVICE_COLORS.electricAc;
-  if(type==='ev-devi')return SERVICE_COLORS.electricDevi;
-  if(type==='cng-ac')return SERVICE_COLORS.cngAc;
-  if(type==='cng-nonac')return SERVICE_COLORS.cngNonAc;
+  // Known vehicle identities override stale cached API colours.
+  const id=fleetIdentity(v);
+  if(id.startsWith('DL51EV'))return SERVICE_COLORS.electricAc;
+  if(id.startsWith('DL51GD'))return SERVICE_COLORS.electricDevi;
+  if(id.startsWith('DL1PB')||id.startsWith('DL1PC')||id.startsWith('DL1PD'))return SERVICE_COLORS.cngNonAc;
+  if(id.startsWith('DL1PE'))return SERVICE_COLORS.cngAc;
+  const t=String(v?.busType||'').trim().toUpperCase();
+  if(t.startsWith('EV DEVI'))return SERVICE_COLORS.electricDevi;
+  if(t.startsWith('EV AC'))return SERVICE_COLORS.electricAc;
+  if(t.startsWith('CNG NONAC')||t.startsWith('CNG NON-AC'))return SERVICE_COLORS.cngNonAc;
+  if(t.startsWith('CNG AC'))return SERVICE_COLORS.cngAc;
   const service=String(v?.serviceColor||'').trim();
   if(isHex(service))return service;
+  if(v?.serviceType==='electric')return SERVICE_COLORS.electricAc;
+  if(v?.serviceType==='dtc')return SERVICE_COLORS.cngAc;
   const routeFallback=String(v?.routeColor||'').trim();
   if(isHex(routeFallback))return routeFallback;
   return SERVICE_COLORS.unknown;
-};
- const ids=[v?.id,v?.licensePlate,v?.vehicleLabel].map(x=>String(x||'').toUpperCase().replace(/[-_\\s]/g,''));
- const id=ids.find(x=>/^(DL51EV|DL51GD|DL1PB|DL1PC|DL1PD|DL1PE)/.test(x))||'';
- if(id.startsWith('DL51EV'))return SERVICE_COLORS.electricAc;
- if(id.startsWith('DL51GD'))return SERVICE_COLORS.electricDevi;
- if(id.startsWith('DL1PB')||id.startsWith('DL1PC')||id.startsWith('DL1PD'))return SERVICE_COLORS.cngNonAc;
- if(id.startsWith('DL1PE'))return SERVICE_COLORS.cngAc;
- const service=String(v?.serviceColor||'').trim();if(isHex(service))return service;
- const t=String(v?.busType||'').trim().toUpperCase();
- if(t.startsWith('EV AC'))return SERVICE_COLORS.electricAc;
- if(t.startsWith('EV DEVI'))return SERVICE_COLORS.electricDevi;
- if(t.startsWith('CNG NONAC'))return SERVICE_COLORS.cngNonAc;
- if(t.startsWith('CNG AC'))return SERVICE_COLORS.cngAc;
- if(v?.serviceType==='electric')return SERVICE_COLORS.electricAc;
- if(v?.serviceType==='dtc')return SERVICE_COLORS.cngAc;
- const routeFallback=String(v?.routeColor||'').trim();if(isHex(routeFallback))return routeFallback;
- return SERVICE_COLORS.unknown;
 };
 export const textOn=(bg:string)=>{const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.179?'#14211B':'#FFFFFF'};
 
