@@ -164,6 +164,9 @@ async function loadDatabaseVehicleCache(){
   }
   const hydrated=[...latest.values()].filter(v=>Number.isFinite(v.latitude)&&Number.isFinite(v.longitude));
   if(!hydrated.length)return;
+  // Seed the exact per-vehicle registry from both live and recent cached IDs,
+  // without overwriting any manually corrected registry row.
+  try{await registerFleetVehicles(hydrated)}catch(error){console.error('Cached fleet registry seed failed:',error?.message||error)}
   cache.vehicles=hydrated.map(applyRouteMeta);
   const timestamps=hydrated.map(v=>Date.parse(v.observedAt)).filter(Number.isFinite);
   const newest=timestamps.length?Math.max(...timestamps):NaN;
