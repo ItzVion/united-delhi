@@ -15,7 +15,7 @@ export default function AboutScreen(){
       <View style={styles.card}><Text style={styles.cardTitle}>Routes and stops</Text><Text style={styles.body}>Static transit data connects route and stop details. Metro lines and station sequences are shown where the metro dataset is available.</Text></View>
       <View style={styles.card}><Text style={styles.cardTitle}>Map</Text><Text style={styles.body}>The map uses Leaflet and OpenStreetMap map tiles. © OpenStreetMap contributors.</Text></View>
       <View style={styles.card}><Text style={styles.cardTitle}>Independent project</Text><Text style={styles.body}>United Delhi is not an official DTC, Delhi Government or Delhi Metro Rail Corporation app, and it does not sell tickets or passes.</Text></View>
-      <Text style={styles.version}>United Delhi · Version 1.0.7</Text>
+      <Text style={styles.version}>United Delhi · Version 1.0.8</Text>
       <Pressable style={styles.legalLink} onPress={()=>navigation.navigate('Legal')}><Text style={styles.legalLinkText}>Read Legal & Privacy information ›</Text></Pressable>
     </ScrollView>
   </SafeAreaView>;
