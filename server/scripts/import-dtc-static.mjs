@@ -4,14 +4,9 @@ import { Readable } from 'node:stream';
 
 const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
 const STATIC_URL_OVERRIDE = String(process.env.DTC_STATIC_URL || '').trim();
-const STATIC_URLS = STATIC_URL_OVERRIDE
-  ? [STATIC_URL_OVERRIDE]
-  : [
-      'https://files.mobilitydatabase.org/mdb-1262/latest.zip',
-      'https://ethanc8.github.io/delhi-gtfs/bus.zip',
-      'https://files.mobilitydatabase.org/mdb-3139/latest.zip'
-    ];
-const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'mobilitydb-mdb-1262-latest').trim();
+const UPLOADED_DTC_STATIC_URL = 'https://br-long-salad-b3b9l7ld.storage.c-4.ap-southeast-1.aws.neon.tech/united-delhi-static-v1/dtc-static-gtfs-v1.zip';
+const STATIC_URLS = STATIC_URL_OVERRIDE ? [STATIC_URL_OVERRIDE] : [UPLOADED_DTC_STATIC_URL];
+const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'uploaded-dtc-static-gtfs-v1-20260902').trim();
 const MAX_COMPRESSED_BYTES = 100 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES = 300 * 1024 * 1024;
 
