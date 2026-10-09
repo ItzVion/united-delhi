@@ -1,0 +1,11 @@
+-- Optional audit/query reference for the runtime-managed vehicle_livery_verifications table.
+-- The server creates this table safely at startup; do not insert a record as verified
+-- unless the evidence identifies the specific physical bus and the reviewer has checked it.
+-- Example verified record:
+-- INSERT INTO vehicle_livery_verifications
+--   (vehicle_id, license_plate, color_hex, color_name, evidence_url, source_label, status, verified_at)
+-- VALUES ('<stable-feed-id>', '<registration-if-known>', '#123456', 'blue and multicoloured',
+--         '<public evidence URL>', 'reviewed photograph / official record', 'verified', NOW());
+--
+-- Never use route_color, registration-prefix guesses, or operator-wide livery assumptions
+-- as vehicle-specific physical colour evidence.
