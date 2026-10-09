@@ -34,6 +34,6 @@ npm run web
 
 Then open `http://localhost:8080`.
 
-The browser client uses the same Render-hosted backend as the mobile app and does not contain private DTC or Neon credentials. Vercel serves this repository from the project root and builds the browser client into `web/dist`. It can be hosted as a static website; see `web/README.md`.
+The browser client uses `https://united-delhi-api.onrender.com` through the Vercel rewrite and local Vite proxy; it does not contain private DTC or Neon credentials. The Vercel project should use `web` as its Root Directory, `npm run build` as its build command, and `dist` as its output directory. See `web/README.md` for deployment settings.
 
 Expo SDK 57 supports Android, iOS and web targets, while the dedicated `web/` client is used here so desktop browsers do not depend on native-only WebView components.
