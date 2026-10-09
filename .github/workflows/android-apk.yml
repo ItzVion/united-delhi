@@ -73,17 +73,15 @@ jobs:
         run: ./gradlew --no-daemon --stacktrace app:assembleRelease
 
       - name: Verify APK exists
-        id: apk
         shell: bash
         run: |
           set -euo pipefail
           apk="app/android/app/build/outputs/apk/release/app-release.apk"
           test -s "$apk"
           sha256sum "$apk"
-          echo "path=$apk" >> "$GITHUB_OUTPUT"
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@ea8e6e4f80f8f1c7cbb8cefc8a6b2a1f2f2c5e34 # v4.6.2
+        uses: actions/upload-artifact@v4
         with:
           name: united-delhi-android-apk
           path: app/android/app/build/outputs/apk/release/app-release.apk
