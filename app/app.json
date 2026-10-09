@@ -2,7 +2,7 @@
   "expo": {
     "name": "United Delhi",
     "slug": "united-delhi",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
@@ -21,7 +21,8 @@
       ],
       "backgroundColor": "#F4F7F4",
       "icon": "./assets/icon.png",
-      "predictiveBackGestureEnabled": true
+      "predictiveBackGestureEnabled": true,
+      "versionCode": 8
     },
     "web": {
       "bundler": "metro",
@@ -43,6 +44,11 @@
           "resizeMode": "contain"
         }
       ]
-    ]
+    ],
+    "androidNavigationBar": {
+      "backgroundColor": "#000000",
+      "barStyle": "light-content",
+      "enforceContrast": false
+    }
   }
 }
