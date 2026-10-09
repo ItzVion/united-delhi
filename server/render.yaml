@@ -3,7 +3,7 @@ services:
     name: united-delhi
     runtime: node
     rootDir: server
-    buildCommand: npm ci
+    buildCommand: npm ci && npm run check && npm test
     startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
