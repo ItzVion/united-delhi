@@ -2,12 +2,6 @@ name: Build Android APK (one-time)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'app/**'
-      - '.github/workflows/android-apk.yml'
 
 permissions:
   contents: read
