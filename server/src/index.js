@@ -4,6 +4,7 @@ import cors from 'cors';
 import pg from 'pg';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { rateLimit } from 'express-rate-limit';
+import { spawn } from 'node:child_process';
 import {syncMetroStatic} from './metro-sync.js';
 
 const {Pool}=pg,app=express();
@@ -38,11 +39,51 @@ const classifyFleet=(id,...aliases)=>{
 const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>classifyFleet(id,licensePlate,vehicleLabel);
 const fallbackColor=()=>SERVICE_COLORS.unknown; // fleet colours are resolved from vehicle identity first
 const cache={vehicles:[],status:KEY?'STARTING':'UNAVAILABLE',reason:KEY?'Render API is starting':'DTC_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
-let refreshing=null,poll=null,routeMetaLoadedAt=0,persistPromise=null,lastPersistAt=0;
+let refreshing=null,poll=null,routeMetaLoadedAt=0,persistPromise=null,lastPersistAt=0,dtcAutoImportRunning=false;
 const routeMeta=new Map();
 
 async function loadRouteMeta(){if(!pool)return;try{const rows=(await pool.query(`SELECT r.route_id,r.agency_id,r.short_name,r.long_name,r.route_color,r.route_text_color,first_stop.name AS from_stop,last_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.stop_id ASC LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true`)).rows;routeMeta.clear();for(const x of rows)routeMeta.set(String(x.route_id),x);routeMetaLoadedAt=Date.now();console.log('Loaded route metadata: '+routeMeta.size+' routes.')}catch(e){console.error('Route metadata load failed:',e?.message||e)}}
 const applyRouteMeta=v=>{const x=routeMeta.get(String(v.routeId||''));const svc=service(v.id,x?.agency_id,x?.short_name,v.routeId,v.licensePlate,v.vehicleLabel);return {...v,routeShortName:x?.short_name||null,routeColor:svc.serviceColor||fallbackColor(),routeTextColor:x?.route_text_color||null,routeLongName:x?.long_name||null,fromStop:x?.from_stop||null,toStop:x?.to_stop||null,operator:x?.agency_id||null,...svc}};
+function autoImportDtcStaticIfEmpty(){
+ if(!pool||String(process.env.DTC_STATIC_AUTO_IMPORT??'true').toLowerCase()==='false'||dtcAutoImportRunning)return;
+ void (async()=>{
+  try{
+   const result=await pool.query('SELECT COUNT(*)::int AS count FROM routes');
+   if(Number(result.rows[0]?.count)>0)return;
+   if(dtcAutoImportRunning)return;
+   dtcAutoImportRunning=true;
+   console.warn('DTC static tables are empty; launching the safety-gated GTFS import in the background.');
+   const child=spawn(process.execPath,['scripts/import-dtc-static.mjs'],{cwd:process.cwd(),env:process.env,stdio:['ignore','pipe','pipe']});
+   child.stdout.setEncoding('utf8');
+   child.stderr.setEncoding('utf8');
+   child.stdout.on('data',chunk=>console.log('[DTC static importer] '+String(chunk).trimEnd()));
+   child.stderr.on('data',chunk=>console.warn('[DTC static importer] '+String(chunk).trimEnd()));
+   child.on('error',error=>{
+    dtcAutoImportRunning=false;
+    console.error('Could not start DTC static importer:',error?.message||error);
+   });
+   child.on('close',code=>{
+    dtcAutoImportRunning=false;
+    if(code===0){
+     routeMetaLoadedAt=0;
+     void (async()=>{
+      await loadRouteMeta();
+      cache.vehicles=cache.vehicles.map(applyRouteMeta);
+      console.log('DTC static import completed; route metadata and cached vehicles refreshed.');
+     })().catch(error=>console.error('Post-import metadata refresh failed:',error?.message||error));
+    }else{
+     console.error('DTC static importer exited with code '+code+'. It will retry in 15 minutes while DTC static tables remain empty.');
+     const retry=setTimeout(autoImportDtcStaticIfEmpty,15*60*1000);
+     retry.unref?.();
+    }
+   });
+  }catch(error){
+   dtcAutoImportRunning=false;
+   console.error('DTC static auto-import check failed:',error?.message||error);
+  }
+ })();
+}
+
 async function loadDatabaseVehicleCache(){
  if(!pool)return;
  try{
@@ -177,7 +218,7 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
 });
 app.use((_q,r)=>r.status(404).json({status:'NOT_FOUND',reason:'Endpoint not found'}));
 app.use((e,_q,r,_n)=>{console.error('Unhandled request error:',e?.message||e);if(!r.headersSent)r.status(500).json({status:'ERROR',reason:'Internal server error'})});
-const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(async()=>{try{if(pool){await ensureRuntimeSchema();await loadRouteMeta();await loadDatabaseVehicleCache()}}catch(e){console.error('Database bootstrap failed:',e?.message||e)}if(KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}if(pool){if(String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()!=='false'){setTimeout(()=>void syncMetroStatic(pool).catch(e=>console.error('DMRC static sync failed:',e?.message||e)),5000);setInterval(()=>void syncMetroStatic(pool).catch(e=>console.error('DMRC static sync failed:',e?.message||e)),24*60*60*1000)}}},1500)});
+const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(async()=>{try{if(pool){await ensureRuntimeSchema();await loadRouteMeta();await loadDatabaseVehicleCache();autoImportDtcStaticIfEmpty()}}catch(e){console.error('Database bootstrap failed:',e?.message||e)}if(KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}if(pool){if(String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()!=='false'){setTimeout(()=>void syncMetroStatic(pool).catch(e=>console.error('DMRC static sync failed:',e?.message||e)),5000);setInterval(()=>void syncMetroStatic(pool).catch(e=>console.error('DMRC static sync failed:',e?.message||e)),24*60*60*1000)}}},1500)});
 server.requestTimeout=30000;server.headersTimeout=40000;server.keepAliveTimeout=65000;
 process.on('unhandledRejection',e=>console.error('Unhandled rejection:',e));process.on('uncaughtException',e=>console.error('Uncaught exception:',e));
 for(const sig of ['SIGTERM','SIGINT'])process.on(sig,async()=>{if(poll)clearInterval(poll);server.close();await pool?.end().catch(()=>{});process.exit(0)});
