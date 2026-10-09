@@ -1,10 +1,67 @@
-// Standard GTFS-Realtime has no physical livery colour field. If the provider sends a
-// protobuf extension, inspect the raw wire bytes because the generated decoder drops unknown fields.
-export const validHexColor=value=>{const color=String(value??'').trim();return /^#[0-9a-f]{6}$/i.test(color)?color:null};
+// Physical bus colour handling. Standard GTFS-Realtime has NO livery colour field, and the
+// protobuf decoder drops unknown fields, so a colour sent as an extension field must be read
+// at wire level. Only exact valid #RRGGBB values from the authoritative payload are accepted.
+export const validHexColor=value=>{
+ const color=String(value??'').trim();
+ return /^#[0-9a-f]{6}$/i.test(color)?color:null;
+};
 const KNOWN={FeedEntity:[1,2,3,4,5,6,7,8,9,10,11],VehiclePosition:[1,2,3,4,5,6,7,8,9,10,11],VehicleDescriptor:[1,2,3,4]};
 function readVarint(b,i){let r=0n,s=0n;for(;;){if(i>=b.length)throw new Error('truncated varint');const x=b[i++];r|=BigInt(x&127)<<s;if(!(x&128))break;s+=7n;if(s>70n)throw new Error('bad varint')}return[r,i]}
-function fields(b){const out=[];let i=0;while(i<b.length){let tag;[tag,i]=readVarint(b,i);const num=Number(tag>>3n),wt=Number(tag&7n);if(wt===0){let v;[v,i]=readVarint(b,i);out.push({num,wt,value:v})}else if(wt===1){if(i+8>b.length)throw new Error('truncated fixed64');out.push({num,wt,value:b.subarray(i,i+8)});i+=8}else if(wt===5){if(i+4>b.length)throw new Error('truncated fixed32');out.push({num,wt,value:b.subarray(i,i+4)});i+=4}else if(wt===2){let n;[n,i]=readVarint(b,i);const len=Number(n);if(i+len>b.length)throw new Error('truncated field');out.push({num,wt,value:b.subarray(i,i+len)});i+=len}else throw new Error('unsupported wire type '+wt)}return out}
+function fields(b){
+ const out=[];let i=0;
+ while(i<b.length){
+  let tag;[tag,i]=readVarint(b,i);const num=Number(tag>>3n),wt=Number(tag&7n);
+  if(wt===0){let v;[v,i]=readVarint(b,i);out.push({num,wt,value:v})}
+  else if(wt===1){if(i+8>b.length)throw new Error('truncated fixed64');out.push({num,wt,value:b.subarray(i,i+8)});i+=8}
+  else if(wt===5){if(i+4>b.length)throw new Error('truncated fixed32');out.push({num,wt,value:b.subarray(i,i+4)});i+=4}
+  else if(wt===2){let n;[n,i]=readVarint(b,i);const len=Number(n);if(i+len>b.length)throw new Error('truncated field');out.push({num,wt,value:b.subarray(i,i+len)});i+=len}
+  else throw new Error('unsupported wire type '+wt);
+ }
+ return out;
+}
 const text=u8=>new TextDecoder('utf-8',{fatal:false}).decode(u8);
-export function parseColorFieldSpec(spec){const m=/^(FeedEntity|VehiclePosition|VehicleDescriptor):(\d{1,5})$/.exec(String(spec||'').trim());return m?{message:m[1],field:Number(m[2])}:null}
-export function scanEntities(bytes){const res=[];let top;try{top=fields(bytes)}catch{return res}for(const f of top){if(f.num!==2||f.wt!==2)continue;try{const ent=fields(f.value),rec={id:null,vehicleId:null,unknown:[]};for(const e of ent){if(e.num===1&&e.wt===2)rec.id=text(e.value);else if(!KNOWN.FeedEntity.includes(e.num))rec.unknown.push({message:'FeedEntity',field:e.num,wireType:e.wt,value:e.wt===2?text(e.value):null});if(e.num===4&&e.wt===2){for(const p of fields(e.value)){if(!KNOWN.VehiclePosition.includes(p.num))rec.unknown.push({message:'VehiclePosition',field:p.num,wireType:p.wt,value:p.wt===2?text(p.value):null});if(p.num===8&&p.wt===2){for(const d of fields(p.value)){if(d.num===1&&d.wt===2&&!rec.vehicleId)rec.vehicleId=text(d.value);if(!KNOWN.VehicleDescriptor.includes(d.num))rec.unknown.push({message:'VehicleDescriptor',field:d.num,wireType:d.wt,value:d.wt===2?text(d.value):null})}}}}res.push(rec)}catch{}}return res}
-export function extractColorsByVehicle(bytes,spec){const cfg=typeof spec==='string'?parseColorFieldSpec(spec):spec,map=new Map();if(!cfg)return map;for(const rec of scanEntities(bytes)){const hit=rec.unknown.find(u=>u.message===cfg.message&&u.field===cfg.field&&u.wireType===2);const color=validHexColor(hit?.value);if(!color)continue;for(const k of [rec.vehicleId,rec.id])if(k)map.set(String(k),color)}return map}
+export function parseColorFieldSpec(spec){
+ const m=/^(FeedEntity|VehiclePosition|VehicleDescriptor):(\d{1,5})$/.exec(String(spec||'').trim());
+ return m?{message:m[1],field:Number(m[2])}:null;
+}
+// Walk FeedMessage -> entity -> vehicle(VehiclePosition) -> vehicle(VehicleDescriptor).
+// Returns [{id, unknown:[{message,field,wireType,value}]}] for fields outside the standard schema.
+export function scanEntities(bytes){
+ const res=[];
+ let top;try{top=fields(bytes)}catch{return res}
+ for(const f of top){
+  if(f.num!==2||f.wt!==2)continue;
+  try{
+   const ent=fields(f.value);const rec={id:null,vehicleId:null,unknown:[]};
+   for(const e of ent){
+    if(e.num===1&&e.wt===2)rec.id=text(e.value);
+    else if(!KNOWN.FeedEntity.includes(e.num))rec.unknown.push({message:'FeedEntity',field:e.num,wireType:e.wt,value:e.wt===2?text(e.value):null});
+    if(e.num===4&&e.wt===2){
+     for(const p of fields(e.value)){
+      if(!KNOWN.VehiclePosition.includes(p.num))rec.unknown.push({message:'VehiclePosition',field:p.num,wireType:p.wt,value:p.wt===2?text(p.value):null});
+      if(p.num===8&&p.wt===2){
+       for(const d of fields(p.value)){
+        if(d.num===1&&d.wt===2&&!rec.vehicleId)rec.vehicleId=text(d.value);
+        if(!KNOWN.VehicleDescriptor.includes(d.num))rec.unknown.push({message:'VehicleDescriptor',field:d.num,wireType:d.wt,value:d.wt===2?text(d.value):null});
+       }
+      }
+     }
+    }
+   }
+   res.push(rec);
+  }catch{/* skip malformed entity */}
+ }
+ return res;
+}
+// Map<vehicleKey, '#RRGGBB'> for the configured extension field. Invalid values are ignored.
+export function extractColorsByVehicle(bytes,spec){
+ const cfg=typeof spec==='string'?parseColorFieldSpec(spec):spec;const map=new Map();
+ if(!cfg)return map;
+ for(const rec of scanEntities(bytes)){
+  const hit=rec.unknown.find(u=>u.message===cfg.message&&u.field===cfg.field&&u.wireType===2);
+  const color=validHexColor(hit?.value);
+  if(!color)continue;
+  for(const k of [rec.vehicleId,rec.id])if(k)map.set(String(k),color);
+ }
+ return map;
+}
