@@ -201,6 +201,36 @@ async function ensureRuntimeSchema(){if(!pool)return;const c=await pool.connect(
  )`);
  await c.query('CREATE INDEX IF NOT EXISTS idx_vehicle_fleet_registry_color ON vehicle_fleet_registry(color_hex)');
  await c.query('CREATE INDEX IF NOT EXISTS idx_vehicle_fleet_registry_type ON vehicle_fleet_registry(bus_type)');
+ // Refresh automatically classified rows when the registration map changes.
+ // Manually managed rows remain untouched and keep their exact API colour.
+ await c.query(`
+  WITH normalized AS (
+   SELECT vehicle_id,regexp_replace(upper(vehicle_id),'[-_[:space:]]','','g') AS vehicle_key
+   FROM vehicle_fleet_registry WHERE source='auto'
+  ), expected AS (
+   SELECT vehicle_id,
+    CASE
+     WHEN vehicle_key LIKE 'DL51EV%' THEN 'EV AC (12 mtr)'
+     WHEN vehicle_key LIKE 'DL51GD%' THEN 'EV DEVI AC (9 mtr)'
+     WHEN vehicle_key LIKE 'DL1PB%' OR vehicle_key LIKE 'DL1PC%' OR vehicle_key LIKE 'DL1PD%' THEN 'CNG NonAC (12 mtr)'
+     WHEN vehicle_key LIKE 'DL1PE%' THEN 'CNG AC (12 mtr)'
+    END AS bus_type,
+    CASE WHEN vehicle_key LIKE 'DL51EV%' OR vehicle_key LIKE 'DL51GD%' THEN 'electric' ELSE 'dtc' END AS service_type,
+    CASE
+     WHEN vehicle_key LIKE 'DL51EV%' THEN '${SERVICE_COLORS.electricAc}'
+     WHEN vehicle_key LIKE 'DL51GD%' THEN '${SERVICE_COLORS.electricDevi}'
+     WHEN vehicle_key LIKE 'DL1PE%' THEN '${SERVICE_COLORS.cngAc}'
+     WHEN vehicle_key LIKE 'DL1PB%' OR vehicle_key LIKE 'DL1PC%' OR vehicle_key LIKE 'DL1PD%' THEN '${SERVICE_COLORS.cngNonAc}'
+    END AS color_hex
+   FROM normalized
+   WHERE vehicle_key LIKE 'DL51EV%' OR vehicle_key LIKE 'DL51GD%' OR vehicle_key LIKE 'DL1PB%' OR vehicle_key LIKE 'DL1PC%' OR vehicle_key LIKE 'DL1PD%' OR vehicle_key LIKE 'DL1PE%'
+  )
+  UPDATE vehicle_fleet_registry AS r
+  SET bus_type=e.bus_type,service_type=e.service_type,color_hex=e.color_hex,updated_at=NOW()
+  FROM expected AS e
+  WHERE r.vehicle_id=e.vehicle_id
+   AND (r.bus_type IS DISTINCT FROM e.bus_type OR r.service_type IS DISTINCT FROM e.service_type OR r.color_hex IS DISTINCT FROM e.color_hex)
+ `);
  console.log('Runtime database schema verified.');
 }finally{c.release()}}
 
