@@ -221,7 +221,20 @@ async function ensureRuntimeSchema(){if(!pool)return;const c=await pool.connect(
  await c.query(`CREATE TABLE IF NOT EXISTS vehicle_livery_verifications (
   vehicle_id TEXT NOT NULL DEFAULT '',
   license_plate TEXT NOT NULL DEFAULT '',
-  color_hex TEXT NOT NULL CHECK(color_hex ~ '^#[0-9A-Fa-f]{6}
+  color_hex TEXT NOT NULL CHECK(color_hex ~ '^#[0-9A-Fa-f]{6}$'),
+  color_name TEXT NOT NULL DEFAULT '',
+  evidence_url TEXT NOT NULL,
+  source_label TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','verified','rejected')),
+  verified_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (length(trim(vehicle_id)) > 0 OR length(trim(license_plate)) > 0),
+  CHECK (status <> 'verified' OR verified_at IS NOT NULL)
+ )`);
+ await c.query("CREATE INDEX IF NOT EXISTS idx_vehicle_livery_verified_id ON vehicle_livery_verifications(vehicle_id) WHERE status='verified'");
+ await c.query("CREATE INDEX IF NOT EXISTS idx_vehicle_livery_verified_plate ON vehicle_livery_verifications(license_plate) WHERE status='verified'");
+ // Never derive or rewrite a physical livery colour from registration prefixes.
+ console.log('Runtime database schema verified.');
 }finally{c.release()}}
 
 
