@@ -143,27 +143,27 @@ body,#root{background:var(--bg)}
 }
 
 
-/* Compact bus colour legend */
-.legend-modal{background:rgba(15,21,25,.48)!important}
-.legend-exact{width:min(560px,calc(100vw - 32px));padding:22px 22px 20px!important;background:#fff!important;border:1px solid #d8dddd!important;box-shadow:0 12px 40px rgba(0,0,0,.18)}
-.legend-exact h2{font-size:25px!important;line-height:1.1;margin:0 0 22px!important;color:#263238!important}
-.legend-head-exact{display:grid;grid-template-columns:92px 1fr;align-items:center;color:#98a1a4;font-size:14px;padding:0 0 8px}
-.legend-exact-row{display:grid;grid-template-columns:92px 1fr;align-items:center;min-height:66px}
-.legend-exact-icons{display:flex;align-items:center;justify-content:flex-start;min-height:40px}
-.legend-exact-bus{width:52px;height:36px;display:grid;place-items:center;color:#fff;border:1px solid rgba(20,33,43,.12)}
-.legend-exact-bus .ic{width:26px!important;height:26px!important;stroke-width:1.7}
-.legend-exact-type{font-size:15px;line-height:20px;color:#263238;font-weight:500}
-.legend-understood{width:100%;height:48px;margin-top:14px;border:0;background:#0F6657;color:#fff;font-size:16px;font-weight:750;cursor:pointer}
+/* Compact One Delhi-style bus legend. Live marker colors remain API-owned. */
+.legend-modal{background:rgba(15,21,25,.48)!important;padding:16px!important;place-items:center}
+.legend-exact{width:min(440px,calc(100vw - 32px));padding:16px!important;background:#fff!important;border:1px solid #d8dddd!important;box-shadow:0 12px 40px rgba(0,0,0,.18);gap:0}
+.legend-exact h2{font-size:20px!important;line-height:1.2;margin:0 0 12px!important;color:#263238!important}
+.legend-head-exact{display:grid;grid-template-columns:64px 1fr;align-items:center;color:#98a1a4;font-size:12px;padding:0 0 4px}
+.legend-exact-row{display:grid;grid-template-columns:64px 1fr;align-items:center;min-height:34px}
+.legend-exact-icons{display:flex;align-items:center;justify-content:flex-start;min-height:27px}
+.legend-exact-bus{width:42px;height:28px;display:grid;place-items:center;color:#fff;border:0}
+.legend-exact-bus .ic{width:21px!important;height:21px!important;stroke-width:1.7}
+.legend-exact-type{font-size:13px;line-height:16px;color:#263238;font-weight:500;text-align:left}
+.legend-understood{width:100%;height:36px;margin-top:8px;border:0;background:#C7352C;color:#fff;font-size:13px;font-weight:750;text-align:center;cursor:pointer}
 @media(max-width:600px){
-.legend-exact{width:calc(100vw - 32px);padding:20px 20px 18px!important}
-.legend-exact h2{font-size:24px!important;margin-bottom:20px!important}
-.legend-head-exact,.legend-exact-row{grid-template-columns:76px 1fr}
-.legend-head-exact{font-size:13px}
-.legend-exact-row{min-height:64px}
-.legend-exact-bus{width:44px;height:32px}
-.legend-exact-bus .ic{width:23px!important;height:23px!important}
-.legend-exact-type{font-size:14px;line-height:18px}
-.legend-understood{height:46px;margin-top:12px;font-size:16px}
+.legend-exact{width:calc(100vw - 32px);padding:14px!important}
+.legend-exact h2{font-size:18px!important;margin-bottom:10px!important}
+.legend-head-exact,.legend-exact-row{grid-template-columns:54px 1fr}
+.legend-head-exact{font-size:11px}
+.legend-exact-row{min-height:31px}
+.legend-exact-bus{width:38px;height:25px}
+.legend-exact-bus .ic{width:19px!important;height:19px!important}
+.legend-exact-type{font-size:12px;line-height:15px}
+.legend-understood{height:32px;margin-top:8px;font-size:12px}
 }
 .route-banner{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 0;border-bottom:1px solid var(--line)}.route-banner>b{font-weight:700;color:var(--ink)}
 .metro-directions{display:flex;gap:10px;margin:0 14px 12px}
