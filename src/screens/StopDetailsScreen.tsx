@@ -22,6 +22,7 @@ export default function StopDetailsScreen() {
   const [routes, setRoutes] = useState<ApiRoute[]>([]);
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const arrivalsRef = useRef<Arrival[]>([]);
+  const arrivalsLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [liveError, setLiveError] = useState<string | null>(null);
 
@@ -38,9 +39,10 @@ export default function StopDetailsScreen() {
 
     if (arrivalsSettled.status === 'fulfilled' && arrivalsSettled.value.status === 'OK') {
       arrivalsRef.current = arrivalsSettled.value.arrivals;
+      arrivalsLoadedRef.current = true;
       setArrivals(arrivalsRef.current);
       setLiveError(null);
-    } else if (!arrivalsRef.current.length) {
+    } else if (!arrivalsLoadedRef.current) {
       setLiveError('Live bus positions are temporarily unavailable.');
     }
     setLoading(false);

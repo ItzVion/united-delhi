@@ -40,6 +40,8 @@ export default function HomeScreen(){
   const [searchError,setSearchError]=useState<string|null>(null);
   const [legendOpen,setLegendOpen]=useState(false);
   const lastVehiclesRef=useRef<Vehicle[]>([]);
+  const lastNearbyLocationRef=useRef<{lat:number;lon:number}|null>(null);
+  const nearbyLoadingRef=useRef(false);
 
   const requestLocation=useCallback(async()=>{
     try{
@@ -66,8 +68,21 @@ export default function HomeScreen(){
   },[]);
 
   const loadNearby=useCallback(async(lat:number,lon:number)=>{
-    try{const result=await api.nearbyStops(lat,lon,6);setNearbyStops(result.status==='OK'?result.stops:[]);}
-    catch{setNearbyStops([]);}
+    if(nearbyLoadingRef.current)return;
+    const previous=lastNearbyLocationRef.current;
+    if(previous){
+      const rad=(n:number)=>n*Math.PI/180,dLat=rad(lat-previous.lat),dLon=rad(lon-previous.lon);
+      const a=Math.sin(dLat/2)**2+Math.cos(rad(previous.lat))*Math.cos(rad(lat))*Math.sin(dLon/2)**2;
+      const metres=6371000*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+      if(metres<100)return;
+    }
+    nearbyLoadingRef.current=true;
+    try{
+      const result=await api.nearbyStops(lat,lon,6);
+      if(result.status==='OK'){lastNearbyLocationRef.current={lat,lon};setNearbyStops(result.stops);}
+    }catch{
+      // Keep the last good nearby stops during transient network failures.
+    }finally{nearbyLoadingRef.current=false}
   },[]);
 
   const loadVehicles=useCallback(async()=>{

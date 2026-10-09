@@ -22,13 +22,34 @@ export default function Home /* refreshed */({vehicles,live,liveNote,onRetry,loc
 }
 function Sheet({location,locState,onLocate,go}:{location:Point|null;locState:string;onLocate:()=>void;go:Go}){
   const el=useRef<HTMLElement>(null),[stops,setStops]=useState<any[]>([]),[busy,setBusy]=useState(false),[err,setErr]=useState(''),[snap,setSnap]=useState(0),drag=useRef<{y:number;h:number;t:number}|null>(null);
-  const load=useCallback(()=>{if(!location){setStops([]);return}let on=true;setBusy(true);setErr('');api.nearby(location.lat,location.lon).then(r=>{if(on){setStops(r.status==='OK'?r.stops:[]);if(r.status!=='OK')setErr(r.reason||'Nearby stops unavailable.')}}).catch(e=>{if(on){setStops([]);setErr((e as Error).message||'Nearby stops unavailable.')}}).finally(()=>{if(on)setBusy(false)});return()=>{on=false}},[location]);
-  useEffect(()=>load(),[load]);
+  const lastFetchedLocation=useRef<Point|null>(null),stopsRef=useRef<any[]>([]),requestId=useRef(0);
+  stopsRef.current=stops;
+  const load=useCallback((force=false)=>{
+    if(!location)return;
+    const previous=lastFetchedLocation.current;
+    if(previous&&!force){
+      const rad=(n:number)=>n*Math.PI/180, dLat=rad(location.lat-previous.lat),dLon=rad(location.lon-previous.lon);
+      const a=Math.sin(dLat/2)**2+Math.cos(rad(previous.lat))*Math.cos(rad(location.lat))*Math.sin(dLon/2)**2;
+      const metres=6371000*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+      if(metres<100)return;
+    }
+    lastFetchedLocation.current=location;
+    const id=++requestId.current;
+    setBusy(true);setErr('');
+    void api.nearby(location.lat,location.lon).then(r=>{
+      if(id!==requestId.current)return;
+      if(r.status==='OK'){stopsRef.current=r.stops;setStops(r.stops);setErr('');}
+      else if(!stopsRef.current.length)setErr(r.reason||'Nearby stops unavailable.');
+    }).catch(e=>{
+      if(id===requestId.current&&!stopsRef.current.length)setErr((e as Error).message||'Nearby stops unavailable.');
+    }).finally(()=>{if(id===requestId.current)setBusy(false)});
+  },[location]);
+  useEffect(()=>{load();},[load]);
   const heights=()=>{const H=el.current?.parentElement?.clientHeight||600;return[158,Math.round(H*.52),H-12]};
   const apply=useCallback((h:number,animate:boolean)=>{const s=el.current;if(!s)return;s.classList.toggle('anim',animate);s.style.setProperty('height',h+'px','important');s.parentElement?.style.setProperty('--sheet-h',h+'px','important')},[]);
   useEffect(()=>{apply(heights()[snap],true)},[snap,apply]);useEffect(()=>{const f=()=>apply(heights()[snap],false);window.addEventListener('resize',f);return()=>window.removeEventListener('resize',f)},[snap,apply]);
   const down=(e:RPE)=>{if(window.matchMedia('(min-width:920px)').matches)return;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);drag.current={y:e.clientY,h:el.current!.offsetHeight,t:performance.now()}};
   const move=(e:RPE)=>{const d=drag.current;if(!d)return;const hs=heights();apply(Math.max(110,Math.min(hs[2],d.h+(d.y-e.clientY))),false)};
   const up=(e:RPE)=>{const d=drag.current;if(!d)return;drag.current=null;const hs=heights(),cur=el.current!.offsetHeight,v=(d.y-e.clientY)/Math.max(1,performance.now()-d.t);let target=hs.reduce((b,h,i)=>Math.abs(h-cur)<Math.abs(hs[b]-cur)?i:b,0);if(Math.abs(v)>.5)target=Math.max(0,Math.min(2,snap+(v>0?1:-1)));if(Math.abs(e.clientY-d.y)<5)target=snap===0?1:snap===1?2:0;if(target===snap)apply(hs[target],true);else setSnap(target)};
-  return <section ref={el} className={'sheet snap'+snap} aria-label="Nearby bus stops"><div className="sheet-head" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} role="button" tabIndex={0} aria-label="Resize stops panel" onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')setSnap(s=>(s+1)%3)}}><span className="grab"/><div className="sheet-title"><b>Nearby bus stops</b>{stops.length?<small>{stops.length} within {dist(stops[stops.length-1]?.distanceMeters)}</small>:null}</div></div><div className="sheet-body">{!location?<div className="state empty"><b>{locState==='asking'?'Finding your location…':'See stops near you'}</b><span>{locState==='denied'?'Location permission is blocked. Allow it in your browser settings, then try again.':locState==='unavailable'?'Your location could not be found.':'Allow location to list nearby stops. You can still search for any route or stop.'}</span>{locState!=='asking'?<button className="btn sm" onClick={onLocate}>Use my location</button>:<span className="spinner"/>}</div>:busy&&!stops.length?<div className="skel">{[0,1,2,3].map(i=><div key={i}/>)}</div>:err?<div className="state err"><b>Couldn't load stops</b><span>{err}</span><button className="btn ghost sm" onClick={()=>load()}>Try again</button></div>:!stops.length?<div className="state empty"><b>No stops nearby</b><span>No bus stops found within 15 km of your location.</span></div>:stops.map((s:any,i:number)=><div className="stop-row" key={String(s.stop_id)+i}><button className="stop-main" onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}><span className="pin"><Icon n="pin" size={18}/></span><span className="row-t"><b>{s.name}</b><small>{dist(s.distanceMeters)} away</small></span></button><button className="btn ghost sm" onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}>View buses</button></div>)}</div></section>;
+  return <section ref={el} className={'sheet snap'+snap} aria-label="Nearby bus stops"><div className="sheet-head" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} role="button" tabIndex={0} aria-label="Resize stops panel" onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')setSnap(s=>(s+1)%3)}}><span className="grab"/><div className="sheet-title"><b>Nearby bus stops</b>{stops.length?<small>{stops.length} within {dist(stops[stops.length-1]?.distanceMeters)}</small>:null}</div></div><div className="sheet-body">{!location?<div className="state empty"><b>{locState==='asking'?'Finding your location…':'See stops near you'}</b><span>{locState==='denied'?'Location permission is blocked. Allow it in your browser settings, then try again.':locState==='unavailable'?'Your location could not be found.':'Allow location to list nearby stops. You can still search for any route or stop.'}</span>{locState!=='asking'?<button className="btn sm" onClick={onLocate}>Use my location</button>:<span className="spinner"/>}</div>:busy&&!stops.length?<div className="skel">{[0,1,2,3].map(i=><div key={i}/>)}</div>:err?<div className="state err"><b>Couldn't load stops</b><span>{err}</span><button className="btn ghost sm" onClick={()=>load(true)}>Try again</button></div>:!stops.length?<div className="state empty"><b>No stops nearby</b><span>No bus stops found within 15 km of your location.</span></div>:stops.map((s:any,i:number)=><div className="stop-row" key={String(s.stop_id)+i}><button className="stop-main" onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}><span className="pin"><Icon n="pin" size={18}/></span><span className="row-t"><b>{s.name}</b><small>{dist(s.distanceMeters)} away</small></span></button><button className="btn ghost sm" onClick={()=>go('/stops/'+encodeURIComponent(s.stop_id))}>View buses</button></div>)}</div></section>;
 }
