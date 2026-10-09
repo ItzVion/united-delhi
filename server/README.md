@@ -48,4 +48,4 @@ SET bus_type = 'CNG NonAC (12 mtr)',
 WHERE vehicle_id = 'DL1PD4669';
 ```
 
-Changes are loaded by the API within about one minute and the exact registered colour takes priority over registration-prefix fallback rules on web and Android.
+Changes are loaded by the API within about one minute. Web and Android display the serviceColor returned by the API without client-side overrides.

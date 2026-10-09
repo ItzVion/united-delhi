@@ -277,7 +277,7 @@ function buildMapHtml(){
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""><style>
 html,body,#map{margin:0;width:100%;height:100%;background:#eef2f1}.leaflet-control-zoom{border:0!important;box-shadow:0 2px 12px rgba(23,49,47,.16)!important;border-radius:0;overflow:hidden}.leaflet-control-zoom a{border:0!important;color:#17312f!important}
 .leaflet-control-locate{margin:0 8px 32px 0}.leaflet-control-locate button{width:40px;height:40px;border:1px solid #d8e4e0;border-radius:0;background:#fff;color:#0b746b;font:900 21px system-ui;line-height:40px;box-shadow:0 3px 14px rgba(23,49,47,.18);cursor:pointer}.leaflet-control-locate button:active{transform:scale(.96)}
-.stop-label{width:10px;height:10px;border-radius:0;background:#0b746b;border:2px solid #fff;box-shadow:0 2px 6px rgba(23,49,47,.28)}.bus-pin{width:34px;height:34px;border-radius:0;background:#3D82CE;color:#fff;border:3px solid #fff;box-shadow:0 3px 10px rgba(23,49,47,.30);display:flex;align-items:center;justify-content:center;font:900 8px system-ui,sans-serif;line-height:1;text-align:center}.bus-pin span{max-width:27px;overflow:hidden;text-overflow:clip}.ud-mobile-bus{width:44px;height:26px;border:2px solid #fff;border-radius:0;box-shadow:0 3px 9px rgba(23,49,47,.30);display:flex;align-items:center;justify-content:center;gap:2px;box-sizing:border-box;font:900 7px/1 system-ui,sans-serif;overflow:hidden;white-space:nowrap}.ud-mobile-bus-glyph{width:17px;height:17px;display:grid;place-items:center;flex:0 0 auto}.ud-mobile-bus-glyph svg{width:17px;height:17px;display:block}.ud-mobile-bus-label{max-width:20px;overflow:hidden;text-overflow:clip}
+.stop-label{width:10px;height:10px;border-radius:0;background:#0b746b;border:2px solid #fff;box-shadow:0 2px 6px rgba(23,49,47,.28)}.ud-mobile-bus{width:44px;height:26px;border:2px solid #fff;border-radius:0;box-shadow:0 3px 9px rgba(23,49,47,.30);display:flex;align-items:center;justify-content:center;gap:2px;box-sizing:border-box;font:900 7px/1 system-ui,sans-serif;overflow:hidden;white-space:nowrap}.ud-mobile-bus-glyph{width:17px;height:17px;display:grid;place-items:center;flex:0 0 auto}.ud-mobile-bus-glyph svg{width:17px;height:17px;display:block}.ud-mobile-bus-label{max-width:20px;overflow:hidden;text-overflow:clip}
 </style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script>
 let currentLocation=null;let autoFocused=false;let lastBusData=[];
 const saved=localStorage.getItem('ud-map-center');
@@ -291,9 +291,9 @@ const locateControl=L.Control.extend({options:{position:'bottomright'},onAdd:fun
 function reportBounds(){const b=map.getBounds();const c=map.getCenter();try{localStorage.setItem('ud-map-center',JSON.stringify({lat:c.lat,lon:c.lng}));}catch{}window.ReactNativeWebView.postMessage(JSON.stringify({type:'bounds',bounds:{south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()}}));}
 map.on('moveend',reportBounds);map.on('zoomend',reportBounds);setTimeout(reportBounds,250);
 function markerFor(v){
- const bg=validColor(v.color)?v.color:'#3D82CE';
+ const bg=validColor(v.color)?v.color:'transparent';
  const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
- const fg='#fff';
+ const fg=textColorFor(bg);
  const html='<div class="ud-mobile-bus" style="background:'+bg+';color:'+fg+'">'+
    '<span class="ud-mobile-bus-glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>'+
    '<span class="ud-mobile-bus-label">'+escapeHtml(label)+'</span></div>';
@@ -326,7 +326,7 @@ function renderBuses(){
  lastBusData.forEach(v=>{const lat=Number(v.lat),lon=Number(v.lon);if(!Number.isFinite(lat)||!Number.isFinite(lon)||!bounds.contains([lat,lon]))return;visible.set(v.id,v);});
  for(const [id,marker] of busMarkers){if(!visible.has(id)){const frame=busAnimations.get(marker);if(frame)cancelAnimationFrame(frame);busAnimations.delete(marker);busLayer.removeLayer(marker);busMarkers.delete(id);}}
  for(const [id,v] of visible){
-   const bg=validColor(v.color)?v.color:'#3D82CE';
+   const bg=validColor(v.color)?v.color:'transparent';
    const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
    const existing=busMarkers.get(id);
    if(existing){
@@ -358,6 +358,7 @@ function openBus(id){
  window.ReactNativeWebView.postMessage(JSON.stringify({type:'bus',busId:id}));
 }
 function validColor(x){return /^#[0-9a-f]{6}$/i.test(String(x));}
+function textColorFor(apiColor){if(!validColor(apiColor))return '#14211B';const h=String(apiColor).slice(1),rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255),lin=rgb.map(c=>c<=.03928?c/12.92:Math.pow((c+.055)/1.055,2.4));return .2126*lin[0]+.7152*lin[1]+.0722*lin[2]>.179?'#14211B':'#FFFFFF';}
 function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);}
 </script></body></html>`;
 }

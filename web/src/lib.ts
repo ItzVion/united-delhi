@@ -18,7 +18,7 @@ export const busColor=(v:{serviceColor?:string|null})=>{
   const color=String(v?.serviceColor||'').trim();
   return isHex(color)?color:'transparent';
 };
-export const textOn=(bg:string)=>{const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.179?'#14211B':'#FFFFFF'};
+export const textOn=(bg:string)=>{if(!isHex(bg))return '#14211B';const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.179?'#14211B':'#FFFFFF'};
 
 export const routeName=(value:unknown)=>{
   let t=String(value??'').trim().replace(/\s+/g,' ');
