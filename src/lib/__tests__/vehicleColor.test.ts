@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {resolveVehicleColor,apiFleetLegendRows} from '../vehicleColor.ts';
+import {resolveVehicleColor,apiFleetLegendRows,hasApiVehicleColor} from '../vehicleColor.ts';
 
 test('native marker preserves the exact API colour regardless of bus type or route colour',()=>{
   assert.equal(resolveVehicleColor({id:'DL1PD4669',busType:'CNG AC (12 mtr)',serviceType:'dtc',routeColor:'#1D4ED8',serviceColor:'#F97316'} as any).background,'#F97316');
