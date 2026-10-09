@@ -33,14 +33,16 @@ export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):Vehicle
   if(busType.startsWith('CNG AC'))return{background:COLORS.cngAc,text:'#FFFFFF'};
   if(busType.startsWith('CNG NONAC'))return{background:COLORS.cngNonAc,text:textFor(COLORS.cngNonAc)};
 
-  if(v.serviceType==='electric')return{background:COLORS.evAc,text:textFor(COLORS.evAc)};
-  if(v.serviceType==='dtc')return{background:COLORS.cngAc,text:textFor(COLORS.cngAc)};
-
-  const id=String((v as any).id||(v as any).vehicleId||(v as any).licensePlate||'').toUpperCase().replace(/[-_\s]/g,'');
+  const ids=[(v as any).id,(v as any).vehicleId,(v as any).licensePlate,(v as any).vehicleLabel]
+    .map(value=>String(value||'').toUpperCase().replace(/[-_\\s]/g,''));
+  const id=ids.find(value=>/^(DL51EV|DL51GD|DL1PB|DL1PC|DL1PD|DL1PE)/.test(value))||'';
   if(id.startsWith('DL51EV'))return{background:COLORS.evAc,text:textFor(COLORS.evAc)};
   if(id.startsWith('DL51GD'))return{background:COLORS.evDevi,text:textFor(COLORS.evDevi)};
-  if(id.startsWith('DL1PD')||id.startsWith('DL1PE'))return{background:COLORS.cngAc,text:'#FFFFFF'};
-  if(id.startsWith('DL1PB')||id.startsWith('DL1PC'))return{background:COLORS.cngNonAc,text:textFor(COLORS.cngNonAc)};
+  if(id.startsWith('DL1PB')||id.startsWith('DL1PC')||id.startsWith('DL1PD'))return{background:COLORS.cngNonAc,text:textFor(COLORS.cngNonAc)};
+  if(id.startsWith('DL1PE'))return{background:COLORS.cngAc,text:textFor(COLORS.cngAc)};
+
+  if(v.serviceType==='electric')return{background:COLORS.evAc,text:textFor(COLORS.evAc)};
+  if(v.serviceType==='dtc')return{background:COLORS.cngAc,text:textFor(COLORS.cngAc)};
 
   const route=validHex(v.routeColor);
   if(route)return{background:route,text:textFor(route)};

@@ -32,8 +32,8 @@ const classifyFleet=(id,...aliases)=>{
  const v=candidates.find(x=>x.startsWith('DL51EV')||x.startsWith('DL51GD')||x.startsWith('DL1PD')||x.startsWith('DL1PE')||x.startsWith('DL1PB')||x.startsWith('DL1PC'))||candidates[0]||'';
  if(v.startsWith('DL51EV'))return{serviceType:'electric',busType:'EV AC (12 mtr)',serviceColor:SERVICE_COLORS.electricAc};
  if(v.startsWith('DL51GD'))return{serviceType:'electric',busType:'EV DEVI AC (9 mtr)',serviceColor:SERVICE_COLORS.electricDevi};
- if(v.startsWith('DL1PD')||v.startsWith('DL1PE'))return{serviceType:'dtc',busType:'CNG AC (12 mtr)',serviceColor:SERVICE_COLORS.cngAc};
- if(v.startsWith('DL1PB')||v.startsWith('DL1PC'))return{serviceType:'dtc',busType:'CNG NonAC (12 mtr)',serviceColor:SERVICE_COLORS.cngNonAc};
+ if(v.startsWith('DL1PB')||v.startsWith('DL1PC')||v.startsWith('DL1PD'))return{serviceType:'dtc',busType:'CNG NonAC (12 mtr)',serviceColor:SERVICE_COLORS.cngNonAc};
+ if(v.startsWith('DL1PE'))return{serviceType:'dtc',busType:'CNG AC (12 mtr)',serviceColor:SERVICE_COLORS.cngAc};
  return{serviceType:'unknown',busType:'Unknown',serviceColor:SERVICE_COLORS.unknown};
 };
 const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>classifyFleet(id,licensePlate,vehicleLabel);
