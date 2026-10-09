@@ -2,10 +2,12 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/types';
 import { colors } from '../theme';
 
 export default function AboutScreen(){
-  const navigation=useNavigation();
+  const navigation=useNavigation<NativeStackNavigationProp<RootStackParamList,'About'>>();
   return <SafeAreaView style={styles.safe}>
     <View style={styles.header}><Pressable onPress={()=>navigation.goBack()} style={styles.back}><Text style={styles.backText}>‹  Back</Text></Pressable><View style={styles.headerCopy}><Text style={styles.eyebrow}>UNITED DELHI</Text><Text style={styles.title}>About this app</Text></View></View>
     <ScrollView contentContainerStyle={styles.content}>
