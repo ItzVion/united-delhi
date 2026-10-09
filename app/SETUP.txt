@@ -1,39 +1,64 @@
-UNITED DELHI SETUP
+UNITED DELHI — DEVELOPMENT AND BUILD
 
-1. Frontend
-   From the repository root:
-   npm install
-   npx expo start
+Repository layout
+- app/     Expo React Native app and local Android APK builder
+- web/     Vite/React website (Vercel project root)
+- server/  Express API (Render service root)
+- legal/   Privacy, terms, security and third-party notices
 
-   For the web client:
-   npm --prefix web install
-   npm --prefix web run dev
+1. Android/iOS app
+From the repository root:
+  cd app
+  npm ci
+  npm run typecheck
+  npm test
+  npx expo start
 
-2. Backend
-   From the server directory:
-   npm ci
-   npm run check
-   npm start
+To build and install a release APK locally on Windows:
+  npm run build:apk
 
-3. Backend environment
-   Set DATABASE_URL and TRANSPORT_STACK_API_KEY in the server environment.
-   Never put either secret in frontend source or the mobile bundle.
+The local APK build requires Android SDK/platform-tools, JDK 17, PowerShell and Gradle access. It does not use Expo cloud builds. Build logs and the APK are written to Desktop\UnitedDelhi-Debug.
 
-4. Current hosted backend
-   Provider: Render
-   Service: https://united-delhi-api.onrender.com
-   Service root: ./server
-   Build command: npm ci
-   Start command: npm start
-   Health endpoint: https://united-delhi-api.onrender.com/health
-   API base URL: https://united-delhi-api.onrender.com
+2. Website
+From the repository root:
+  cd web
+  npm install
+  npm run dev
 
-   Required environment variables:
-   - TRANSPORT_STACK_API_KEY
-   - DATABASE_URL
-   - APP_ORIGINS
-   - TRANSPORT_STACK_REALTIME_URL (optional; defaults to the approved Transport Stack endpoint)
+Open the local URL printed by Vite (normally http://localhost:5173). Local /api requests are proxied to the hosted API.
 
-5. Static GTFS data
-   The repository uses its pinned GTFS snapshot unless a newer compatible source is
-   verified against the realtime route IDs.
+Vercel settings:
+- Root Directory: web
+- Include files outside root directory: Off
+- Framework: Vite
+- Install Command: npm install
+- Build Command: npm run build
+- Output Directory: dist
+
+3. Backend
+From the repository root:
+  cd server
+  npm ci
+  npm run check
+  npm test
+  npm start
+
+4. Hosted backend
+Provider: Render
+Public API: https://united-delhi-api.onrender.com
+Health check: https://united-delhi-api.onrender.com/health
+Service root: server
+Build command: npm ci
+Start command: npm start
+
+Required Render environment variables:
+- DATABASE_URL
+- TRANSPORT_STACK_API_KEY
+- APP_ORIGINS
+Optional:
+- TRANSPORT_STACK_REALTIME_URL
+
+Never put DATABASE_URL or TRANSPORT_STACK_API_KEY in app/ or web/. Both clients use the public API only.
+
+5. Live vehicle colours
+The app displays only valid per-vehicle serviceColor values supplied by the live API or an individually verified physical-livery record. Standard GTFS-Realtime does not define a vehicle-livery colour field. Unknown physical colours remain neutral grey and are not guessed from route colour, vehicle type or registration prefix.
