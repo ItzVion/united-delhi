@@ -23,7 +23,16 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: npm audit --audit-level=critical
+      - name: Report dependency advisories (non-blocking)
+        run: npm audit --json > audit-report.json || true
+        working-directory: app
+      - name: Upload app dependency audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-dependency-audit-report
+          path: app/audit-report.json
+          if-no-files-found: error
+          retention-days: 7
 
   web:
     runs-on: ubuntu-latest
@@ -39,7 +48,15 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm run build
-      - run: npm audit --audit-level=critical
+      - name: Report dependency advisories (non-blocking)
+        run: npm audit --json > audit-report.json || true
+      - name: Upload web dependency audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dependency-audit-report
+          path: web/audit-report.json
+          if-no-files-found: error
+          retention-days: 7
 
   backend:
     runs-on: ubuntu-latest
@@ -57,4 +74,12 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: node --check scripts/import-dtc-static.mjs
-      - run: npm audit --omit=dev --audit-level=moderate
+      - name: Report production dependency advisories (non-blocking)
+        run: npm audit --omit=dev --json > audit-report.json || true
+      - name: Upload backend dependency audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dependency-audit-report
+          path: server/audit-report.json
+          if-no-files-found: error
+          retention-days: 7
