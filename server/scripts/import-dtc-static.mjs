@@ -7,8 +7,8 @@ const STATIC_URL_OVERRIDE = String(process.env.DTC_STATIC_URL || '').trim();
 const STATIC_URLS = STATIC_URL_OVERRIDE
   ? [STATIC_URL_OVERRIDE]
   : [
-      'https://ethanc8.github.io/delhi-gtfs/bus.zip',
       'https://files.mobilitydatabase.org/mdb-1262/latest.zip',
+      'https://ethanc8.github.io/delhi-gtfs/bus.zip',
       'https://files.mobilitydatabase.org/mdb-3139/latest.zip'
     ];
 const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'mobilitydb-mdb-1262-latest').trim();
@@ -107,9 +107,6 @@ class ZipArchive {
       p += 46 + nameLength + extraLength + commentLength;
     }
 
-    if (this.totalUncompressed > MAX_UNCOMPRESSED_BYTES) {
-      throw new Error('DTC static ZIP expanded size exceeds the safety limit');
-    }
   }
 
   find(name) {
@@ -194,7 +191,16 @@ async function downloadZip() {
       if (contentLength && contentLength > MAX_COMPRESSED_BYTES) throw new Error('ZIP exceeds the compressed-size safety limit');
       const data = Buffer.from(await response.arrayBuffer());
       if (data.length > MAX_COMPRESSED_BYTES) throw new Error('ZIP exceeds the compressed-size safety limit');
+      const archive = new ZipArchive(data);
+      const requiredFiles = ['routes.txt', 'stops.txt', 'trips.txt', 'stop_times.txt'];
+      const missing = requiredFiles.filter((name) => !archive.find(name));
+      if (missing.length) throw new Error('ZIP is missing required GTFS files: ' + missing.join(', '));
+      const requiredExpandedBytes = requiredFiles.reduce((sum, name) => sum + archive.find(name).uncompressedSize, 0);
+      if (requiredExpandedBytes > MAX_UNCOMPRESSED_BYTES) {
+        throw new Error('Required GTFS files exceed the expanded-size safety limit');
+      }
       console.log('Downloaded DTC static ZIP: ' + Math.round(data.length / 1024 / 1024 * 100) / 100 + ' MB');
+      console.log('Required GTFS files expand to ' + Math.round(requiredExpandedBytes / 1024 / 1024 * 100) / 100 + ' MB');
       return { data, sourceUrl: url };
     } catch (error) {
       lastError = error?.name === 'AbortError' ? new Error('download timed out') : error;
