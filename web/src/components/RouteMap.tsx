@@ -5,7 +5,7 @@ import {busColor,esc,textOn} from '../lib';
 import {TILE,busIcon,busPopup} from './MapView';
 export default function RouteMap({stops,buses,onStop}:{stops:any[];buses:Vehicle[];onStop:(id:string)=>void}){
  const el=useRef<HTMLDivElement>(null),mapRef=useRef<L.Map|null>(null),busLayer=useRef<L.LayerGroup|null>(null),stopRef=useRef(onStop);stopRef.current=onStop;
- const vehicleIdIcon=(b:Vehicle)=>{const label=String(b.vehicleLabel||b.licensePlate||b.id||'').trim()||'BUS',color=busColor(b),foreground=textOn(color);return L.divIcon({className:'vehicle-id-icon',iconSize:[Math.max(42,label.length*6.4),18],iconAnchor:[Math.max(21,label.length*3.2),9],html:'<span class="vehicle-id-marker" style="background:'+esc(color)+';color:'+esc(foreground)+'">'+esc(label)+'</span>'})};
+ const vehicleIdIcon=(b:Vehicle)=>{const label=String(b.vehicleLabel||b.licensePlate||b.id||'').trim()||'BUS',color=busColor(b),foreground='#FFFFFF';return L.divIcon({className:'vehicle-id-icon',iconSize:[Math.max(42,label.length*6.4),18],iconAnchor:[Math.max(21,label.length*3.2),9],html:'<span class="vehicle-id-marker" style="background:'+esc(color)+';color:'+esc(foreground)+'">'+esc(label)+'</span>'})};
  const valid=stops.filter(s=>Number.isFinite(Number(s.latitude))&&Number.isFinite(Number(s.longitude)));
  const stopsKey=valid.map(s=>String(s.stop_id)).join(',');
  const stopsRef=useRef(valid);stopsRef.current=valid;
