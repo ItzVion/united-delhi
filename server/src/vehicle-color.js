@@ -1,70 +1,155 @@
-// Physical bus colour handling. Standard GTFS-Realtime has NO livery colour field, and the
-// protobuf decoder drops unknown fields, so a colour sent as an extension field must be read
-// at wire level. Only exact valid #RRGGBB values from the authoritative payload are accepted.
-export const validHexColor=value=>{
- const color=String(value??'').trim();
- return /^#[0-9a-f]{6}$/i.test(color)?color:null;
+// Physical bus colour handling. Standard GTFS-Realtime has no vehicle-livery colour field.
+// Some producers may add private protobuf extensions, so only an exact #RRGGBB string
+// from a per-vehicle descriptor/position extension (or an explicitly configured field) is used.
+export const validHexColor = value => {
+  const color = String(value ?? '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : null;
 };
-const KNOWN={FeedEntity:[1,2,3,4,5,6,7,8,9,10,11],VehiclePosition:[1,2,3,4,5,6,7,8,9,10,11],VehicleDescriptor:[1,2,3,4]};
-function readVarint(b,i){let r=0n,s=0n;for(;;){if(i>=b.length)throw new Error('truncated varint');const x=b[i++];r|=BigInt(x&127)<<s;if(!(x&128))break;s+=7n;if(s>70n)throw new Error('bad varint')}return[r,i]}
-function fields(b){
- const out=[];let i=0;
- while(i<b.length){
-  let tag;[tag,i]=readVarint(b,i);const num=Number(tag>>3n),wt=Number(tag&7n);
-  if(wt===0){let v;[v,i]=readVarint(b,i);out.push({num,wt,value:v})}
-  else if(wt===1){if(i+8>b.length)throw new Error('truncated fixed64');out.push({num,wt,value:b.subarray(i,i+8)});i+=8}
-  else if(wt===5){if(i+4>b.length)throw new Error('truncated fixed32');out.push({num,wt,value:b.subarray(i,i+4)});i+=4}
-  else if(wt===2){let n;[n,i]=readVarint(b,i);const len=Number(n);if(i+len>b.length)throw new Error('truncated field');out.push({num,wt,value:b.subarray(i,i+len)});i+=len}
-  else throw new Error('unsupported wire type '+wt);
- }
- return out;
-}
-const text=u8=>new TextDecoder('utf-8',{fatal:false}).decode(u8);
-export function parseColorFieldSpec(spec){
- const m=/^(FeedEntity|VehiclePosition|VehicleDescriptor):(\d{1,5})$/.exec(String(spec||'').trim());
- return m?{message:m[1],field:Number(m[2])}:null;
-}
-// Walk FeedMessage -> entity -> vehicle(VehiclePosition) -> vehicle(VehicleDescriptor).
-// Returns [{id, unknown:[{message,field,wireType,value}]}] for fields outside the standard schema.
-export function scanEntities(bytes){
- const res=[];
- let top;try{top=fields(bytes)}catch{return res}
- for(const f of top){
-  if(f.num!==2||f.wt!==2)continue;
-  try{
-   const ent=fields(f.value);const rec={id:null,vehicleId:null,unknown:[]};
-   for(const e of ent){
-    if(e.num===1&&e.wt===2)rec.id=text(e.value);
-    else if(!KNOWN.FeedEntity.includes(e.num))rec.unknown.push({message:'FeedEntity',field:e.num,wireType:e.wt,value:e.wt===2?text(e.value):null});
-    if(e.num===4&&e.wt===2){
-     for(const p of fields(e.value)){
-      if(!KNOWN.VehiclePosition.includes(p.num))rec.unknown.push({message:'VehiclePosition',field:p.num,wireType:p.wt,value:p.wt===2?text(p.value):null});
-      if(p.num===8&&p.wt===2){
-       for(const d of fields(p.value)){
-        if(d.num===1&&d.wt===2&&!rec.vehicleId)rec.vehicleId=text(d.value);
-        if(!KNOWN.VehicleDescriptor.includes(d.num))rec.unknown.push({message:'VehicleDescriptor',field:d.num,wireType:d.wt,value:d.wt===2?text(d.value):null});
-       }
-      }
-     }
-    }
-   }
-   res.push(rec);
-  }catch{/* skip malformed entity */}
- }
- return res;
-}
-// Map<vehicleKey, '#RRGGBB'> for the configured extension field. Invalid values are ignored.
-export function extractColorsByVehicle(bytes,spec){
- const cfg=typeof spec==='string'?parseColorFieldSpec(spec):spec;const map=new Map();
- for(const rec of scanEntities(bytes)){
-  // If a field number is configured, use only that exact field. Otherwise detect only
-  // unknown VehicleDescriptor extension values that are themselves exact #RRGGBB strings.
-  const candidates=rec.unknown.filter(u=>u.message==='VehicleDescriptor'&&u.wireType===2&&(!cfg||(u.message===cfg.message&&u.field===cfg.field)));
-  for(const hit of candidates){
-   const color=validHexColor(hit.value);
-   if(!color)continue;
-   for(const k of [rec.vehicleId,rec.id])if(k&&!map.has(String(k)))map.set(String(k),color);
+
+const KNOWN = {
+  FeedEntity: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  VehiclePosition: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  VehicleDescriptor: [1, 2, 3, 4]
+};
+
+function readVarint(bytes, index) {
+  let result = 0n;
+  let shift = 0n;
+  for (;;) {
+    if (index >= bytes.length) throw new Error('truncated varint');
+    const byte = bytes[index++];
+    result |= BigInt(byte & 127) << shift;
+    if (!(byte & 128)) break;
+    shift += 7n;
+    if (shift > 70n) throw new Error('bad varint');
   }
- }
- return map;
+  return [result, index];
+}
+
+function fields(bytes) {
+  const out = [];
+  let index = 0;
+  while (index < bytes.length) {
+    let tag;
+    [tag, index] = readVarint(bytes, index);
+    const number = Number(tag >> 3n);
+    const wireType = Number(tag & 7n);
+    if (wireType === 0) {
+      let value;
+      [value, index] = readVarint(bytes, index);
+      out.push({ number, wireType, value });
+    } else if (wireType === 1) {
+      if (index + 8 > bytes.length) throw new Error('truncated fixed64');
+      out.push({ number, wireType, value: bytes.subarray(index, index + 8) });
+      index += 8;
+    } else if (wireType === 5) {
+      if (index + 4 > bytes.length) throw new Error('truncated fixed32');
+      out.push({ number, wireType, value: bytes.subarray(index, index + 4) });
+      index += 4;
+    } else if (wireType === 2) {
+      let length;
+      [length, index] = readVarint(bytes, index);
+      const size = Number(length);
+      if (index + size > bytes.length) throw new Error('truncated field');
+      out.push({ number, wireType, value: bytes.subarray(index, index + size) });
+      index += size;
+    } else {
+      throw new Error('unsupported wire type ' + wireType);
+    }
+  }
+  return out;
+}
+
+const decodeText = bytes => new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+
+export function parseColorFieldSpec(spec) {
+  const match = /^(FeedEntity|VehiclePosition|VehicleDescriptor):(\d{1,5})$/.exec(String(spec || '').trim());
+  return match ? { message: match[1], field: Number(match[2]) } : null;
+}
+
+// Walk FeedMessage -> entity -> vehicle position -> vehicle descriptor. Unknown
+// length-delimited fields are retained only within their owning entity.
+export function scanEntities(bytes) {
+  const result = [];
+  let top;
+  try {
+    top = fields(bytes);
+  } catch {
+    return result;
+  }
+
+  for (const topField of top) {
+    if (topField.number !== 2 || topField.wireType !== 2) continue;
+    try {
+      const entityFields = fields(topField.value);
+      const record = { id: null, vehicleId: null, unknown: [] };
+      for (const entityField of entityFields) {
+        if (entityField.number === 1 && entityField.wireType === 2) {
+          record.id = decodeText(entityField.value);
+        } else if (!KNOWN.FeedEntity.includes(entityField.number)) {
+          record.unknown.push({
+            message: 'FeedEntity',
+            field: entityField.number,
+            wireType: entityField.wireType,
+            value: entityField.wireType === 2 ? decodeText(entityField.value) : null
+          });
+        }
+
+        if (entityField.number !== 4 || entityField.wireType !== 2) continue;
+        for (const positionField of fields(entityField.value)) {
+          if (!KNOWN.VehiclePosition.includes(positionField.number)) {
+            record.unknown.push({
+              message: 'VehiclePosition',
+              field: positionField.number,
+              wireType: positionField.wireType,
+              value: positionField.wireType === 2 ? decodeText(positionField.value) : null
+            });
+          }
+          if (positionField.number !== 8 || positionField.wireType !== 2) continue;
+
+          for (const descriptorField of fields(positionField.value)) {
+            if (descriptorField.number === 1 && descriptorField.wireType === 2 && !record.vehicleId) {
+              record.vehicleId = decodeText(descriptorField.value);
+            }
+            if (!KNOWN.VehicleDescriptor.includes(descriptorField.number)) {
+              record.unknown.push({
+                message: 'VehicleDescriptor',
+                field: descriptorField.number,
+                wireType: descriptorField.wireType,
+                value: descriptorField.wireType === 2 ? decodeText(descriptorField.value) : null
+              });
+            }
+          }
+        }
+      }
+      result.push(record);
+    } catch {
+      // Ignore malformed entities without discarding the rest of the feed.
+    }
+  }
+  return result;
+}
+
+// Map<vehicleKey, '#RRGGBB'>. With no explicit field setting, inspect vehicle-scoped
+// extensions on VehicleDescriptor and VehiclePosition. Never infer colour from other data.
+export function extractColorsByVehicle(bytes, spec) {
+  const config = typeof spec === 'string' ? parseColorFieldSpec(spec) : spec;
+  const colors = new Map();
+
+  for (const record of scanEntities(bytes)) {
+    const candidates = record.unknown.filter(field => {
+      if (field.wireType !== 2) return false;
+      if (config) return field.message === config.message && field.field === config.field;
+      return field.message === 'VehicleDescriptor' || field.message === 'VehiclePosition';
+    });
+
+    for (const candidate of candidates) {
+      const color = validHexColor(candidate.value);
+      if (!color) continue;
+      for (const key of [record.vehicleId, record.id]) {
+        if (key && !colors.has(String(key))) colors.set(String(key), color);
+      }
+    }
+  }
+  return colors;
 }
