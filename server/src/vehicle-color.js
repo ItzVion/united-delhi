@@ -56,12 +56,15 @@ export function scanEntities(bytes){
 // Map<vehicleKey, '#RRGGBB'> for the configured extension field. Invalid values are ignored.
 export function extractColorsByVehicle(bytes,spec){
  const cfg=typeof spec==='string'?parseColorFieldSpec(spec):spec;const map=new Map();
- if(!cfg)return map;
  for(const rec of scanEntities(bytes)){
-  const hit=rec.unknown.find(u=>u.message===cfg.message&&u.field===cfg.field&&u.wireType===2);
-  const color=validHexColor(hit?.value);
-  if(!color)continue;
-  for(const k of [rec.vehicleId,rec.id])if(k)map.set(String(k),color);
+  // If a field number is configured, use only that exact field. Otherwise detect only
+  // unknown VehicleDescriptor extension values that are themselves exact #RRGGBB strings.
+  const candidates=rec.unknown.filter(u=>u.message==='VehicleDescriptor'&&u.wireType===2&&(!cfg||(u.message===cfg.message&&u.field===cfg.field)));
+  for(const hit of candidates){
+   const color=validHexColor(hit.value);
+   if(!color)continue;
+   for(const k of [rec.vehicleId,rec.id])if(k&&!map.has(String(k)))map.set(String(k),color);
+  }
  }
  return map;
 }
