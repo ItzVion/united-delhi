@@ -5,8 +5,9 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 
 const execFileAsync=promisify(execFile);
-const URL='https://otd.delhi.gov.in/data/staticDMRC/';
-const TOKEN='1'.repeat(64);
+const URL='https://br-long-salad-b3b9l7ld.storage.c-4.ap-southeast-1.aws.neon.tech/united-delhi-static-v1/dmrc-static-gtfs-v1.zip';
+const SOURCE_KEY='uploaded-dmrc-static-gtfs-v1-20230810';
+let syncRunning=false;
 
 function csv(text){
   const out=[],row=[];let cell='',quoted=false;
@@ -36,48 +37,55 @@ async function unzipFeed(buf,dir){
 
 export async function syncMetroStatic(pool){
   if(!pool)return {ok:false,reason:'Database is not configured'};
+  if(syncRunning)return {ok:false,reason:'A Metro static sync is already running'};
+  syncRunning=true;
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'united-delhi-dmrc-'));
   try{
-    let body=null,sourceUrl=URL,lastError=null;
-    for(const candidate of [URL,'https://ethanc8.github.io/delhi-gtfs/metro.zip']){
-      const controller=new AbortController();
-      const timer=setTimeout(()=>controller.abort(),candidate===URL?20000:30000);
-      try{
-        if(candidate===URL){
-          const page=await fetch(URL,{method:'GET',headers:{accept:'text/html','user-agent':'United-Delhi/2.0'},signal:controller.signal});
-          if(!page.ok)throw new Error('Static page HTTP '+page.status);
-          const html=await page.text();
-          const cookie=(page.headers.get('set-cookie')||'').match(/csrftoken=([^;]+)/)?.[1]||TOKEN;
-          const token=html.match(/name=[\"']csrfmiddlewaretoken[\"'][^>]*value=[\"']([^\"']+)/i)?.[1]||html.match(/value=[\"']([^\"']+)[\"'][^>]*name=[\"']csrfmiddlewaretoken[\"']/i)?.[1]||cookie;
-          const form=new FormData();form.append('csrfmiddlewaretoken',token);form.append('usage_type','non-commercial');form.append('usageType','Non-Commercial');form.append('purpose','academia');form.append('agree','on');form.append('terms','on');form.append('download','1');
-          const response=await fetch(URL,{method:'POST',headers:{cookie:'csrftoken='+cookie,referer:URL,'user-agent':'United-Delhi/2.0'},body:form,signal:controller.signal});
-          if(!response.ok)throw new Error('DMRC static download HTTP '+response.status);
-          body=Buffer.from(await response.arrayBuffer());
-        }else{
-          const response=await fetch(candidate,{headers:{accept:'application/zip','user-agent':'United-Delhi/2.0'},signal:controller.signal});
-          if(!response.ok)throw new Error('Metro fallback HTTP '+response.status);
-          body=Buffer.from(await response.arrayBuffer());
-        }
-        if(body.slice(0,2).equals(Buffer.from([0x50,0x4b]))){sourceUrl=candidate;break}
-        throw new Error('Response was not a ZIP');
-      }catch(e){lastError=e}
-      finally{clearTimeout(timer)}
+    const meta=(await pool.query('SELECT source_key,route_count,stop_count FROM metro_feed_meta WHERE id=1').catch(()=>({rows:[]}))).rows[0];
+    if(meta?.source_key===SOURCE_KEY&&Number(meta.route_count)>=18&&Number(meta.stop_count)>=260){
+      return {ok:true,unchanged:true,routes:Number(meta.route_count),stops:Number(meta.stop_count)};
     }
-    if(!body||!body.slice(0,2).equals(Buffer.from([0x50,0x4b])))throw new Error('DMRC static download failed: '+(lastError?.message||'unknown error'));
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),120000);
+    let body,sourceUrl=URL;
+    try{
+      const response=await fetch(URL,{headers:{accept:'application/zip','user-agent':'United-Delhi/2.0'},signal:controller.signal});
+      if(!response.ok)throw new Error('Uploaded DMRC static ZIP HTTP '+response.status);
+      body=Buffer.from(await response.arrayBuffer());
+      if(!body.slice(0,2).equals(Buffer.from([0x50,0x4b])))throw new Error('Uploaded DMRC response is not a ZIP archive');
+    }finally{clearTimeout(timer)}
     const feed=await unzipFeed(body,dir);
     if(!feed.routes.length||!feed.stops.length||!feed.trips.length||!feed.stopTimes.length)throw new Error('DMRC feed is missing required GTFS files');
 
-    // A GTFS route contains trips in both directions and sometimes short-turn
-    // variants. Mixing every trip by route_id scrambles stations at identical
-    // stop_sequence values. Keep the longest complete trip per route/direction.
+    // The supplied feed stores opposite directions as separate GTFS routes
+    // whose route_short_name values pair as CODE and CODE_R. Group those two
+    // direction-specific routes into one readable line while retaining the
+    // original stop order for each direction.
+    const rawRouteById=new Map(feed.routes.map(x=>[esc(x.route_id),x]));
+    const rawRouteByShort=new Map(feed.routes.map(x=>[esc(x.route_short_name),x]).filter(([short,x])=>short&&x));
+    const groupedRoutes=[],rawRouteToGroup=new Map();
+    const lineNames={RED:'Red Line',YELLOW:'Yellow Line',BLUE:'Blue Line',GREEN:'Green Line',VIOLET:'Violet Line',MAGENTA:'Magenta Line',PINK:'Pink Line',GRAY:'Grey Line',RAPID:'Rapid Metro',AQUA:'Noida Aqua Line','ORANGE/AIRPORT':'Airport Express'};
+    const lineColors={RED:'D83B3B',YELLOW:'E5B12C',BLUE:'2F63B7',GREEN:'2F9B62',VIOLET:'7A4FB5',MAGENTA:'B044A6',PINK:'D65A9A',GRAY:'6B7280',RAPID:'3A8D8D',AQUA:'159A9C','ORANGE/AIRPORT':'E06B2C'};
+    for(const [short,baseRoute] of rawRouteByShort){
+      if(short.endsWith('_R'))continue;
+      const reverse=rawRouteByShort.get(short+'_R');
+      if(!reverse)continue;
+      const routeId='Metro_'+short;
+      const prefix=esc(baseRoute.route_long_name).split('_',1)[0].toUpperCase();
+      const lineName=lineNames[prefix]||prefix||'Metro Line';
+      const detail=esc(baseRoute.route_long_name).split('_').slice(1).join('_').trim();
+      groupedRoutes.push({route_id:routeId,agency_id:esc(baseRoute.agency_id)||esc(feed.agency[0]?.agency_id)||'DMRC',short_name:lineName,long_name:lineName+(detail?' · '+detail:''),route_type:num(baseRoute.route_type)||1,route_color:lineColors[prefix]||null,route_text_color:'FFFFFF'});
+      rawRouteToGroup.set(esc(baseRoute.route_id),{routeId,directionId:0});
+      rawRouteToGroup.set(esc(reverse.route_id),{routeId,directionId:1});
+    }
+    if(groupedRoutes.length<15)throw new Error('DMRC feed did not contain the expected paired directional routes');
     const tripById=new Map(feed.trips.map(x=>[esc(x.trip_id),x]));
     const stopsByTrip=new Map();
     for(const x of feed.stopTimes){
-      const tripId=esc(x.trip_id),trip=tripById.get(tripId);
-      const routeId=esc(trip?.route_id),stopId=esc(x.stop_id),seq=num(x.stop_sequence);
-      if(!tripId||!routeId||!stopId||!Number.isFinite(seq))continue;
+      const tripId=esc(x.trip_id),trip=tripById.get(tripId),rawRoute=rawRouteById.get(esc(trip?.route_id));
+      const mapped=rawRouteToGroup.get(esc(rawRoute?.route_id)),stopId=esc(x.stop_id),seq=num(x.stop_sequence);
+      if(!tripId||!mapped||!stopId||!Number.isFinite(seq))continue;
       const bucket=stopsByTrip.get(tripId)||[];
-      bucket.push({routeId,stopId,seq});
+      bucket.push({routeId:mapped.routeId,directionId:mapped.directionId,stopId,seq});
       stopsByTrip.set(tripId,bucket);
     }
     const candidatesByDirection=new Map(),seenPatterns=new Set();
@@ -85,10 +93,7 @@ export async function syncMetroStatic(pool){
       tripStops.sort((a,b)=>a.seq-b.seq);
       const ordered=tripStops.filter((x,i,a)=>i===0||x.seq!==a[i-1].seq);
       if(ordered.length<2)continue;
-      const trip=tripById.get(tripId),rawDirection=esc(trip?.direction_id);
-      const inferred=ordered[0].stopId.localeCompare(ordered[ordered.length-1].stopId)<=0?0:1;
-      const parsed=rawDirection!==''?Number(rawDirection):inferred;
-      const directionId=Number.isInteger(parsed)&&parsed>=0?parsed:inferred;
+      const directionId=ordered[0].directionId;
       const routeId=ordered[0].routeId,key=routeId+'|'+directionId;
       const signature=key+'|'+ordered.map(x=>x.stopId).join('>');
       if(seenPatterns.has(signature))continue;
@@ -158,9 +163,9 @@ export async function syncMetroStatic(pool){
       await c.query('ALTER TABLE metro_route_stops ADD CONSTRAINT metro_route_stops_pkey PRIMARY KEY(route_id,direction_id,stop_id,stop_sequence)');
       await c.query(`CREATE TABLE IF NOT EXISTS metro_feed_meta(id INTEGER PRIMARY KEY CHECK(id=1),source_url TEXT NOT NULL,source_key TEXT NOT NULL,imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),route_count INTEGER NOT NULL DEFAULT 0,stop_count INTEGER NOT NULL DEFAULT 0,route_stop_count INTEGER NOT NULL DEFAULT 0)`);
       await c.query('TRUNCATE metro_route_stops,metro_routes,metro_stops');
-      for(let i=0;i<feed.routes.length;i+=300){
-        const chunk=feed.routes.slice(i,i+300),vals=[];
-        const sql=chunk.map((x,j)=>{const b=j*7;vals.push(esc(x.route_id),esc(x.agency_id)||null,esc(x.route_short_name)||null,esc(x.route_long_name)||null,num(x.route_type)||0,esc(x.route_color)||null,esc(x.route_text_color)||null);return `($${b+1},$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},NOW())`}).join(',');
+      for(let i=0;i<groupedRoutes.length;i+=300){
+        const chunk=groupedRoutes.slice(i,i+300),vals=[];
+        const sql=chunk.map((x,j)=>{const b=j*7;vals.push(x.route_id,x.agency_id,x.short_name,x.long_name,x.route_type,x.route_color,x.route_text_color);return `($${b+1},$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},NOW())`}).join(',');
         await c.query(`INSERT INTO metro_routes(route_id,agency_id,short_name,long_name,route_type,route_color,route_text_color,updated_at) VALUES ${sql}`,vals);
       }
       for(let i=0;i<feed.stops.length;i+=500){
@@ -168,7 +173,7 @@ export async function syncMetroStatic(pool){
         const sql=chunk.map((x,j)=>{const b=j*4;vals.push(esc(x.stop_id),esc(x.stop_name),num(x.stop_lat),num(x.stop_lon));return `($${b+1},$${b+2},$${b+3},$${b+4},NOW())`}).join(',');
         if(sql)await c.query(`INSERT INTO metro_stops(stop_id,name,latitude,longitude,updated_at) VALUES ${sql}`,vals);
       }
-      const knownRoutes=new Set(feed.routes.map(x=>esc(x.route_id)));
+      const knownRoutes=new Set(groupedRoutes.map(x=>x.route_id));
       const knownStops=new Set(feed.stops.map(x=>esc(x.stop_id)));
       const valid=routeStops.filter(x=>knownRoutes.has(x.routeId)&&knownStops.has(x.stopId));
       for(let i=0;i<valid.length;i+=500){
@@ -180,12 +185,13 @@ export async function syncMetroStatic(pool){
       await c.query('CREATE INDEX IF NOT EXISTS idx_metro_route_stops_stop ON metro_route_stops(stop_id,stop_sequence)');
       await c.query('CREATE INDEX IF NOT EXISTS idx_metro_route_stops_route ON metro_route_stops(route_id,stop_sequence)');
       await c.query('CREATE INDEX IF NOT EXISTS idx_metro_route_stops_route_dir ON metro_route_stops(route_id,direction_id,stop_sequence)');
-      await c.query('INSERT INTO metro_feed_meta(id,source_url,source_key,imported_at,route_count,stop_count,route_stop_count) VALUES(1,$1,$2,NOW(),$3,$4,$5) ON CONFLICT(id) DO UPDATE SET source_url=EXCLUDED.source_url,source_key=EXCLUDED.source_key,imported_at=EXCLUDED.imported_at,route_count=EXCLUDED.route_count,stop_count=EXCLUDED.stop_count,route_stop_count=EXCLUDED.route_stop_count',[sourceUrl,'official-dmrc-gtfs',feed.routes.length,feed.stops.length,valid.length]);
+      await c.query('INSERT INTO metro_feed_meta(id,source_url,source_key,imported_at,route_count,stop_count,route_stop_count) VALUES(1,$1,$2,NOW(),$3,$4,$5) ON CONFLICT(id) DO UPDATE SET source_url=EXCLUDED.source_url,source_key=EXCLUDED.source_key,imported_at=EXCLUDED.imported_at,route_count=EXCLUDED.route_count,stop_count=EXCLUDED.stop_count,route_stop_count=EXCLUDED.route_stop_count',[sourceUrl,SOURCE_KEY,groupedRoutes.length,feed.stops.length,valid.length]);
       await c.query('COMMIT');
       console.log('DMRC static sync complete: '+feed.routes.length+' routes, '+feed.stops.length+' stops, '+valid.length+' route-stop links.');
-      return {ok:true,routes:feed.routes.length,stops:feed.stops.length,routeStops:valid.length};
+      return {ok:true,routes:groupedRoutes.length,stops:feed.stops.length,routeStops:valid.length};
     }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e}finally{c.release()}
   }finally{
+    syncRunning=false;
     await fs.rm(dir,{recursive:true,force:true}).catch(()=>{});
   }
 }
