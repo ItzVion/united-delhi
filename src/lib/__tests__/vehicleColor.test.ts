@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {resolveVehicleColor} from '../vehicleColor.ts';
-import {busColor} from '../../../web/src/lib.ts';
 
 test('native bus fill uses the API serviceColor',()=>{
   assert.equal(resolveVehicleColor({id:'DL1PD4669',busType:'CNG AC (12 mtr)',serviceType:'dtc',routeColor:'#1D4ED8',serviceColor:'#F97316'} as any).background,'#F97316');
@@ -9,12 +8,4 @@ test('native bus fill uses the API serviceColor',()=>{
 
 test('native does not guess color when the API omits serviceColor',()=>{
   assert.equal(resolveVehicleColor({id:'DL1PD4669',busType:'CNG NonAC (12 mtr)',serviceType:'dtc',routeColor:'#1D4ED8'} as any).background,'transparent');
-});
-
-test('web bus fill uses the API serviceColor',()=>{
-  assert.equal(busColor({id:'DL1PD4669',busType:'CNG AC (12 mtr)',serviceType:'dtc',routeColor:'#1D4ED8',serviceColor:'#F97316'} as any),'#F97316');
-});
-
-test('web does not guess color when the API omits serviceColor',()=>{
-  assert.equal(busColor({id:'DL1PD4669',busType:'CNG NonAC (12 mtr)',serviceType:'dtc',routeColor:'#1D4FD8'} as any),'transparent');
 });

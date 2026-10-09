@@ -37,7 +37,6 @@ const classifyFleet=(id,...aliases)=>{
  return{serviceType:'unknown',busType:'Unknown',serviceColor:SERVICE_COLORS.unknown};
 };
 const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>classifyFleet(id,licensePlate,vehicleLabel);
-const fallbackColor=()=>SERVICE_COLORS.unknown; // fleet colours are resolved from vehicle identity first
 const cache={vehicles:[],status:KEY?'STARTING':'UNAVAILABLE',reason:KEY?'Render API is starting':'DTC_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
 let refreshing=null,poll=null,routeMetaLoadedAt=0,persistPromise=null,lastPersistAt=0,dtcAutoImportRunning=false;
 const routeMeta=new Map();
