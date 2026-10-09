@@ -6,6 +6,7 @@ on:
     branches:
       - main
     paths:
+      - 'app/**'
       - '.github/workflows/android-apk.yml'
 
 permissions:
@@ -41,7 +42,7 @@ jobs:
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools platforms;android-35 build-tools;35.0.0
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
           accept-android-sdk-licenses: true
 
       - name: Install app dependencies
