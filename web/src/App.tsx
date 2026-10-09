@@ -10,9 +10,9 @@ import Metro from './components/Metro';
 import MetroRoute from './components/MetroRoute';
 import {Planner,RoutePage,StopPage,Hub,Help,Legal,Privacy,Terms,About} from './components/pages';
 
-const CACHE_KEY='ud-live-vehicles-v8';
-const LEGACY_CACHE_KEY='ud-live-vehicles-v4';
-const readCache=():Vehicle[]=>{try{window.localStorage.removeItem(LEGACY_CACHE_KEY)}catch{}try{const d=JSON.parse(storageGet(CACHE_KEY)||'null');return Array.isArray(d?.vehicles)?d.vehicles:[]}catch{return[]}};
+const CACHE_KEY='ud-live-vehicles-v9';
+const LEGACY_CACHE_KEYS=['ud-live-vehicles-v8','ud-live-vehicles-v4'];
+const readCache=():Vehicle[]=>{for(const key of LEGACY_CACHE_KEYS){try{window.localStorage.removeItem(key)}catch{}}try{const d=JSON.parse(storageGet(CACHE_KEY)||'null');return Array.isArray(d?.vehicles)?d.vehicles:[]}catch{return[]}};
 
 export default function App(){
   const[page,setPage]=useState<Page>(()=>parsePath());
