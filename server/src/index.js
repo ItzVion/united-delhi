@@ -91,10 +91,6 @@ async function registerFleetVehicles(vehicles){
   for(const row of inserted)rememberFleetRow(row);
  }
 }
-const validHexColor=value=>{
- const color=String(value??'').trim();
- return /^#[0-9a-f]{6}$/i.test(color)?color:null;
-};
 const applyFleetRegistry=v=>{
  const row=fleetRegistry.get(fleetRegistryKey(v));
  const upstreamColor=validHexColor(v?.serviceColor);
