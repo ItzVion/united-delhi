@@ -67,20 +67,47 @@ export async function syncMetroStatic(pool){
     const feed=await unzipFeed(body,dir);
     if(!feed.routes.length||!feed.stops.length||!feed.trips.length||!feed.stopTimes.length)throw new Error('DMRC feed is missing required GTFS files');
 
-    const tripRoute=new Map(feed.trips.map(x=>[esc(x.trip_id),esc(x.route_id)]));
-    const routeStops=new Map();
+    // A GTFS route contains trips in both directions and sometimes short-turn
+    // variants. Mixing every trip by route_id scrambles stations at identical
+    // stop_sequence values. Keep the longest complete trip per route/direction.
+    const tripById=new Map(feed.trips.map(x=>[esc(x.trip_id),x]));
+    const stopsByTrip=new Map();
     for(const x of feed.stopTimes){
-      const routeId=tripRoute.get(esc(x.trip_id));const stopId=esc(x.stop_id);const seq=num(x.stop_sequence);
-      if(!routeId||!stopId||!Number.isFinite(seq))continue;
-      const key=routeId+'|'+stopId+'|'+seq;
-      routeStops.set(key,{routeId,stopId,seq});
+      const tripId=esc(x.trip_id),trip=tripById.get(tripId);
+      const routeId=esc(trip?.route_id),stopId=esc(x.stop_id),seq=num(x.stop_sequence);
+      if(!tripId||!routeId||!stopId||!Number.isFinite(seq))continue;
+      const bucket=stopsByTrip.get(tripId)||[];
+      bucket.push({routeId,stopId,seq});
+      stopsByTrip.set(tripId,bucket);
+    }
+    const bestByDirection=new Map();
+    for(const [tripId,tripStops] of stopsByTrip){
+      tripStops.sort((a,b)=>a.seq-b.seq);
+      const ordered=tripStops.filter((x,i,a)=>i===0||x.seq!==a[i-1].seq);
+      if(ordered.length<2)continue;
+      const trip=tripById.get(tripId),rawDirection=esc(trip?.direction_id);
+      const inferred=ordered[0].stopId.localeCompare(ordered[ordered.length-1].stopId)<=0?0:1;
+      const parsed=rawDirection!==''?Number(rawDirection):inferred;
+      const directionId=Number.isInteger(parsed)&&parsed>=0?parsed:inferred;
+      const routeId=ordered[0].routeId,key=routeId+'|'+directionId;
+      const previous=bestByDirection.get(key);
+      if(!previous||ordered.length>previous.stops.length){
+        bestByDirection.set(key,{routeId,directionId,stops:ordered});
+      }
+    }
+    const routeStops=[];
+    for(const pattern of bestByDirection.values()){
+      for(const x of pattern.stops)routeStops.push({...x,directionId:pattern.directionId});
     }
     const c=await pool.connect();
     try{
       await c.query('BEGIN');
       await c.query(`CREATE TABLE IF NOT EXISTS metro_routes(route_id TEXT PRIMARY KEY,agency_id TEXT,short_name TEXT,long_name TEXT,route_type INTEGER,route_color TEXT,route_text_color TEXT,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
       await c.query(`CREATE TABLE IF NOT EXISTS metro_stops(stop_id TEXT PRIMARY KEY,name TEXT NOT NULL,latitude DOUBLE PRECISION NOT NULL,longitude DOUBLE PRECISION NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-      await c.query(`CREATE TABLE IF NOT EXISTS metro_route_stops(route_id TEXT NOT NULL REFERENCES metro_routes(route_id) ON DELETE CASCADE,stop_id TEXT NOT NULL REFERENCES metro_stops(stop_id) ON DELETE CASCADE,stop_sequence INTEGER NOT NULL,PRIMARY KEY(route_id,stop_id,stop_sequence))`);
+      await c.query(`CREATE TABLE IF NOT EXISTS metro_route_stops(route_id TEXT NOT NULL REFERENCES metro_routes(route_id) ON DELETE CASCADE,direction_id INTEGER NOT NULL DEFAULT 0,stop_id TEXT NOT NULL REFERENCES metro_stops(stop_id) ON DELETE CASCADE,stop_sequence INTEGER NOT NULL,PRIMARY KEY(route_id,direction_id,stop_id,stop_sequence))`);
+      await c.query('ALTER TABLE metro_route_stops ADD COLUMN IF NOT EXISTS direction_id INTEGER NOT NULL DEFAULT 0');
+      await c.query('ALTER TABLE metro_route_stops DROP CONSTRAINT IF EXISTS metro_route_stops_pkey');
+      await c.query('ALTER TABLE metro_route_stops ADD CONSTRAINT metro_route_stops_pkey PRIMARY KEY(route_id,direction_id,stop_id,stop_sequence)');
       await c.query(`CREATE TABLE IF NOT EXISTS metro_feed_meta(id INTEGER PRIMARY KEY CHECK(id=1),source_url TEXT NOT NULL,source_key TEXT NOT NULL,imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),route_count INTEGER NOT NULL DEFAULT 0,stop_count INTEGER NOT NULL DEFAULT 0,route_stop_count INTEGER NOT NULL DEFAULT 0)`);
       await c.query('TRUNCATE metro_route_stops,metro_routes,metro_stops');
       for(let i=0;i<feed.routes.length;i+=300){
@@ -93,15 +120,18 @@ export async function syncMetroStatic(pool){
         const sql=chunk.map((x,j)=>{const b=j*4;vals.push(esc(x.stop_id),esc(x.stop_name),num(x.stop_lat),num(x.stop_lon));return `($${b+1},$${b+2},$${b+3},$${b+4},NOW())`}).join(',');
         if(sql)await c.query(`INSERT INTO metro_stops(stop_id,name,latitude,longitude,updated_at) VALUES ${sql}`,vals);
       }
-      const valid=[...routeStops.values()];
+      const knownRoutes=new Set(feed.routes.map(x=>esc(x.route_id)));
+      const knownStops=new Set(feed.stops.map(x=>esc(x.stop_id)));
+      const valid=routeStops.filter(x=>knownRoutes.has(x.routeId)&&knownStops.has(x.stopId));
       for(let i=0;i<valid.length;i+=500){
         const chunk=valid.slice(i,i+500),vals=[];
-        const sql=chunk.map((x,j)=>{const b=j*3;vals.push(x.routeId,x.stopId,x.seq);return `($${b+1},$${b+2},$${b+3})`}).join(',');
-        await c.query(`INSERT INTO metro_route_stops(route_id,stop_id,stop_sequence) VALUES ${sql} ON CONFLICT DO NOTHING`,vals);
+        const sql=chunk.map((x,j)=>{const b=j*4;vals.push(x.routeId,x.directionId,x.stopId,x.seq);return `(${b+1},${b+2},${b+3},${b+4})`}).join(',');
+        await c.query(`INSERT INTO metro_route_stops(route_id,direction_id,stop_id,stop_sequence) VALUES ${sql} ON CONFLICT DO NOTHING`,vals);
       }
       await c.query('CREATE INDEX IF NOT EXISTS idx_metro_stops_name ON metro_stops(lower(name))');
       await c.query('CREATE INDEX IF NOT EXISTS idx_metro_route_stops_stop ON metro_route_stops(stop_id,stop_sequence)');
       await c.query('CREATE INDEX IF NOT EXISTS idx_metro_route_stops_route ON metro_route_stops(route_id,stop_sequence)');
+      await c.query('CREATE INDEX IF NOT EXISTS idx_metro_route_stops_route_dir ON metro_route_stops(route_id,direction_id,stop_sequence)');
       await c.query('INSERT INTO metro_feed_meta(id,source_url,source_key,imported_at,route_count,stop_count,route_stop_count) VALUES(1,$1,$2,NOW(),$3,$4,$5) ON CONFLICT(id) DO UPDATE SET source_url=EXCLUDED.source_url,source_key=EXCLUDED.source_key,imported_at=EXCLUDED.imported_at,route_count=EXCLUDED.route_count,stop_count=EXCLUDED.stop_count,route_stop_count=EXCLUDED.route_stop_count',[sourceUrl,'official-dmrc-gtfs',feed.routes.length,feed.stops.length,valid.length]);
       await c.query('COMMIT');
       console.log('DMRC static sync complete: '+feed.routes.length+' routes, '+feed.stops.length+' stops, '+valid.length+' route-stop links.');

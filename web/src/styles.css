@@ -166,3 +166,12 @@ body,#root{background:var(--bg)}
 .legend-understood{height:46px;margin-top:12px;font-size:16px}
 }
 .route-banner{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 0;border-bottom:1px solid var(--line)}.route-banner>b{font-weight:700;color:var(--ink)}
+.metro-directions{display:flex;gap:10px;margin:0 14px 12px}
+.metro-directions button{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;padding:11px 12px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.metro-directions button.on{border-color:var(--g);background:var(--soft);box-shadow:inset 0 -3px 0 var(--g)}
+.metro-directions small{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+.metro-directions b{font-size:12px;line-height:1.4;overflow-wrap:anywhere}
+.view:not(.view-home){padding-bottom:calc(var(--nav) + var(--safe-b) + 28px)!important}
+.page{padding-bottom:calc(var(--nav) + var(--safe-b) + 28px)}
+.timeline{margin-bottom:24px!important}
+@media(max-width:600px){.metro-directions{flex-direction:column}.metro-directions button{padding:10px 12px}}
