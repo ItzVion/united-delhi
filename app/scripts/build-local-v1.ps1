@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $project = Split-Path -Parent $PSScriptRoot
+$repo = Split-Path -Parent $project
 $debug = Join-Path $env:USERPROFILE "Desktop\UnitedDelhi-Debug"
 New-Item -ItemType Directory -Path $debug -Force | Out-Null
 
@@ -57,7 +58,7 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "Unit tests failed." }
 
   Write-Host "[4/7] Backend install, syntax and tests"
-  Push-Location (Join-Path $project "server")
+  Push-Location (Join-Path $repo "server")
   npm ci
   if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Backend dependency install failed." }
   node --check src/index.js
@@ -69,7 +70,7 @@ try {
   Pop-Location
 
   Write-Host "[5/7] Web install/typecheck/build"
-  Push-Location (Join-Path $project "web")
+  Push-Location (Join-Path $repo "web")
   if (Test-Path "package-lock.json") { npm ci } else { npm install }
   if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Web dependency install failed." }
   npm run typecheck
