@@ -19,21 +19,15 @@ const str=(v,max=160)=>{const x=String(v??'').trim();return x&&x.length<=max?x:n
 const num=v=>{const x=Number(v);return Number.isFinite(x)?x:null};
 const coord=(v,a,b)=>{const x=num(v);return x!==null&&x>=a&&x<=b?x:null};
 const dist=(a,b,c,d)=>{const R=6371000,r=Math.PI/180,la=(c-a)*r,lo=(d-b)*r,x=Math.sin(la/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(lo/2)**2;return 2*R*Math.asin(Math.sqrt(x))};
-const SERVICE_COLORS={
- electricAc:'#0E7490',
- electricDevi:'#16A34A',
- cngAc:'#1D4ED8',
- cngNonAc:'#F97316',
- unknown:'#64748B'
-};
+const UNKNOWN_BUS_MARKER_COLOR='#64748B';
 const classifyFleet=(id,...aliases)=>{
  const candidates=[id,...aliases].map(x=>String(x||'').toUpperCase().replace(/[-_\s]/g,'')).filter(Boolean);
  const v=candidates.find(x=>x.startsWith('DL51EV')||x.startsWith('DL51GD')||x.startsWith('DL1PD')||x.startsWith('DL1PE')||x.startsWith('DL1PB')||x.startsWith('DL1PC'))||candidates[0]||'';
- if(v.startsWith('DL51EV'))return{serviceType:'electric',busType:'EV AC (12 mtr)',serviceColor:SERVICE_COLORS.electricAc};
- if(v.startsWith('DL51GD'))return{serviceType:'electric',busType:'EV DEVI AC (9 mtr)',serviceColor:SERVICE_COLORS.electricDevi};
- if(v.startsWith('DL1PB')||v.startsWith('DL1PC')||v.startsWith('DL1PD'))return{serviceType:'dtc',busType:'CNG NonAC (12 mtr)',serviceColor:SERVICE_COLORS.cngNonAc};
- if(v.startsWith('DL1PE'))return{serviceType:'dtc',busType:'CNG AC (12 mtr)',serviceColor:SERVICE_COLORS.cngAc};
- return{serviceType:'unknown',busType:'Unknown',serviceColor:SERVICE_COLORS.unknown};
+ if(v.startsWith('DL51EV'))return{serviceType:'electric',busType:'EV AC (12 mtr)'};
+ if(v.startsWith('DL51GD'))return{serviceType:'electric',busType:'EV DEVI AC (9 mtr)'};
+ if(v.startsWith('DL1PB')||v.startsWith('DL1PC')||v.startsWith('DL1PD'))return{serviceType:'dtc',busType:'CNG NonAC (12 mtr)'};
+ if(v.startsWith('DL1PE'))return{serviceType:'dtc',busType:'CNG AC (12 mtr)'};
+ return{serviceType:'unknown',busType:'Unknown'};
 };
 const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>classifyFleet(id,licensePlate,vehicleLabel);
 const cache={vehicles:[],status:TRANSPORT_STACK_KEY?'STARTING':'UNAVAILABLE',reason:TRANSPORT_STACK_KEY?'Render API is starting':'TRANSPORT_STACK_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
@@ -46,7 +40,7 @@ const fleetRegistryKey=v=>normalizeVehicleKey(v?.id||v?.vehicleId||v?.licensePla
 function rememberFleetRow(row){
  const key=normalizeVehicleKey(row.vehicle_id);
  if(!key)return;
- fleetRegistry.set(key,{vehicleId:String(row.vehicle_id),busType:String(row.bus_type||'Unknown'),serviceType:String(row.service_type||'unknown'),colorHex:String(row.color_hex||SERVICE_COLORS.unknown),source:String(row.source||'auto'),updatedAt:row.updated_at||null});
+ fleetRegistry.set(key,{vehicleId:String(row.vehicle_id),busType:String(row.bus_type||'Unknown'),serviceType:String(row.service_type||'unknown'),colorHex:String(row.color_hex||UNKNOWN_BUS_MARKER_COLOR),source:String(row.source||'auto'),updatedAt:row.updated_at||null});
 }
 async function loadFleetRegistry(force=false){
  if(!pool)return;
@@ -68,7 +62,7 @@ async function registerFleetVehicles(vehicles){
   if(!vehicleId||!key||seen.has(key)||fleetRegistry.has(key))continue;
   seen.add(key);
   const initial=classifyFleet(vehicleId,vehicle.licensePlate,vehicle.vehicleLabel);
-  missing.push({vehicleId,busType:initial.busType,serviceType:initial.serviceType,colorHex:initial.serviceColor});
+  missing.push({vehicleId,busType:initial.busType,serviceType:initial.serviceType,colorHex:UNKNOWN_BUS_MARKER_COLOR});
  }
  for(let i=0;i<missing.length;i+=250){
   const chunk=missing.slice(i,i+250),values=[];
@@ -80,10 +74,14 @@ async function registerFleetVehicles(vehicles){
   for(const row of inserted)rememberFleetRow(row);
  }
 }
+const validHexColor=value=>{
+ const color=String(value??'').trim();
+ return /^#[0-9a-f]{6}$/i.test(color)?color:null;
+};
 const applyFleetRegistry=v=>{
  const row=fleetRegistry.get(fleetRegistryKey(v));
- if(!row)return v;
- return {...v,busType:row.busType,serviceType:row.serviceType,serviceColor:row.colorHex};
+ const serviceColor=validHexColor(v?.serviceColor);
+ return {...v,...(row?{busType:row.busType,serviceType:row.serviceType}:{}),serviceColor,fleetColorSource:serviceColor?'upstream-api':'not-provided-by-realtime-feed'};
 };
 
 async function loadRouteMeta(){if(!pool)return;try{const rows=(await pool.query(`SELECT r.route_id,r.agency_id,r.short_name,r.long_name,r.route_color,r.route_text_color,first_stop.name AS from_stop,last_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.stop_id ASC LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true`)).rows;routeMeta.clear();for(const x of rows)routeMeta.set(String(x.route_id),x);routeMetaLoadedAt=Date.now();console.log('Loaded route metadata: '+routeMeta.size+' routes.')}catch(e){console.error('Route metadata load failed:',e?.message||e)}}
@@ -200,36 +198,7 @@ async function ensureRuntimeSchema(){if(!pool)return;const c=await pool.connect(
  )`);
  await c.query('CREATE INDEX IF NOT EXISTS idx_vehicle_fleet_registry_color ON vehicle_fleet_registry(color_hex)');
  await c.query('CREATE INDEX IF NOT EXISTS idx_vehicle_fleet_registry_type ON vehicle_fleet_registry(bus_type)');
- // Refresh automatically classified rows when the registration map changes.
- // Manually managed rows remain untouched and keep their exact API colour.
- await c.query(`
-  WITH normalized AS (
-   SELECT vehicle_id,regexp_replace(upper(vehicle_id),'[-_[:space:]]','','g') AS vehicle_key
-   FROM vehicle_fleet_registry WHERE source='auto'
-  ), expected AS (
-   SELECT vehicle_id,
-    CASE
-     WHEN vehicle_key LIKE 'DL51EV%' THEN 'EV AC (12 mtr)'
-     WHEN vehicle_key LIKE 'DL51GD%' THEN 'EV DEVI AC (9 mtr)'
-     WHEN vehicle_key LIKE 'DL1PB%' OR vehicle_key LIKE 'DL1PC%' OR vehicle_key LIKE 'DL1PD%' THEN 'CNG NonAC (12 mtr)'
-     WHEN vehicle_key LIKE 'DL1PE%' THEN 'CNG AC (12 mtr)'
-    END AS bus_type,
-    CASE WHEN vehicle_key LIKE 'DL51EV%' OR vehicle_key LIKE 'DL51GD%' THEN 'electric' ELSE 'dtc' END AS service_type,
-    CASE
-     WHEN vehicle_key LIKE 'DL51EV%' THEN '${SERVICE_COLORS.electricAc}'
-     WHEN vehicle_key LIKE 'DL51GD%' THEN '${SERVICE_COLORS.electricDevi}'
-     WHEN vehicle_key LIKE 'DL1PE%' THEN '${SERVICE_COLORS.cngAc}'
-     WHEN vehicle_key LIKE 'DL1PB%' OR vehicle_key LIKE 'DL1PC%' OR vehicle_key LIKE 'DL1PD%' THEN '${SERVICE_COLORS.cngNonAc}'
-    END AS color_hex
-   FROM normalized
-   WHERE vehicle_key LIKE 'DL51EV%' OR vehicle_key LIKE 'DL51GD%' OR vehicle_key LIKE 'DL1PB%' OR vehicle_key LIKE 'DL1PC%' OR vehicle_key LIKE 'DL1PD%' OR vehicle_key LIKE 'DL1PE%'
-  )
-  UPDATE vehicle_fleet_registry AS r
-  SET bus_type=e.bus_type,service_type=e.service_type,color_hex=e.color_hex,updated_at=NOW()
-  FROM expected AS e
-  WHERE r.vehicle_id=e.vehicle_id
-   AND (r.bus_type IS DISTINCT FROM e.bus_type OR r.service_type IS DISTINCT FROM e.service_type OR r.color_hex IS DISTINCT FROM e.color_hex)
- `);
+ // Never derive or rewrite a physical livery colour from registration prefixes.
  console.log('Runtime database schema verified.');
 }finally{c.release()}}
 
@@ -240,7 +209,8 @@ function parseVehicle(e,feedTs){
  const lat=coord(p.latitude,-90,90),lon=coord(p.longitude,-180,180),id=str(v?.vehicle?.id||v?.id||e?.id);if(lat===null||lon===null||!id)return null;
  const ts=num(v?.timestamp||feedTs);if(!ts)return null;
  const ageMs=Date.now()-(ts*1000);if(ageMs>90000||ageMs<-60000)return null;
- return{id,routeId:str(v?.trip?.routeId),tripId:str(v?.trip?.tripId),stopId:str(v?.stopId),vehicleLabel:str(v?.vehicle?.label),licensePlate:str(v?.vehicle?.licensePlate),latitude:lat,longitude:lon,bearing:num(p.bearing),observedAt:new Date(ts*1000).toISOString()};
+ const serviceColor=validHexColor(v?.serviceColor??v?.color??v?.vehicle?.serviceColor??v?.vehicle?.color??v?.vehicle?.colorHex);
+ return{id,routeId:str(v?.trip?.routeId),tripId:str(v?.trip?.tripId),stopId:str(v?.stopId),vehicleLabel:str(v?.vehicle?.label),licensePlate:str(v?.vehicle?.licensePlate),serviceColor,latitude:lat,longitude:lon,bearing:num(p.bearing),observedAt:new Date(ts*1000).toISOString()};
 }
 async function fetchLive(){
  if(!TRANSPORT_STACK_KEY)throw new Error('TRANSPORT_STACK_API_KEY is not configured');

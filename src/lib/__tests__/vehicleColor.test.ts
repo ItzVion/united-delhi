@@ -1,26 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {resolveVehicleColor} from '../vehicleColor.ts';
+import {resolveVehicleColor,apiFleetLegendRows} from '../vehicleColor.ts';
 
-test('native bus fill uses the API serviceColor',()=>{
+test('native marker preserves the exact API colour regardless of bus type or route colour',()=>{
   assert.equal(resolveVehicleColor({id:'DL1PD4669',busType:'CNG AC (12 mtr)',serviceType:'dtc',routeColor:'#1D4ED8',serviceColor:'#F97316'} as any).background,'#F97316');
+  assert.equal(resolveVehicleColor({id:'DL1PD4669',busType:'CNG NonAC (12 mtr)',serviceType:'dtc',routeColor:'#F97316',serviceColor:'#1D4ED8'} as any).background,'#1D4ED8');
+  assert.equal(resolveVehicleColor({busType:'EV DEVI AC (9 mtr)',serviceColor:'#16A34A'} as any).background,'#16A34A');
 });
 
-test('native does not guess color when the API omits serviceColor',()=>{
-  assert.equal(resolveVehicleColor({id:'DL1PD4669',busType:'CNG NonAC (12 mtr)',serviceType:'dtc',routeColor:'#1D4ED8'} as any).background,'transparent');
+test('native uses a neutral marker when the API omits a verified bus colour',()=>{
+  assert.equal(resolveVehicleColor({id:'DL1PD4669',busType:'CNG NonAC (12 mtr)',serviceType:'dtc',routeColor:'#1D4ED8'} as any).background,'#64748B');
 });
 
-test('native tunes only matching API hue to the type legend shade',()=>{
-  assert.equal(resolveVehicleColor({busType:'CNG NonAC (12 mtr)',serviceColor:'#F97316'} as any).background,'#F2A76D');
-  assert.equal(resolveVehicleColor({busType:'EV DEVI AC (9 mtr)',serviceColor:'#16A34A'} as any).background,'#219653');
-  assert.equal(resolveVehicleColor({busType:'EV AC (12 mtr)',serviceColor:'#0E7490'} as any).background,'#54C4D8');
-});
-
-test('native never changes an API colour to a different hue family',()=>{
-  assert.equal(resolveVehicleColor({busType:'CNG AC (12 mtr)',serviceColor:'#F97316'} as any).background,'#F97316');
-  assert.equal(resolveVehicleColor({busType:'EV AC (12 mtr)',serviceColor:'#1D4ED8'} as any).background,'#1D4ED8');
-});
-
-test('native preserves low-saturation API colours instead of treating grey as red',()=>{
+test('native preserves a valid grey API colour exactly',()=>{
   assert.equal(resolveVehicleColor({busType:'CNG AC (12 mtr)',serviceColor:'#777777'} as any).background,'#777777');
+});
+
+test('native legend only reports colours actually supplied by the API',()=>{
+  assert.deepEqual(apiFleetLegendRows([{serviceColor:'#1D4ED8'},{serviceColor:'#1D4ED8'},{serviceColor:null},{serviceColor:'#F97316'}]),[
+    {key:'#1D4ED8',label:'#1D4ED8 (2)',color:'#1D4ED8'},
+    {key:'#F97316',label:'#F97316 (1)',color:'#F97316'}
+  ]);
 });

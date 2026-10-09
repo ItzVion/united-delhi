@@ -13,44 +13,11 @@ export const METRO_LINE_COLORS={RED:'#D83B3B',YELLOW:'#E5B12C',BLUE:'#2F63B7',GR
 export const metroColor=(value)=>{const t=String(value||'').toUpperCase();for(const k of Object.keys(METRO_LINE_COLORS))if(t.includes(k))return METRO_LINE_COLORS[k];return '#1F3D36';};
 
 export const isHex=(v:unknown):v is string=>/^#[0-9a-f]{6}$/i.test(String(v||''));
-// Match API colours to the reference legend by shade only. Never change hue families.
-const LEGEND_BUS_SWATCHES:{match:(type:string)=>boolean;colors:string[]}[]=[
- {match:type=>type.startsWith('EV AC'),colors:['#54C4D8']},
- {match:type=>type.startsWith('EV DEVI'),colors:['#FF7F21','#219653']},
- {match:type=>type.startsWith('CNG AC'),colors:['#2F80ED','#EB4B4B']},
- {match:type=>type.startsWith('CNG NONAC')||type.startsWith('CNG NON-AC'),colors:['#F2A76D','#62E099']}
-];
-function colorHue(hex:string):number|null{
- const h=hex.replace('#','');
- const [r,g,b]=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255);
- const max=Math.max(r,g,b),min=Math.min(r,g,b),delta=max-min;
- if(delta<0.08)return null;
- let hue=max===r?60*(((g-b)/delta)%6):max===g?60*((b-r)/delta+2):60*((r-g)/delta+4);
- return (hue+360)%360;
-}
-function hueDistance(a:number,b:number){const d=Math.abs(a-b);return Math.min(d,360-d)}
-function legendBusColor(apiColor:string|null|undefined,busType:string|null|undefined):string{
- const color=String(apiColor??'').trim();
- if(!/^#[0-9a-f]{6}$/i.test(color))return color;
- const type=String(busType??'').trim().toUpperCase();
- const category=LEGEND_BUS_SWATCHES.find(row=>row.match(type));
- if(!category)return color;
- const hue=colorHue(color);
- if(hue===null)return color;
- let closest:{color:string;distance:number}|null=null;
- for(const swatch of category.colors){
-  const swatchHue=colorHue(swatch);
-  if(swatchHue===null)continue;
-  const distance=hueDistance(hue,swatchHue);
-  if(!closest||distance<closest.distance)closest={color:swatch,distance};
- }
- // If API hue disagrees with the type's legend palette, trust the API exactly.
- return closest&&closest.distance<=24?closest.color:color;
-}
-// Keep API colour authoritative. Only tune shade to a nearby legend swatch; never swap hue families.
+// Use the exact verified API colour. Slate is only a neutral marker when the API supplies none.
+export const UNKNOWN_BUS_MARKER_COLOR='#64748B';
 export const busColor=(v:{serviceColor?:string|null;busType?:string|null})=>{
-  const color=String(v?.serviceColor||'').trim();
-  return isHex(color)?legendBusColor(color,v?.busType):'transparent';
+  const color=String(v?.serviceColor??'').trim();
+  return isHex(color)?color:UNKNOWN_BUS_MARKER_COLOR;
 };
 export const textOn=(bg:string)=>{if(!isHex(bg))return '#14211B';const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.179?'#14211B':'#FFFFFF'};
 

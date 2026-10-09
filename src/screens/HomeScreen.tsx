@@ -18,13 +18,7 @@ import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type MapBounds = { south:number; west:number; north:number; east:number };
 const DELHI={latitude:28.6139,longitude:77.209};
-// Fixed six-row One Delhi legend; map marker colours still come from the API.
-const LEGEND_DIALOG_ROWS=[
-  {key:'ev-ac',label:'EV AC (12 mtr)',colors:['#54C4D8']},
-  {key:'ev-devi-ac',label:'EV DEVI AC (9 mtr)',colors:['#FF7F21','#219653']},
-  {key:'cng-ac',label:'CNG AC (12 mtr)',colors:['#2F80ED','#EB4B4B']},
-  {key:'cng-nonac',label:'CNG NonAC (12 mtr)',colors:['#F2A76D','#62E099']}
-];
+const UNKNOWN_BUS_MARKER_COLOR='#64748B';
 export default function HomeScreen(){
   const navigation=useNavigation<Nav>();
   const { width:windowWidth }=useWindowDimensions();
@@ -235,9 +229,9 @@ export default function HomeScreen(){
         <Modal visible={legendOpen} transparent animationType="fade" onRequestClose={()=>setLegendOpen(false)}>
           <Pressable style={styles.legendOverlay} onPress={()=>setLegendOpen(false)}>
             <Pressable style={styles.legendDialog} onPress={event=>event.stopPropagation()}>
-              <Text style={styles.legendTitle}>Bus Color Legend</Text>
+              <Text style={styles.legendTitle}>Verified API Colours</Text>
               <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Type</Text></View>
-              {LEGEND_DIALOG_ROWS.map(row=><View key={row.key} style={styles.legendRow}><View style={styles.legendIcons}>{row.colors.map((color,index)=><View key={row.key+'-'+index} style={[styles.legendBus,{backgroundColor:color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View>)}</View><Text style={styles.legendType}>{row.label}</Text></View>)}
+              {legendRows.map(row=><View key={row.key} style={styles.legendRow}><View style={styles.legendIcons}><View style={[styles.legendBus,{backgroundColor:row.color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View></View><Text style={styles.legendType}>{row.label}</Text></View>)}<View style={styles.legendRow}><View style={styles.legendIcons}><View style={[styles.legendBus,{backgroundColor:UNKNOWN_BUS_MARKER_COLOR}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View></View><Text style={styles.legendType}>Colour not supplied by live API</Text></View>
               <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Got it</Text></Pressable>
             </Pressable>
           </Pressable>

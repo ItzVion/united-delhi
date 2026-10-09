@@ -32,20 +32,8 @@ The importer uses the current public Mobility Database snapshot by default. Over
 
 The realtime service refreshes its in-memory route metadata when the database was previously empty and then periodically (at most every 15 minutes), so a completed one-time static import is picked up without requiring a database-side restart.
 
-### Exact per-vehicle fleet colours
+### Live bus-livery colours
 
-The API creates and maintains `public.vehicle_fleet_registry` automatically. Each row is keyed by the exact `vehicle_id` and includes `bus_type`, `service_type`, and `color_hex`. New live vehicles are inserted once; existing rows are deliberately not overwritten by prefix-based guesses, so a correction made in Neon remains the source of truth.
+The current Transport Stack GTFS-Realtime VehiclePositions feed supplies vehicle positions and identifiers, but does not define a verified physical bus-livery colour field. United Delhi preserves a valid upstream `serviceColor` exactly when one is supplied. It never infers a livery from route number, registration prefix, bus type, route colour, or the old fleet registry.
 
-You can view/edit the table in Neon Console → Tables → `vehicle_fleet_registry`. To correct a specific bus, update its row, for example:
-
-```sql
-UPDATE public.vehicle_fleet_registry
-SET bus_type = 'CNG NonAC (12 mtr)',
-    service_type = 'dtc',
-    color_hex = '#F97316',
-    source = 'manual',
-    updated_at = NOW()
-WHERE vehicle_id = 'DL1PD4669';
-```
-
-Changes are loaded by the API within about one minute. Web and Android display the serviceColor returned by the API without client-side overrides.
+When no verified colour is present, the map uses a neutral slate marker (`#64748B`) to mean **unknown**, not to claim that the physical bus is slate-coloured. Cached marker colours from older releases are invalidated on the web and mobile clients.
