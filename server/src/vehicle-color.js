@@ -131,7 +131,7 @@ export function scanEntities(bytes) {
 }
 
 // Map<vehicleKey, '#RRGGBB'>. With no explicit field setting, inspect vehicle-scoped
-// extensions on VehicleDescriptor and VehiclePosition. Never infer colour from other data.
+// extensions attached to the vehicle entity, position, or descriptor. Never infer colour from other data.
 export function extractColorsByVehicle(bytes, spec) {
   const config = typeof spec === 'string' ? parseColorFieldSpec(spec) : spec;
   const colors = new Map();
@@ -140,10 +140,10 @@ export function extractColorsByVehicle(bytes, spec) {
     const candidates = record.unknown.filter(field => {
       if (field.wireType !== 2) return false;
       if (config) return field.message === config.message && field.field === config.field;
-      return field.message === 'VehicleDescriptor' || field.message === 'VehiclePosition';
+      return field.message === 'VehicleDescriptor' || field.message === 'VehiclePosition' || field.message === 'FeedEntity';
     });
 
-    for (const candidate of candidates) {
+    const priority = { VehicleDescriptor: 0, VehiclePosition: 1, FeedEntity: 2 };\n    candidates.sort((a, b) => priority[a.message] - priority[b.message]);\n\n    for (const candidate of candidates) {
       const color = validHexColor(candidate.value);
       if (!color) continue;
       for (const key of [record.vehicleId, record.id]) {
