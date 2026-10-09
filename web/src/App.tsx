@@ -50,7 +50,7 @@ export default function App(){
     let watch:number|undefined;
     let cancelled=false;
     const start=()=>{
-      if(cancelled)return;
+      if(cancelled||watch!==undefined)return;
       watch=navigator.geolocation.watchPosition(p=>{
         const next={lat:p.coords.latitude,lon:p.coords.longitude};
         setLocation(next);
@@ -81,7 +81,7 @@ export default function App(){
       const list=Array.isArray(r.vehicles)?r.vehicles:[];
       if(list.length){hasData.current=true;setVehicles(list)}
       const age= r.fetchedAt ? Math.max(0,Date.now()-Date.parse(r.fetchedAt)) : Infinity;
-      const fresh=list.length>0 && Number.isFinite(age) && age<=90000 && r.source!=='client-cache';
+      const fresh=list.length>0 && Number.isFinite(age) && age<=90000 && r.source!=='client-cache' && r.stale!==true;
       setLive(fresh?'ok':list.length||hasData.current?'stale':'unavailable');
       setLiveNote(fresh?'':(r.reason||''));
     }catch(e){
@@ -112,8 +112,8 @@ export default function App(){
     return <Consent go={go} onAccept={()=>{storageSet('ud-consent-v1','1');setAccepted(true)}}/>;
   }
 
-  const tab=page.kind==='home'||page.kind==='route'||page.kind==='stop'?'home':page.kind==='plan'?'plan':page.kind==='metro'?'metro':page.kind==='settings'||page.kind==='hub'||page.kind==='legal'||page.kind==='privacy'||page.kind==='terms'||page.kind==='help'||page.kind==='about'?'settings':'home';
-  const nav:[string,string,'bus'|'plan'|'metro'|'hub'|'help',string][]=[['home','/','bus','Bus'],['plan','/plan','plan','Trip Plan'],['metro','/metro','bus','Metro'],['settings','/settings','help','Settings']];
+  const tab=page.kind==='home'||page.kind==='route'||page.kind==='stop'?'home':page.kind==='plan'?'plan':page.kind==='metro'||page.kind==='metroRoute'?'metro':page.kind==='settings'||page.kind==='hub'||page.kind==='legal'||page.kind==='privacy'||page.kind==='terms'||page.kind==='help'||page.kind==='about'?'settings':'home';
+  const nav:[string,string,'bus'|'plan'|'metro'|'hub'|'help',string][]=[['home','/','bus','Bus'],['plan','/plan','plan','Trip Plan'],['metro','/metro','metro','Metro'],['settings','/settings','help','Settings']];
 
   return <div className="app">
     {!online?<div className="banner off" role="status">You're offline. Showing the last saved data.</div>:null}

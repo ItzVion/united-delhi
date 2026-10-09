@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -8,6 +8,8 @@ import { colors } from '../theme';
 import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
+import { resolveRouteColor } from '../lib/routeColor';
+import { resolveVehicleColor } from '../lib/vehicleColor';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'StopDetails'>;
 type StopRoute = RouteProp<RootStackParamList, 'StopDetails'>;
@@ -19,6 +21,7 @@ export default function StopDetailsScreen() {
   const [stop, setStop] = useState<Stop | null>(null);
   const [routes, setRoutes] = useState<ApiRoute[]>([]);
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
+  const arrivalsRef = useRef<Arrival[]>([]);
   const [loading, setLoading] = useState(true);
   const [liveError, setLiveError] = useState<string | null>(null);
 
@@ -28,16 +31,16 @@ export default function StopDetailsScreen() {
     if (stopSettled.status === 'fulfilled' && stopSettled.value.status === 'OK') {
       setStop(stopSettled.value.stop);
       setRoutes(stopSettled.value.routes);
-    } else {
+    } else if (stopSettled.status === 'fulfilled' && stopSettled.value.status === 'NOT_FOUND') {
       setStop(null);
       setRoutes([]);
     }
 
     if (arrivalsSettled.status === 'fulfilled' && arrivalsSettled.value.status === 'OK') {
-      setArrivals(arrivalsSettled.value.arrivals);
+      arrivalsRef.current = arrivalsSettled.value.arrivals;
+      setArrivals(arrivalsRef.current);
       setLiveError(null);
-    } else {
-      setArrivals([]);
+    } else if (!arrivalsRef.current.length) {
       setLiveError('Live bus positions are temporarily unavailable.');
     }
     setLoading(false);
@@ -125,15 +128,15 @@ export default function StopDetailsScreen() {
                   : null;
             const liveArrival = arrivals.find(a => displayRouteName(a.routeShortName || a.routeId)?.toUpperCase() === name.toUpperCase());
             const live = liveRoutes.has(name.toUpperCase());
-            const routeColor = liveArrival?.serviceColor ? { background: liveArrival.serviceColor, text: liveArrival.serviceType === 'electric' ? '#17313B' : '#FFFFFF' } : { background: '#E57D43', text: '#FFFFFF' };
+            const routeColor = liveArrival ? resolveVehicleColor(liveArrival) : resolveRouteColor(name, first.route_color, first.route_text_color);
             return (
               <Pressable
                 key={name}
                 style={styles.routeRow}
                 onPress={() => navigation.navigate('RouteDetails', { routeId: first.route_id, label: name })}
               >
-                <View style={[styles.routeNumber, { backgroundColor: live ? '#E57D43' : routeColor.background }]}>
-                  <Text style={[styles.routeNumberText, { color: live ? '#FFFFFF' : routeColor.text }]}>{name}</Text>
+                <View style={[styles.routeNumber, { backgroundColor: routeColor.background }]}>
+                  <Text style={[styles.routeNumberText, { color: routeColor.text }]}>{name}</Text>
                 </View>
                 <View style={styles.routeCopy}>
                   <Text style={styles.routeName} numberOfLines={1}>{detail || 'Bus route ' + name}</Text>

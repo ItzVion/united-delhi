@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -20,6 +20,7 @@ export default function RouteDetailsScreen(){
   const {params}=useRoute<RouteDetailsRoute>();
   const {routeId,label}=params;
   const mapRef=useRef<WebView|null>(null);
+  const routeMapSource=useMemo(()=>({html:buildRouteMapHtml()}),[]);
   const [route,setRoute]=useState<ApiRoute|null>(null);
   const [stops,setStops]=useState<Stop[]>([]);
   const [vehicles,setVehicles]=useState<Vehicle[]>([]);
@@ -43,12 +44,12 @@ export default function RouteDetailsScreen(){
     if(!mapReady)return;
     const payload={
       stops:stops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
-      buses:vehicles.flatMap(v=>{const name=displayRouteName(v.routeShortName);if(!name)return [];const c=v.serviceColor?{background:v.serviceColor,text:v.serviceType==='electric'?'#17313B':'#FFFFFF'}:resolveRouteColor(name,null,null);const vehicle=String(v.vehicleLabel||v.licensePlate||v.id||'BUS');return[{id:v.id,route:name,vehicle,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];})
+      buses:vehicles.flatMap(v=>{const name=displayRouteName(v.routeShortName)||displayRouteName(v.routeId);if(!name)return [];const c=resolveVehicleColor(v);const vehicle=String(v.vehicleLabel||v.licensePlate||v.id||'BUS');return[{id:v.id,route:name,vehicle,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];})
     };
     mapRef.current?.injectJavaScript(`window.updateRouteMap(${JSON.stringify(payload)});true;`);
   },[mapReady,stops,vehicles]);
 
-  const routeName=route?.publicRouteName||displayRouteName(route?.short_name)||displayRouteName(label)||'Bus route';
+  const routeName=route?.publicRouteName||displayRouteName(route?.short_name)||displayRouteName(label)||displayRouteName(routeId)||'Bus route';
   const from=route?.fromStop||stops[0]?.name||'Starting stop';
   const to=route?.toStop||stops[stops.length-1]?.name||'Ending stop';
   const liveVehicle=vehicles[0]||null;const c=liveVehicle?resolveVehicleColor(liveVehicle):resolveRouteColor(routeName,route?.route_color,route?.route_text_color);
@@ -72,7 +73,7 @@ export default function RouteDetailsScreen(){
     </View>
 
     <View style={styles.mapWrap}>
-      <WebView ref={mapRef} style={styles.map} originWhitelist={['*']} javaScriptEnabled domStorageEnabled cacheEnabled userAgent="UnitedDelhi/1.0 (+https://github.com/ItzVion/united-delhi)" source={{html:buildRouteMapHtml()}} onLoadEnd={()=>setMapReady(true)}
+      <WebView ref={mapRef} style={styles.map} originWhitelist={['*']} javaScriptEnabled domStorageEnabled cacheEnabled userAgent="UnitedDelhi/1.0 (+https://github.com/ItzVion/united-delhi)" source={routeMapSource} onLoadEnd={()=>setMapReady(true)}
         onMessage={event=>{try{const m=JSON.parse(event.nativeEvent.data);if(m.type==='stop'){const stop=stops.find(s=>s.stop_id===m.stopId);if(stop)navigation.navigate('StopDetails',{stopId:stop.stop_id,stopName:stop.name});}else if(m.type==='bus'){const bus=vehicles.find(v=>v.id===m.busId);if(bus)setSelectedBus(bus);}}catch{}}}/>
       <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View>
       <View pointerEvents="none" style={styles.mapPill}><View style={styles.liveDot}/><Text style={styles.mapPillText}>{vehicles.length?(`${vehicles.length} live on route`):'No live position on route'}</Text></View>
@@ -81,7 +82,7 @@ export default function RouteDetailsScreen(){
     <View style={styles.summary}>
       <Metric value={String(stops.length)} label="stops"/>
       <Metric value={String(vehicles.length)} label="live buses"/>
-      <Metric value={selectedBus?.serviceType==='electric'?'Electric':'Non-AC CNG'} label="bus type"/>
+      <Metric value={selectedBus?.busType||(selectedBus?.serviceType==='electric'?'Electric':'Unknown')} label="bus type"/>
     </View>
 
     {vehicles.length>0?<View style={styles.liveCard}>
@@ -93,8 +94,8 @@ export default function RouteDetailsScreen(){
       <View style={styles.modalBackdrop}>
         <Pressable style={styles.modalDismissArea} onPress={()=>setSelectedBus(null)}/>
         {selectedBus ? (() => {
-          const busName=displayRouteName(selectedBus.routeShortName)||routeName;
-          const busColor=selectedBus.serviceColor?{background:selectedBus.serviceColor,text:selectedBus.serviceType==='electric'?'#17313B':'#FFFFFF'}:resolveRouteColor(busName,null,null);
+          const busName=displayRouteName(selectedBus.routeShortName)||displayRouteName(selectedBus.routeId)||routeName;
+          const busColor=resolveVehicleColor(selectedBus);
           const ageMs=Date.now()-Date.parse(selectedBus.observedAt);
           const age=Number.isFinite(ageMs)?Math.max(0,Math.round(ageMs/1000)):null;
           return <View style={styles.busSheet}>

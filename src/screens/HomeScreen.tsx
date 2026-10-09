@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -24,6 +24,7 @@ export default function HomeScreen(){
   const contentWidth=Math.min(windowWidth,760);
   const mapHeight=Math.min(380,Math.max(275,contentWidth*0.36));
   const mapRef=useRef<WebView|null>(null);
+  const mapSource=useMemo(()=>({html:buildMapHtml()}),[]);
   const [location,setLocation]=useState<Location.LocationObject|null>(null);
   const [locationStatus,setLocationStatus]=useState('Finding your location…');
   const [nearbyStops,setNearbyStops]=useState<Stop[]>([]);
@@ -74,7 +75,7 @@ export default function HomeScreen(){
       const result=await api.vehicles();
       if(Array.isArray(result.vehicles)&&result.vehicles.length){lastVehiclesRef.current=result.vehicles;setVehicles(result.vehicles);}else if(lastVehiclesRef.current.length){setVehicles(lastVehiclesRef.current);}
       setLastRealtimeAt(result.fetchedAt||null);
-      setFresh(result.status==='OK'?'ok':result.status==='STALE'?'stale':'unavailable');
+      setFresh(result.stale===true||result.status==='STALE'?'stale':result.status==='OK'?'ok':'unavailable');
     }catch{
       if(lastVehiclesRef.current.length)setVehicles(lastVehiclesRef.current);
       setFresh(lastVehiclesRef.current.length?'stale':'unavailable');
@@ -116,7 +117,7 @@ export default function HomeScreen(){
       center,
       stops:nearbyStops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
       buses:visible.map(v=>{
-        const route=displayRouteName(v.routeShortName) || 'LIVE';
+        const route=displayRouteName(v.routeShortName) || displayRouteName(v.routeId) || 'BUS';
         const c=resolveVehicleColor(v);
         return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,lat:v.latitude,lon:v.longitude}];
       }).flat(),
@@ -163,7 +164,7 @@ export default function HomeScreen(){
           domStorageEnabled
           cacheEnabled
           userAgent="UnitedDelhi/1.0 (+https://github.com/ItzVion/united-delhi)"
-          source={{html:buildMapHtml()}}
+          source={mapSource}
           onLoadEnd={()=>setMapReady(true)}
           onMessage={event=>{
             try{
@@ -187,7 +188,7 @@ export default function HomeScreen(){
         <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#58B8C7'}]}/><Text style={styles.legendText}>EV AC (12 mtr)</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#42A968'}]}/><Text style={styles.legendText}>EV DEVI AC (9 mtr)</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#4D8FD0'}]}/><Text style={styles.legendText}>CNG AC (12 mtr)</Text></View><View style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:'#E8B083'}]}/><Text style={styles.legendText}>CNG NonAC (12 mtr)</Text></View></View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
-          const name=displayRouteName(selectedBus.routeShortName) || 'Live bus';
+          const name=displayRouteName(selectedBus.routeShortName) || displayRouteName(selectedBus.routeId) || 'Bus';
           if(!selectedBus.routeId) return null;
           const c=resolveVehicleColor(selectedBus);
           const ageSeconds=Math.max(0,Math.round((Date.now()-Date.parse(selectedBus.observedAt))/1000));
@@ -195,7 +196,7 @@ export default function HomeScreen(){
           return <View style={styles.busPreview}>
             <Pressable style={styles.busPreviewClose} onPress={()=>setSelectedBus(null)}><Text style={styles.busPreviewCloseText}>×</Text></Pressable>
             <Pressable style={styles.busPreviewBody} onPress={()=>{
-              if(selectedBus.routeShortName) navigation.navigate('RouteDetails',{routeId:selectedBus.routeId!,label:name});
+              if(selectedBus.routeId) navigation.navigate('RouteDetails',{routeId:selectedBus.routeId,label:name});
             }}>
               <View style={[styles.busPreviewBadge,{backgroundColor:c.background}]}><Text style={[styles.busPreviewBadgeText,{color:c.text}]}>{name}</Text></View>
               <View style={styles.busPreviewCopy}>
@@ -236,7 +237,7 @@ export default function HomeScreen(){
 
       {nearbyStops.slice(0,4).map(stop=><Pressable key={stop.stop_id} style={styles.stopCard} onPress={()=>navigation.navigate('StopDetails',{stopId:stop.stop_id,stopName:stop.name})}>
         <View style={styles.stopIcon}><Text style={styles.stopIconText}>●</Text></View>
-        <View style={styles.stopCopy}><Text style={styles.stopName} numberOfLines={1}>{stop.name}</Text><Text style={styles.stopDistance}>{stop.distance_m!=null?`${Math.round(stop.distance_m)} m away`:'Nearby stop'}</Text></View>
+        <View style={styles.stopCopy}><Text style={styles.stopName} numberOfLines={1}>{stop.name}</Text><Text style={styles.stopDistance}>{(stop.distanceMeters??stop.distance_m)!=null?`${Math.round(Number(stop.distanceMeters??stop.distance_m))} m away`:'Nearby stop'}</Text></View>
         <Text style={styles.arrow}>›</Text>
       </Pressable>)}
       {!nearbyStops.length?<View style={styles.emptyCard}><Text style={styles.emptyTitle}>No nearby stops yet</Text><Text style={styles.emptyText}>Location is optional; use the map or enable location to find nearby stops.</Text></View>:null}

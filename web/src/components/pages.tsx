@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useState} from 'react';
+import {useCallback,useEffect,useRef,useState} from 'react';
 import {api} from '../api';
 import type {Vehicle} from '../api';
 import {busColor,dist,routeName,fullRouteName,secText,storageGet,storageSet} from '../lib';
@@ -9,11 +9,11 @@ import {LEGAL} from './legal';
 
 type Svc=Map<string,Vehicle>;const fleetSummary=(buses:Vehicle[])=>{const m=new Map<string,number>();for(const v of buses){const k=v.busType||'Unknown';m.set(k,(m.get(k)||0)+1)}const e=[...m.entries()].sort((a,b)=>b[1]-a[1]);return{label:e.length>1?'Mixed fleet':e[0]?.[0]||'Unknown',vehicle:e.length?buses.find(v=>v.busType===e[0][0])||buses[0]||null:null}};
 function useLoad<T>(fn:()=>Promise<T>,deps:any[],every=0){
- const[data,setData]=useState<T|null>(null),[err,setErr]=useState(''),[busy,setBusy]=useState(true),[at,setAt]=useState<Date|null>(null);
- const run=useCallback(async(silent=false)=>{if(!silent){setBusy(true);setErr('')}try{const d=await fn();setData(d);setAt(new Date());setErr('')}catch(e){if(!silent||!data)setErr((e as Error).message||'Could not load.')}finally{setBusy(false)}
+ const dataRef=useRef<T|null>(null);const[data,setData]=useState<T|null>(null),[err,setErr]=useState(''),[busy,setBusy]=useState(true),[at,setAt]=useState<Date|null>(null);
+ const run=useCallback(async(silent=false)=>{if(!silent){setBusy(true);setErr('')}try{const d=await fn();dataRef.current=d;setData(d);setAt(new Date());setErr('')}catch(e){if(!silent||!dataRef.current)setErr((e as Error).message||'Could not load.')}finally{setBusy(false)}
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },deps);
- useEffect(()=>{setData(null);let on=true;void run();if(!every)return;const id=window.setInterval(()=>{if(on&&!document.hidden)void run(true)},every);return()=>{on=false;window.clearInterval(id)}},[run,every]);
+ useEffect(()=>{setData(null);dataRef.current=null;let on=true;void run();if(!every)return;const id=window.setInterval(()=>{if(on&&!document.hidden)void run(true)},every);return()=>{on=false;window.clearInterval(id)}},[run,every]);
  return{data,err,busy,at,reload:()=>run()};
 }
 export function RoutePage({id,go,services}:{id:string;go:Go;services:Svc}){
