@@ -11,6 +11,11 @@ on:
       - 'server/**'
       - '.github/workflows/ci.yml'
 
+# Keep only the newest CI run for main when several pushes arrive quickly.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
