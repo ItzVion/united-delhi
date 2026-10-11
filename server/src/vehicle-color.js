@@ -16,6 +16,24 @@ export function resolveEvidenceBackedColor(upstreamColor, verifiedLiveryColor) {
   return validHexColor(upstreamColor) || validHexColor(verifiedLiveryColor);
 }
 
+// Best-effort visual estimates when the API and reviewed vehicle records have no colour.
+// Route colours and route IDs are never used as physical-livery evidence.
+export function estimateFleetLiveryColor({ busType, serviceType, operator } = {}) {
+  const type = String(busType || '').toLowerCase().replace(/[_-]+/g, ' ');
+  const operatorText = String(operator || '').toLowerCase();
+  const nonAc = /non\s*ac|non\s*air\s*conditioned/.test(type);
+  const ac = !nonAc && (/\bac\b|air\s*conditioned/.test(type));
+  const cluster = /dimts|cluster/.test(operatorText);
+  const mohalla = /mohalla/.test(type + ' ' + operatorText);
+  if (mohalla) return null;
+  if (cluster && nonAc) return '#F97316';
+  if (cluster && ac) return '#2563EB';
+  if ((serviceType === 'electric' || /\bev\b|electric/.test(type)) && ac) return '#2563EB';
+  if (serviceType === 'dtc' && /cng/.test(type) && nonAc) return '#238B45';
+  if (serviceType === 'dtc' && /cng/.test(type) && ac) return '#D83B3B';
+  return null;
+}
+
 const KNOWN = {
   FeedEntity: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
   VehiclePosition: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],

@@ -11,7 +11,7 @@ import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
-import { apiFleetLegendRows, hasEvidenceBackedVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
+import { fleetLegendRows, hasEvidenceBackedVehicleColor, hasEstimatedVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
 import { confirmLocationUse } from '../lib/locationConsent';
 import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 
@@ -33,7 +33,7 @@ export default function HomeScreen(){
   const [locationStatus,setLocationStatus]=useState('Finding your location…');
   const [nearbyStops,setNearbyStops]=useState<Stop[]>([]);
   const [vehicles,setVehicles]=useState<Vehicle[]>([]);
-  const legendRows=useMemo(()=>apiFleetLegendRows(vehicles),[vehicles]);
+  const legendRows=useMemo(()=>fleetLegendRows(vehicles),[vehicles]);
   const [fresh,setFresh]=useState<'loading'|'ok'|'stale'|'unavailable'>('loading');
   const [lastRealtimeAt,setLastRealtimeAt]=useState<string|null>(null);
   const [mapReady,setMapReady]=useState(false);
@@ -162,7 +162,7 @@ export default function HomeScreen(){
       buses:visible.map(v=>{
         const route=displayRouteName(v.routeShortName) || displayRouteName(v.routeId) || 'BUS';
         const c=resolveVehicleColor(v);
-        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,colourKnown:hasEvidenceBackedVehicleColor(v),lat:v.latitude,lon:v.longitude}];
+        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,colourKnown:hasEvidenceBackedVehicleColor(v),colourEstimated:hasEstimatedVehicleColor(v),lat:v.latitude,lon:v.longitude}];
       }).flat(),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
     };
@@ -251,7 +251,7 @@ export default function HomeScreen(){
               <View style={styles.busPreviewCopy}>
                 <Text style={styles.busPreviewEyebrow}>LIVE BUS</Text>
                 <Text style={styles.busPreviewTitle} numberOfLines={1}>To {selectedBus.toStop || 'Destination'}</Text>
-                <Text style={styles.busPreviewMeta} numberOfLines={1}>{selectedBus.vehicleLabel || selectedBus.licensePlate || selectedBus.id} · {freshness} · View route</Text>
+                <Text style={styles.busPreviewMeta} numberOfLines={2}>{selectedBus.vehicleLabel || selectedBus.licensePlate || selectedBus.id} · {freshness} · View route{selectedBus.fleetColorSource==='estimated-fleet-type'?' · colour estimated':''}</Text>
               </View>
               <Text style={styles.busPreviewArrow}>›</Text>
             </Pressable>
@@ -261,9 +261,10 @@ export default function HomeScreen(){
         <Modal visible={legendOpen} transparent animationType="fade" onRequestClose={()=>setLegendOpen(false)}>
           <Pressable style={styles.legendOverlay} onPress={()=>setLegendOpen(false)}>
             <Pressable style={styles.legendDialog} onPress={event=>event.stopPropagation()}>
-              <Text style={styles.legendTitle}>Verified API Colours</Text>
-              <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Type</Text></View>
-              {legendRows.map(row=><View key={row.key} style={styles.legendRow}><View style={styles.legendIcons}><View style={[styles.legendBus,{backgroundColor:row.color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View></View><Text style={styles.legendType}>{row.label}</Text></View>)}<View style={styles.legendRow}><View style={styles.legendIcons}><View style={[styles.legendBus,{backgroundColor:UNKNOWN_BUS_MARKER_COLOR}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View></View><Text style={styles.legendType}>Colour not supplied by live API</Text></View>
+              <Text style={styles.legendTitle}>Bus Colour Legend</Text>
+              <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Colour source</Text></View>
+              {legendRows.map(row=><View key={row.key} style={styles.legendRow}><View style={styles.legendIcons}><View style={[styles.legendBus,{backgroundColor:row.color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View></View><Text style={styles.legendType}>{row.label}</Text></View>)}<View style={styles.legendRow}><View style={styles.legendIcons}><View style={[styles.legendBus,{backgroundColor:UNKNOWN_BUS_MARKER_COLOR}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View></View><Text style={styles.legendType}>Unknown colour · neutral grey</Text></View>
+              <Text style={styles.legendNote}>Estimated colours are visual hints only and can be wrong or out of date. Do not identify a bus, its operator or AC status by colour alone.</Text>
               <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Got it</Text></Pressable>
             </Pressable>
           </Pressable>
@@ -328,11 +329,12 @@ map.on('moveend',reportBounds);map.on('zoomend',reportBounds);setTimeout(reportB
 function markerFor(v){
  const bg=validColor(v.color)?v.color:'transparent';
  const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
- const fg=textColorFor(bg),knownColour=v.colourKnown===true;
- const unknownBadge=knownColour?'':'<span class="ud-colour-unknown" title="Physical bus colour not supplied by live API" aria-hidden="true">?</span>';
- const html='<div class="ud-mobile-bus'+(knownColour?'':' unknown-colour')+'" title="'+(knownColour?'Vehicle colour supplied by live API':'Physical vehicle colour is unknown')+'" style="background:'+bg+';color:'+fg+'">'+
+ const fg=textColorFor(bg),knownColour=v.colourKnown===true,estimatedColour=v.colourEstimated===true,displayableColour=knownColour||estimatedColour;
+ const badge=knownColour?'':estimatedColour?'<span class="ud-colour-unknown" title="Estimated from fleet details; this colour may be wrong" aria-hidden="true">~</span>':'<span class="ud-colour-unknown" title="No usable physical-colour information" aria-hidden="true">?</span>';
+ const markerTitle=estimatedColour?'Estimated bus colour; it may be inaccurate':knownColour?'Colour supplied by the API or a reviewed vehicle record':'Physical bus colour unknown';
+ const html='<div class="ud-mobile-bus'+(displayableColour?'':' unknown-colour')+'" title="'+markerTitle+'" style="background:'+bg+';color:'+fg+'">'+
    '<span class="ud-mobile-bus-glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>'+
-   '<span class="ud-mobile-bus-label">'+escapeHtml(label)+'</span>'+unknownBadge+'</div>';
+   '<span class="ud-mobile-bus-label">'+escapeHtml(label)+'</span>'+badge+'</div>';
  return L.marker([Number(v.lat),Number(v.lon)],{zIndexOffset:1000,icon:L.divIcon({className:'ud-bus-icon',html,iconSize:[44,26],iconAnchor:[22,13]})});
 }
 function animateMarker(marker,target,duration=1100){
@@ -368,12 +370,12 @@ function renderBuses(){
    if(existing){
      animateMarker(existing,[Number(v.lat),Number(v.lon)]);
 
-     if(existing._udLabel!==label||existing._udBg!==bg||existing._udKnown!==(v.colourKnown===true)){
-       const next=markerFor(v);next.on('click',()=>openBus(v.id));next._udLabel=label;next._udBg=bg;next._udKnown=v.colourKnown===true;
+     if(existing._udLabel!==label||existing._udBg!==bg||existing._udKnown!==(v.colourKnown===true)||existing._udEstimated!==(v.colourEstimated===true)){
+       const next=markerFor(v);next.on('click',()=>openBus(v.id));next._udLabel=label;next._udBg=bg;next._udKnown=v.colourKnown===true;next._udEstimated=v.colourEstimated===true;
        busLayer.removeLayer(existing);busMarkers.set(id,next);next.addTo(busLayer);
      }
    }else{
-     const marker=markerFor(v);marker._udLabel=label;marker._udBg=bg;marker._udKnown=v.colourKnown===true;marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);busMarkers.set(id,marker);
+     const marker=markerFor(v);marker._udLabel=label;marker._udBg=bg;marker._udKnown=v.colourKnown===true;marker._udEstimated=v.colourEstimated===true;marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);busMarkers.set(id,marker);
    }
  }
 }
@@ -422,6 +424,7 @@ const styles=StyleSheet.create({
  legendBusWindshield:{position:'absolute',left:6,right:6,top:9,height:3,backgroundColor:'rgba(255,255,255,.9)'},
  legendBusLightRow:{position:'absolute',left:5,right:5,bottom:2,flexDirection:'row',justifyContent:'space-between'},
  legendBusLight:{width:4,height:3,borderRadius:0,backgroundColor:'#fff'},
+ legendNote:{fontSize:11,lineHeight:16,color:colors.textMuted,paddingHorizontal:16,paddingBottom:14},
  legendType:{flex:1,fontSize:14,fontWeight:'500',color:colors.text,textAlign:'left'},
  legendClose:{marginTop:12,minHeight:44,alignItems:'center',justifyContent:'center',backgroundColor:'#C7352C',paddingHorizontal:16},
  legendCloseText:{fontSize:14,fontWeight:'800',color:'#fff'},

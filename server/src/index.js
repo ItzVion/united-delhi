@@ -6,7 +6,7 @@ import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { rateLimit } from 'express-rate-limit';
 import { spawn } from 'node:child_process';
 import {syncMetroStatic} from './metro-sync.js';
-import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
+import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,estimateFleetLiveryColor,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
 const COLOR_FIELD=parseColorFieldSpec(process.env.TRANSPORT_STACK_COLOR_FIELD);
 
 const {Pool}=pg,app=express();
@@ -93,11 +93,15 @@ async function registerFleetVehicles(vehicles){
 }
 const applyFleetRegistry=v=>{
  const row=fleetRegistry.get(fleetRegistryKey(v));
- const upstreamColor=apiVehicleColorOnly(v?.serviceColor);
+ const priorSource=String(v?.fleetColorSource||'');
+ const upstreamColor=(!priorSource||priorSource==='upstream-api')?apiVehicleColorOnly(v?.serviceColor):null;
  const verified=vehicleIdentityKeys(v).map(key=>verifiedLiveryByKey.get(key)).find(Boolean)||null;
- const serviceColor=resolveEvidenceBackedColor(upstreamColor,verified?.colorHex);
- const fleetColorSource=upstreamColor?'upstream-api':verified?'verified-livery-record':'not-provided-by-realtime-feed';
- return {...v,...(row?{busType:row.busType,serviceType:row.serviceType}:{}),serviceColor,fleetColorSource,
+ const vehicle={...v,...(row?{busType:row.busType,serviceType:row.serviceType}:{})};
+ const exactColor=resolveEvidenceBackedColor(upstreamColor,verified?.colorHex);
+ const estimatedColor=exactColor?null:estimateFleetLiveryColor({busType:vehicle.busType,serviceType:vehicle.serviceType,operator:vehicle.operator});
+ const serviceColor=exactColor||estimatedColor;
+ const fleetColorSource=upstreamColor?'upstream-api':verified?'verified-livery-record':estimatedColor?'estimated-fleet-type':'not-provided-by-realtime-feed';
+ return {...vehicle,serviceColor,fleetColorSource,
   ...(verified?{liveryVerification:{status:'verified',colorName:verified.colorName||null,source:verified.sourceLabel||null,evidenceUrl:verified.evidenceUrl||null,verifiedAt:verified.verifiedAt}}:{})};
 };
 

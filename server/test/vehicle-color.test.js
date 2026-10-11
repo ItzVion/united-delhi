@@ -5,6 +5,7 @@ import {
   validHexColor,
   apiVehicleColorOnly,
   resolveEvidenceBackedColor,
+  estimateFleetLiveryColor,
   scanEntities,
   extractColorsByVehicle,
   parseColorFieldSpec
@@ -105,9 +106,19 @@ test('auto-detection ignores field numbers outside GTFS extension ranges', () =>
   assert.equal(extractColorsByVehicle(feed({ extNum: 99 })).size, 0);
 });
 
-test('invalid values are ignored, with no guessed registration or type colours', () => {
+test('invalid API colour values are ignored by the raw feed decoder', () => {
   assert.equal(extractColorsByVehicle(feed({ extVal: 'orange' })).size, 0);
   assert.equal(extractColorsByVehicle(feed({ extVal: null })).size, 0);
+});
+
+test('fleet-colour estimates use explicit fleet type and service, not route colour', () => {
+  assert.equal(estimateFleetLiveryColor({busType:'CNG NonAC (12 mtr)',serviceType:'dtc'}), '#238B45');
+  assert.equal(estimateFleetLiveryColor({busType:'CNG AC (12 mtr)',serviceType:'dtc'}), '#D83B3B');
+  assert.equal(estimateFleetLiveryColor({busType:'EV AC (12 mtr)',serviceType:'electric'}), '#2563EB');
+  assert.equal(estimateFleetLiveryColor({busType:'Non-AC',serviceType:'unknown',operator:'DIMTS Cluster'}), '#F97316');
+  assert.equal(estimateFleetLiveryColor({busType:'AC',serviceType:'unknown',operator:'DIMTS'}), '#2563EB');
+  assert.equal(estimateFleetLiveryColor({busType:'Unknown',serviceType:'unknown',operator:'OTD'}), null);
+  assert.equal(estimateFleetLiveryColor({busType:'Mohalla EV AC',serviceType:'electric'}), null);
 });
 
 test('malformed bytes never throw', () => {
