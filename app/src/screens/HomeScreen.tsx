@@ -210,7 +210,8 @@ export default function HomeScreen(){
               }else if(m.type==='bus'){
                 const bus=vehicles.find(v=>v.id===m.busId);
                 if(bus)setSelectedBus(bus);
-              }else if(m.type==='bounds'&&m.bounds)setBounds(m.bounds);
+              }else if(m.type==='refresh-buses')void loadVehicles();
+              else if(m.type==='bounds'&&m.bounds)setBounds(m.bounds);
               else if(m.type==='legend')setLegendOpen(true);
               else if(m.type==='locate')void requestLocation();
             }catch{}
@@ -309,7 +310,7 @@ const map=L.map('map',{preferCanvas:true,zoomControl:true,attributionControl:fal
 const tileLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:['a','b','c'],maxZoom:19,keepBuffer:1,updateWhenZooming:false,updateWhenIdle:true}).addTo(map);let failedTiles=0;tileLayer.on('tileerror',()=>{failedTiles++;if(failedTiles>=3)notifyNative({type:'map-tile-error'})});tileLayer.on('tileload',()=>{failedTiles=0;notifyNative({type:'map-tiles-ok'})});
 const stopLayer=L.layerGroup().addTo(map),busLayer=L.layerGroup().addTo(map),userLayer=L.layerGroup().addTo(map),busMarkers=new Map(),busAnimations=new Map();
 const legendControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-legend'),button=L.DomUtil.create('button','');button.type='button';button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 15V9h10v6M8 17h2m4 0h2M8 11h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';button.title='Bus color legend';button.setAttribute('aria-label','Bus color legend');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>notifyNative({type:'legend'}));wrap.appendChild(button);return wrap;}});map.addControl(new legendControl());
-const locateControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-locate'),button=L.DomUtil.create('button','');button.type='button';button.textContent='◎';button.title='Center on my location';button.setAttribute('aria-label','Center on my location');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>{if(currentLocation){map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.0,easeLinearity:.2})}else{notifyNative({type:'locate'});}});wrap.appendChild(button);return wrap;}});map.addControl(new locateControl());
+const locateControl=L.Control.extend({options:{position:'bottomright'},onAdd:function(){const wrap=L.DomUtil.create('div','leaflet-control-locate'),button=L.DomUtil.create('button','');button.type='button';button.textContent='◎';button.title='Center on my location';button.setAttribute('aria-label','Center on my location');L.DomEvent.disableClickPropagation(button);L.DomEvent.on(button,'click',()=>{notifyNative({type:'refresh-buses'});if(currentLocation){map.flyTo([currentLocation.lat,currentLocation.lon],14,{duration:1.0,easeLinearity:.2})}else{notifyNative({type:'locate'});}});wrap.appendChild(button);return wrap;}});map.addControl(new locateControl());
 function reportBounds(){const b=map.getBounds();const c=map.getCenter();try{localStorage.setItem('ud-map-center',JSON.stringify({lat:c.lat,lon:c.lng}));}catch{}notifyNative({type:'bounds',bounds:{south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()}});}
 map.on('moveend',reportBounds);map.on('zoomend',reportBounds);setTimeout(reportBounds,250);
 function markerFor(v){
