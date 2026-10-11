@@ -25,6 +25,8 @@ export default function App(){
   const[locState,setLocState]=useState<'idle'|'asking'|'denied'|'unavailable'|'cached'>('idle');
   const[legend,setLegend]=useState(false);
   const busy=useRef(false);
+  const refreshPending=useRef(false);
+  const loadRef=useRef<()=>void>(()=>{});
   const hasData=useRef(false);
 
   const go:Go=useCallback((path,replace)=>{
@@ -76,7 +78,7 @@ export default function App(){
   },[accepted]);
 
   const load=useCallback(async()=>{
-    if(busy.current)return;busy.current=true;
+    if(busy.current){refreshPending.current=true;return;}busy.current=true;
     try{
       const r=await api.vehicles();
       const list=Array.isArray(r.vehicles)?r.vehicles:[];
@@ -88,8 +90,12 @@ export default function App(){
     }catch(e){
       setLive(hasData.current?'stale':'unavailable');
       setLiveNote(hasData.current?'Showing the last known bus positions.':((e as Error).message||'Live data is unavailable.'));
-    }finally{busy.current=false}
+    }finally{
+      busy.current=false;
+      if(refreshPending.current){refreshPending.current=false;window.setTimeout(()=>loadRef.current(),0);}
+    }
   },[]);
+  loadRef.current=()=>{void load()};
   useEffect(()=>{
     if(!accepted)return;
     const c=readCache();if(c.length){hasData.current=true;setVehicles(c);setLive('stale');setLiveNote('Showing the last known bus positions while live data loads.')}
