@@ -89,7 +89,7 @@ export default function App(){
       setLiveNote(fresh?'':(r.reason||''));
     }catch(e){
       setLive(hasData.current?'stale':'unavailable');
-      setLiveNote(hasData.current?'Showing the last known bus positions.':((e as Error).message||'Live data is unavailable.'));
+      setLiveNote(hasData.current?'Showing the last known bus positions while live data reconnects.':'The live service is waking up or reconnecting. It can take up to a minute after inactivity; retrying automatically.');
     }finally{
       busy.current=false;
       if(refreshPending.current){refreshPending.current=false;window.setTimeout(()=>loadRef.current(),0);}

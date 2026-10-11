@@ -25,34 +25,55 @@ export default function StopDetailsScreen() {
   const arrivalsLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [liveError, setLiveError] = useState<string | null>(null);
+  const requestInFlightRef = useRef(false);
+  const refreshPendingRef = useRef(false);
+  const requestIdRef = useRef(0);
+  const loadRef = useRef<() => void>(() => {});
 
   const load = useCallback(async () => {
-    const [stopSettled, arrivalsSettled] = await Promise.allSettled([api.stop(stopId), api.arrivals(stopId)]);
+    if (requestInFlightRef.current) { refreshPendingRef.current = true; return; }
+    requestInFlightRef.current = true;
+    const requestId = ++requestIdRef.current;
+    try {
+      const [stopSettled, arrivalsSettled] = await Promise.allSettled([api.stop(stopId), api.arrivals(stopId)]);
+      if (requestId !== requestIdRef.current) return;
 
-    if (stopSettled.status === 'fulfilled' && stopSettled.value.status === 'OK') {
-      setStop(stopSettled.value.stop);
-      setRoutes(stopSettled.value.routes);
-    } else if (stopSettled.status === 'fulfilled' && stopSettled.value.status === 'NOT_FOUND') {
-      setStop(null);
-      setRoutes([]);
-    }
+      if (stopSettled.status === 'fulfilled' && stopSettled.value.status === 'OK') {
+        setStop(stopSettled.value.stop);
+        setRoutes(stopSettled.value.routes);
+      } else if (stopSettled.status === 'fulfilled' && stopSettled.value.status === 'NOT_FOUND') {
+        setStop(null);
+        setRoutes([]);
+      }
 
-    if (arrivalsSettled.status === 'fulfilled' && arrivalsSettled.value.status === 'OK') {
-      arrivalsRef.current = arrivalsSettled.value.arrivals;
-      arrivalsLoadedRef.current = true;
-      setArrivals(arrivalsRef.current);
-      setLiveError(null);
-    } else if (!arrivalsLoadedRef.current) {
-      setLiveError('Live bus positions are temporarily unavailable.');
+      if (arrivalsSettled.status === 'fulfilled' && arrivalsSettled.value.status === 'OK') {
+        arrivalsRef.current = arrivalsSettled.value.arrivals;
+        arrivalsLoadedRef.current = true;
+        setArrivals(arrivalsRef.current);
+        setLiveError(null);
+      } else if (!arrivalsLoadedRef.current) {
+        setLiveError('Live bus positions are temporarily unavailable.');
+      }
+    } finally {
+      requestInFlightRef.current = false;
+      if (requestId === requestIdRef.current) setLoading(false);
+      if (refreshPendingRef.current) { refreshPendingRef.current = false; setTimeout(() => loadRef.current(), 0); }
     }
-    setLoading(false);
   }, [stopId]);
+  loadRef.current = () => { void load(); };
 
   useEffect(() => {
+    requestIdRef.current++;
+    arrivalsRef.current = [];
+    arrivalsLoadedRef.current = false;
+    setStop(null);
+    setRoutes([]);
+    setArrivals([]);
+    setLiveError(null);
     setLoading(true);
     void load();
     const id = setInterval(() => void load(), 30000);
-    return () => clearInterval(id);
+    return () => { clearInterval(id); requestIdRef.current++; refreshPendingRef.current = false; };
   }, [load]);
 
   const grouped = useMemo(() => {

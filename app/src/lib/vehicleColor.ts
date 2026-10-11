@@ -29,7 +29,13 @@ export function apiFleetLegendRows(vehicles:ApiVehicleColor[]){
 }
 
 export function hasApiVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):boolean{
-  return validApiColor(v.serviceColor)!==null;
+  const source=String((v as any).fleetColorSource||'');
+  return validApiColor(v.serviceColor)!==null&&(!source||source==='upstream-api');
+}
+
+export function hasEvidenceBackedVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):boolean{
+  const source=String((v as any).fleetColorSource||'');
+  return validApiColor(v.serviceColor)!==null&&(!source||source==='upstream-api'||source==='verified-livery-record');
 }
 
 export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{

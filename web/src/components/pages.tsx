@@ -10,10 +10,33 @@ import {LEGAL} from './legal';
 type Svc=Map<string,Vehicle>;const fleetSummary=(buses:Vehicle[])=>{const m=new Map<string,number>();for(const v of buses){const k=v.busType||'Unknown';m.set(k,(m.get(k)||0)+1)}const e=[...m.entries()].sort((a,b)=>b[1]-a[1]);return{label:e.length>1?'Mixed fleet':e[0]?.[0]||'Unknown',vehicle:e.length?buses.find(v=>v.busType===e[0][0])||buses[0]||null:null}};
 function useLoad<T>(fn:()=>Promise<T>,deps:any[],every=0){
  const dataRef=useRef<T|null>(null);const[data,setData]=useState<T|null>(null),[err,setErr]=useState(''),[busy,setBusy]=useState(true),[at,setAt]=useState<Date|null>(null);
- const run=useCallback(async(silent=false)=>{if(!silent){setBusy(true);setErr('')}try{const d=await fn();dataRef.current=d;setData(d);setAt(new Date());setErr('')}catch(e){if(!silent||!dataRef.current)setErr((e as Error).message||'Could not load.')}finally{setBusy(false)}
+ const generationRef=useRef(0),inFlightRef=useRef(false),pendingRef=useRef<{silent:boolean;generation:number}|null>(null),runRef=useRef<(silent?:boolean,generation?:number)=>Promise<void>>(async()=>{});
+ const run=useCallback(async(silent=false,generation=generationRef.current)=>{
+  if(generation!==generationRef.current)return;
+  if(inFlightRef.current){pendingRef.current={silent,generation};return;}
+  inFlightRef.current=true;
+  if(!silent){setBusy(true);setErr('');}
+  try{
+   const d=await fn();
+   if(generation===generationRef.current){dataRef.current=d;setData(d);setAt(new Date());setErr('');}
+  }catch(e){
+   if(generation===generationRef.current&&(!silent||!dataRef.current))setErr((e as Error).message||'Could not load.');
+  }finally{
+   inFlightRef.current=false;
+   if(generation===generationRef.current)setBusy(false);
+   const pending=pendingRef.current;
+   if(pending){pendingRef.current=null;window.setTimeout(()=>void runRef.current(pending.silent,generationRef.current),0);}
+  }
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },deps);
- useEffect(()=>{setData(null);dataRef.current=null;let on=true;void run();if(!every)return;const id=window.setInterval(()=>{if(on&&!document.hidden)void run(true)},every);return()=>{on=false;window.clearInterval(id)}},[run,every]);
+ runRef.current=run;
+ useEffect(()=>{
+  const generation=++generationRef.current;
+  pendingRef.current=null;dataRef.current=null;setData(null);setBusy(true);setErr('');setAt(null);
+  void runRef.current(false,generation);
+  const id=every?window.setInterval(()=>{if(!document.hidden)void runRef.current(true,generation)},every):null;
+  return()=>{if(generationRef.current===generation)generationRef.current++;pendingRef.current=null;if(id!==null)window.clearInterval(id);};
+ },[run,every]);
  return{data,err,busy,at,reload:()=>run()};
 }
 export function RoutePage({id,go,services}:{id:string;go:Go;services:Svc}){

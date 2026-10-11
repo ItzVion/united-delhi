@@ -1,15 +1,8 @@
 name: CI
 
 on:
+  # Deliberately manual-only to conserve Actions minutes; do not run on pushes.
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'app/**'
-      - 'web/**'
-      - 'server/**'
-      - '.github/workflows/ci.yml'
 
 # Keep only the newest CI run for main when several pushes arrive quickly.
 concurrency:

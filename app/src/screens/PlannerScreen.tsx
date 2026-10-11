@@ -38,7 +38,6 @@ export default function PlannerScreen() {
     let active=true;
     const timer=setTimeout(async()=>{try{const r=await api.search(value);if(active)setToSuggestions((r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label})));}catch{if(active)setToSuggestions([]);}},180);
     return()=>{active=false;clearTimeout(timer);};
-    return()=>clearTimeout(timer);
   },[to]);
   const swap = () => { const value = from; const valueId = fromStopId; setFrom(to); setTo(value); setFromStopId(toStopId); setToStopId(valueId); };
 

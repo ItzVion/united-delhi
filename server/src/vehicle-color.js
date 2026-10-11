@@ -10,6 +10,12 @@ export const validHexColor = value => {
 // Do not substitute database livery records, route colours, bus type or registration data.
 export const apiVehicleColorOnly = serviceColor => validHexColor(serviceColor);
 
+// Prefer an exact upstream colour. When the feed omits it, allow only a per-vehicle
+// colour verified against real physical-bus evidence; never infer from route/type/plate.
+export function resolveEvidenceBackedColor(upstreamColor, verifiedLiveryColor) {
+  return validHexColor(upstreamColor) || validHexColor(verifiedLiveryColor);
+}
+
 const KNOWN = {
   FeedEntity: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
   VehiclePosition: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],

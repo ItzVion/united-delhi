@@ -39,8 +39,11 @@ export async function syncMetroStatic(pool){
   if(!pool)return {ok:false,reason:'Database is not configured'};
   if(syncRunning)return {ok:false,reason:'A Metro static sync is already running'};
   syncRunning=true;
-  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'united-delhi-dmrc-'));
+  let dir=null;
   try{
+    // Allocate inside the protected try/finally so a temp-directory failure
+    // never leaves the module-level mutex stuck in the running state.
+    dir=await fs.mkdtemp(path.join(os.tmpdir(),'united-delhi-dmrc-'));
     const meta=(await pool.query('SELECT source_key,route_count,stop_count FROM metro_feed_meta WHERE id=1').catch(()=>({rows:[]}))).rows[0];
     if(meta?.source_key===SOURCE_KEY&&Number(meta.route_count)>=18&&Number(meta.stop_count)>=260){
       return {ok:true,unchanged:true,routes:Number(meta.route_count),stops:Number(meta.stop_count)};
@@ -192,6 +195,6 @@ export async function syncMetroStatic(pool){
     }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e}finally{c.release()}
   }finally{
     syncRunning=false;
-    await fs.rm(dir,{recursive:true,force:true}).catch(()=>{});
+    if(dir)await fs.rm(dir,{recursive:true,force:true}).catch(()=>{});
   }
 }

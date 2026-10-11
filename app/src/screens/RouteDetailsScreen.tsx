@@ -10,7 +10,7 @@ import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
-import { hasApiVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
+import { hasEvidenceBackedVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
 
 type Nav=NativeStackNavigationProp<RootStackParamList,'RouteDetails'>;
 type RouteDetailsRoute=RouteProp<RootStackParamList,'RouteDetails'>;
@@ -28,23 +28,36 @@ export default function RouteDetailsScreen(){
   const [mapReady,setMapReady]=useState(false);
   const [error,setError]=useState<string|null>(null);
   const [selectedBus,setSelectedBus]=useState<Vehicle|null>(null);
+  const requestInFlightRef=useRef(false);
+  const refreshPendingRef=useRef(false);
+  const requestIdRef=useRef(0);
+  const loadRef=useRef<()=>void>(()=>{});
 
   const load=useCallback(async()=>{
+    if(requestInFlightRef.current){refreshPendingRef.current=true;return;}
+    requestInFlightRef.current=true;
+    const requestId=++requestIdRef.current;
     try{
       const result=await api.route(routeId);
+      if(requestId!==requestIdRef.current)return;
       if(result.status==='OK'){setRoute(result.route);setStops(result.stops);setVehicles(result.vehicles);setError(null);}
       else setError('Route details are unavailable.');
-    }catch(e){setError((e as Error).message||'Route details are unavailable.');}
-    finally{setLoading(false);}
+    }catch(e){if(requestId===requestIdRef.current)setError((e as Error).message||'Route details are unavailable.');}
+    finally{
+      requestInFlightRef.current=false;
+      if(requestId===requestIdRef.current)setLoading(false);
+      if(refreshPendingRef.current){refreshPendingRef.current=false;setTimeout(()=>loadRef.current(),0);}
+    }
   },[routeId]);
+  loadRef.current=()=>{void load()};
 
-  useEffect(()=>{setLoading(true);void load();const id=setInterval(()=>void load(),15000);return()=>clearInterval(id);},[load]);
+  useEffect(()=>{requestIdRef.current++;setLoading(true);void load();const id=setInterval(()=>void load(),15000);return()=>{clearInterval(id);requestIdRef.current++;refreshPendingRef.current=false;}},[load]);
 
   useEffect(()=>{
     if(!mapReady)return;
     const payload={
       stops:stops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
-      buses:vehicles.flatMap(v=>{const name=displayRouteName(v.routeShortName)||displayRouteName(v.routeId);if(!name)return [];const c=resolveVehicleColor(v);const vehicle=String(v.vehicleLabel||v.licensePlate||v.id||'BUS');return[{id:v.id,route:name,vehicle,color:c.background,textColor:c.text,colourKnown:hasApiVehicleColor(v),lat:v.latitude,lon:v.longitude}];})
+      buses:vehicles.flatMap(v=>{const name=displayRouteName(v.routeShortName)||displayRouteName(v.routeId);if(!name)return [];const c=resolveVehicleColor(v);const vehicle=String(v.vehicleLabel||v.licensePlate||v.id||'BUS');return[{id:v.id,route:name,vehicle,color:c.background,textColor:c.text,colourKnown:hasEvidenceBackedVehicleColor(v),lat:v.latitude,lon:v.longitude}];})
     };
     mapRef.current?.injectJavaScript(`window.updateRouteMap(${JSON.stringify(payload)});true;`);
   },[mapReady,stops,vehicles]);

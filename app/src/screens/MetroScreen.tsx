@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../api/client';
@@ -22,26 +22,32 @@ export default function MetroScreen(){
   const [routeLoading,setRouteLoading]=useState(false);
   const [routeError,setRouteError]=useState('');
   const [activeDirection,setActiveDirection]=useState('');
+  const catalogueRequestId=useRef(0);
+  const routeRequestId=useRef(0);
 
   const load=useCallback(async()=>{
+    const requestId=++catalogueRequestId.current;
     setLoading(true);setError('');
     try{
       const response=await api.metro();
+      if(requestId!==catalogueRequestId.current)return;
       if(response.status!=='OK'||!Array.isArray(response.routes))throw new Error(response.reason||'Metro network data is unavailable.');
       setCatalogue(response);
-    }catch(e){setError((e as Error).message||'Metro network data is unavailable.')}
-    finally{setLoading(false)}
+    }catch(e){if(requestId===catalogueRequestId.current)setError((e as Error).message||'Metro network data is unavailable.')}
+    finally{if(requestId===catalogueRequestId.current)setLoading(false)}
   },[]);
-  useEffect(()=>{void load()},[load]);
+  useEffect(()=>{void load();return()=>{catalogueRequestId.current++;routeRequestId.current++;}},[load]);
 
   const openRoute=useCallback(async(route:MetroRoute)=>{
+    const requestId=++routeRequestId.current;
     setSelectedRoute(route);setRouteData(null);setRouteLoading(true);setRouteError('');setActiveDirection('');
     try{
       const response=await api.metroRoute(route.route_id);
+      if(requestId!==routeRequestId.current)return;
       if(response.status!=='OK')throw new Error(response.reason||'Stations for this line are unavailable.');
       setRouteData(response);
-    }catch(e){setRouteError((e as Error).message||'Stations for this line are unavailable.')}
-    finally{setRouteLoading(false)}
+    }catch(e){if(requestId===routeRequestId.current)setRouteError((e as Error).message||'Stations for this line are unavailable.')}
+    finally{if(requestId===routeRequestId.current)setRouteLoading(false)}
   },[]);
   const routes=useMemo(()=>{
     const all=catalogue?.routes||[],term=query.trim().toLowerCase();
@@ -53,7 +59,7 @@ export default function MetroScreen(){
 
   return <SafeAreaView style={styles.safe}>
     <View style={styles.headerRow}>
-      {selectedRoute?<Pressable onPress={()=>{setSelectedRoute(null);setRouteData(null);setRouteError('')}} style={styles.back}><Text style={styles.backText}>‹  Lines</Text></Pressable>:<View style={styles.backSpacer}/>}
+      {selectedRoute?<Pressable onPress={()=>{routeRequestId.current++;setSelectedRoute(null);setRouteData(null);setRouteError('');setRouteLoading(false)}} style={styles.back}><Text style={styles.backText}>‹  Lines</Text></Pressable>:<View style={styles.backSpacer}/>}
       <View style={styles.headCopy}><Text style={styles.eyebrow}>DELHI TRANSIT</Text><Text style={styles.title}>{selectedRoute?(selectedRoute.short_name||'Metro line'):'Delhi Metro'}</Text></View>
       <Pressable style={styles.refresh} onPress={()=>selectedRoute?void openRoute(selectedRoute):void load()}><Text style={styles.refreshText}>↻</Text></Pressable>
     </View>

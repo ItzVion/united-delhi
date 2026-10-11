@@ -6,7 +6,7 @@ import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { rateLimit } from 'express-rate-limit';
 import { spawn } from 'node:child_process';
 import {syncMetroStatic} from './metro-sync.js';
-import {validHexColor,apiVehicleColorOnly,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
+import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
 const COLOR_FIELD=parseColorFieldSpec(process.env.TRANSPORT_STACK_COLOR_FIELD);
 
 const {Pool}=pg,app=express();
@@ -95,9 +95,9 @@ const applyFleetRegistry=v=>{
  const row=fleetRegistry.get(fleetRegistryKey(v));
  const upstreamColor=apiVehicleColorOnly(v?.serviceColor);
  const verified=vehicleIdentityKeys(v).map(key=>verifiedLiveryByKey.get(key)).find(Boolean)||null;
- const serviceColor=upstreamColor;
- return {...v,...(row?{busType:row.busType,serviceType:row.serviceType}:{}),serviceColor,
-  fleetColorSource:upstreamColor?'upstream-api':'not-provided-by-realtime-feed',
+ const serviceColor=resolveEvidenceBackedColor(upstreamColor,verified?.colorHex);
+ const fleetColorSource=upstreamColor?'upstream-api':verified?'verified-livery-record':'not-provided-by-realtime-feed';
+ return {...v,...(row?{busType:row.busType,serviceType:row.serviceType}:{}),serviceColor,fleetColorSource,
   ...(verified?{liveryVerification:{status:'verified',colorName:verified.colorName||null,source:verified.sourceLabel||null,evidenceUrl:verified.evidenceUrl||null,verifiedAt:verified.verifiedAt}}:{})};
 };
 
@@ -291,7 +291,18 @@ app.get('/',(_q,r)=>r.json({status:'OK',service:'united-delhi',message:'API is r
 app.get('/health',(_q,r)=>r.json({status:'OK',service:'united-delhi',realtime:cache.status,time:new Date().toISOString(),cachedVehicles:cache.vehicles.length}));
 app.get('/healthz',(_q,r)=>r.json({status:'OK'}));
 app.get('/ready',(_q,r)=>r.json({status:'OK',database:Boolean(pool),realtime:cache.status,cachedVehicles:cache.vehicles.length}));
-app.get('/api/status',async(_q,r)=>{let database='NOT_CONFIGURED';if(pool){try{await pool.query('SELECT 1');database='OK'}catch{database='ERROR'}}r.json({status:'OK',database,realtime:cache.status,realtimeVehicles:cache.vehicles.length,fetchedAt:cache.fetchedAt,source:cache.source,persistedAt:cache.persistedAt,reason:cache.reason})});
+const publicRealtimeReason=(hasData,stale)=>{
+ if(hasData)return stale?'Showing the last known bus positions while live data reconnects.':null;
+ if(!TRANSPORT_STACK_KEY)return 'Live bus tracking is temporarily unavailable. Please try again shortly.';
+ return 'The live bus service is waking up or reconnecting. It can take up to a minute after inactivity; retrying automatically.';
+};
+app.get('/api/status',async(_q,r)=>{
+ let database='NOT_CONFIGURED';
+ if(pool){try{await pool.query('SELECT 1');database='OK'}catch{database='ERROR'}}
+ const ageMs=cache.fetchedAt?Date.now()-Date.parse(cache.fetchedAt):Infinity;
+ const stale=!Number.isFinite(ageMs)||ageMs>90000||cache.status!=='OK';
+ r.json({status:'OK',database,realtime:cache.status,realtimeVehicles:cache.vehicles.length,fetchedAt:cache.fetchedAt,source:cache.source,persistedAt:cache.persistedAt,reason:publicRealtimeReason(cache.vehicles.length>0,stale)});
+});
 app.get('/api/vehicle-colors',async(q,r)=>{
  if(!pool)return r.status(503).json({status:'UNAVAILABLE',count:0,vehicles:[],reason:'Database is not configured'});
  try{
@@ -311,14 +322,18 @@ app.get('/api/vehicle-colors/:id',async(q,r)=>{
   r.json({status:'OK',vehicleId:row.vehicle_id||null,licensePlate:row.license_plate||null,colorHex:row.color_hex,colorName:row.color_name||null,evidenceUrl:row.evidence_url,source:row.source_label,verifiedAt:new Date(row.verified_at).toISOString()});
  }catch(error){console.error('Verified vehicle colour lookup failed:',error?.message||error);r.status(500).json({status:'ERROR',reason:'Vehicle colour is temporarily unavailable'})}
 });
-app.get('/api/realtime/vehicles',async(_q,r)=>{
- let stale=!cache.fetchedAt||Date.now()-Date.parse(cache.fetchedAt)>90000;
- if(stale&&TRANSPORT_STACK_KEY)await refresh().catch(()=>{});
- stale=!cache.fetchedAt||Date.now()-Date.parse(cache.fetchedAt)>90000;
+app.get('/api/realtime/vehicles',(_q,r)=>{
+ const ageMs=cache.fetchedAt?Date.now()-Date.parse(cache.fetchedAt):Infinity;
+ const stale=!Number.isFinite(ageMs)||ageMs>90000||cache.status!=='OK';
+ // Never hold a client request open while a sleeping service or upstream feed wakes up.
+ // Kick off the refresh in the background and return cached data (or a friendly empty state).
+ if(stale&&TRANSPORT_STACK_KEY)void refresh().catch(()=>{});
  const hasData=cache.vehicles.length>0;
+ const responseAge=cache.fetchedAt?Date.now()-Date.parse(cache.fetchedAt):Infinity;
+ const responseStale=!Number.isFinite(responseAge)||responseAge>90000||cache.status!=='OK';
  r.setHeader('Cache-Control','no-store, no-cache, must-revalidate, proxy-revalidate');
  r.setHeader('Pragma','no-cache');
- r.json({status:hasData?'OK':cache.status,count:cache.vehicles.length,vehicles:cache.vehicles,fetchedAt:cache.fetchedAt,stale:stale||cache.status==='STALE',source:cache.source,cacheAgeSeconds:cache.fetchedAt?Math.max(0,Math.round((Date.now()-Date.parse(cache.fetchedAt))/1000)):null,reason:cache.reason});
+ r.json({status:hasData?(responseStale?'STALE':'OK'):cache.status,count:cache.vehicles.length,vehicles:cache.vehicles,fetchedAt:cache.fetchedAt,stale:responseStale,source:cache.source,cacheAgeSeconds:Number.isFinite(responseAge)?Math.max(0,Math.round(responseAge/1000)):null,reason:publicRealtimeReason(hasData,responseStale)});
 });
 
 app.get('/api/metro',async(_q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',routes:[],stops:[],reason:'Database is not configured'});try{const meta=(await pool.query('SELECT * FROM metro_feed_meta WHERE id=1')).rows[0]||null;const routes=(await pool.query('SELECT route_id,agency_id,short_name,long_name,route_type,route_color,route_text_color FROM metro_routes ORDER BY short_name,route_id')).rows;const stops=(await pool.query('SELECT stop_id,name,latitude,longitude FROM metro_stops ORDER BY name,stop_id')).rows;r.json({status:'OK',routes,stops,meta})}catch(e){r.status(500).json({status:'ERROR',routes:[],stops:[],reason:'Metro data is temporarily unavailable'})}});

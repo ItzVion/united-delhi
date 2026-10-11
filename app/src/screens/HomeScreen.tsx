@@ -11,7 +11,7 @@ import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
-import { apiFleetLegendRows, hasApiVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
+import { apiFleetLegendRows, hasEvidenceBackedVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
 import { confirmLocationUse } from '../lib/locationConsent';
 import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 
@@ -48,6 +48,9 @@ export default function HomeScreen(){
   const lastVehiclesRef=useRef<Vehicle[]>([]);
   const lastNearbyLocationRef=useRef<{lat:number;lon:number}|null>(null);
   const nearbyLoadingRef=useRef(false);
+  const vehiclesLoadingRef=useRef(false);
+  const vehiclesRefreshPendingRef=useRef(false);
+  const loadVehiclesRef=useRef<()=>void>(()=>{});
 
   const requestLocation=useCallback(async()=>{
     try{
@@ -92,10 +95,12 @@ export default function HomeScreen(){
   },[]);
 
   const loadVehicles=useCallback(async()=>{
+    if(vehiclesLoadingRef.current){vehiclesRefreshPendingRef.current=true;return;}
+    vehiclesLoadingRef.current=true;
     try{
       const result=await api.vehicles();
       const list=Array.isArray(result.vehicles)?result.vehicles:[];
-      // Never call a retained/cached fleet "live" when the latest response is empty.
+      // Never call retained/cached positions "live" when the current feed is empty or stale.
       if(list.length){
         lastVehiclesRef.current=list;
         setVehicles(list);
@@ -110,8 +115,15 @@ export default function HomeScreen(){
     }catch{
       if(lastVehiclesRef.current.length)setVehicles(lastVehiclesRef.current);
       setFresh(lastVehiclesRef.current.length?'stale':'unavailable');
+    }finally{
+      vehiclesLoadingRef.current=false;
+      if(vehiclesRefreshPendingRef.current){
+        vehiclesRefreshPendingRef.current=false;
+        setTimeout(()=>loadVehiclesRef.current(),0);
+      }
     }
   },[]);
+  loadVehiclesRef.current=()=>{void loadVehicles()};
 
   useEffect(()=>{void requestLocation();},[requestLocation]);
   useEffect(()=>{if(location)void loadNearby(location.coords.latitude,location.coords.longitude);},[location,loadNearby]);
@@ -150,7 +162,7 @@ export default function HomeScreen(){
       buses:visible.map(v=>{
         const route=displayRouteName(v.routeShortName) || displayRouteName(v.routeId) || 'BUS';
         const c=resolveVehicleColor(v);
-        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,colourKnown:hasApiVehicleColor(v),lat:v.latitude,lon:v.longitude}];
+        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,colourKnown:hasEvidenceBackedVehicleColor(v),lat:v.latitude,lon:v.longitude}];
       }).flat(),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
     };
