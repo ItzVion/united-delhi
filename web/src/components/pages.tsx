@@ -63,7 +63,7 @@ const readRecent=():{from:StopPick;to:StopPick}[]=>{
   return Array.isArray(d)?d.slice(0,5).filter((x:any)=>x&&x.from&&x.to).map((x:any)=>({
    from:{id:x.from.id?String(x.from.id):null,label:String(x.from.label||''),mode:x.from.mode==='metro'?'metro':'bus'},
    to:{id:x.to.id?String(x.to.id):null,label:String(x.to.label||''),mode:x.to.mode==='metro'?'metro':'bus'}
-  })):[]}
+  })):[];
  }catch{return[]}
 };
 let plannerMetroStopsCache:any[]|null=null;
