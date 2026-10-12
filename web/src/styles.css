@@ -145,6 +145,7 @@ body,#root{background:var(--bg)}
 
 /* One Delhi-style legend: row layout, paired fleet colours and red acknowledgement. */
 /* Compact One Delhi-style bus colour-meaning legend. */
+/* Compact One Delhi-style bus colour-meaning legend. */
 .legend-modal{background:rgba(15,21,25,.48)!important;padding:16px!important;place-items:center}
 .legend-exact{width:min(360px,calc(100vw - 40px));max-width:360px;padding:14px 12px 10px!important;background:#fff!important;border:1px solid #d8dddd!important;box-shadow:0 12px 40px rgba(0,0,0,.18);gap:0}
 .legend-exact h2{font-size:20px!important;line-height:1.1;margin:0 0 12px!important;color:#263238!important}
@@ -155,10 +156,7 @@ body,#root{background:var(--bg)}
 .legend-exact-bus .ic{width:15px!important;height:15px!important;stroke-width:1.7}
 .legend-exact-type{font-size:12px;line-height:15px;color:#263238;font-weight:500;text-align:left}
 .legend-understood{width:100%;height:32px;margin-top:8px;border:0;background:#C7352C;color:#fff;font-size:12px;font-weight:750;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center}
-@media(min-width:601px){
- .legend-exact{width:min(360px,calc(100vw - 40px))}
- .legend-exact h2{font-size:20px!important}
-}
+@media(min-width:601px){.legend-exact{width:min(360px,calc(100vw - 40px))}.legend-exact h2{font-size:20px!important}}
 .route-banner{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 0;border-bottom:1px solid var(--line)}.route-banner>b{font-weight:700;color:var(--ink)}
 .metro-directions{display:flex;gap:10px;margin:0 14px 12px}
 .metro-directions button{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;padding:11px 12px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
