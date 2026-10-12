@@ -10,13 +10,31 @@ import {Icon,RouteBadge} from './ui';
 type Props={vehicles:Vehicle[];live:LiveStatus;liveNote:string;onRetry:()=>void;location:Point|null;locState:string;onLocate:()=>void;onLegend:()=>void;go:Go;services:Map<string,Vehicle>};
 export default function Home({vehicles,live,liveNote,onRetry,location,locState,onLocate,onLegend,go,services}:Props){
   const[q,setQ]=useState(''),[focus,setFocus]=useState(false),[results,setResults]=useState<any[]>([]),[sBusy,setSBusy]=useState(false),[sErr,setSErr]=useState('');
-  const term=q.trim();
-  useEffect(()=>{if(term.length<2){setResults([]);setSBusy(false);setSErr('');return}let on=true;setSBusy(true);setSErr('');const t=window.setTimeout(async()=>{try{const r=await api.search(term);if(on)setResults((r.results||[]).slice(0,40))}catch(e){if(on){setResults([]);setSErr((e as Error).message||'Search is unavailable.')}}finally{if(on)setSBusy(false)}},200);return()=>{on=false;window.clearTimeout(t)}},[term]);
-  const open=(path:string)=>{setQ('');setFocus(false);(document.activeElement as HTMLElement|null)?.blur?.();go(path)};
+  const term=q.trim(),requestId=useRef(0);
+  useEffect(()=>{
+    const id=++requestId.current;
+    if(term.length<1){setResults([]);setSBusy(false);setSErr('');return}
+    let on=true;
+    setSBusy(true);setSErr('');
+    const controller=new AbortController();
+    const t=window.setTimeout(async()=>{
+      try{
+        const r=await api.search(term,{signal:controller.signal});
+        if(on&&id===requestId.current)setResults((r.results||[]).slice(0,20));
+      }catch(e){
+        if(on&&id===requestId.current&&(e as Error)?.name!=='AbortError'){
+          setResults([]);setSErr((e as Error).message||'Search is temporarily unavailable. Please try again.');
+        }
+      }finally{if(on&&id===requestId.current)setSBusy(false)}
+    },120);
+    return()=>{on=false;controller.abort();window.clearTimeout(t)};
+  },[term]);
+  useEffect(()=>{if(!focus)return;const keydown=(event:KeyboardEvent)=>{if(event.key==='Escape'){setFocus(false);(document.activeElement as HTMLElement|null)?.blur?.()}};window.addEventListener('keydown',keydown);return()=>window.removeEventListener('keydown',keydown)},[focus]);
+  const open=(path:string)=>{setQ('');setResults([]);setFocus(false);(document.activeElement as HTMLElement|null)?.blur?.();go(path)};
   const chip=live==='loading'?'Connecting…':live==='ok'?vehicles.length.toLocaleString('en-IN')+' live':live==='stale'?'Last known':'Offline';
   return <div className="home" data-snap="peek">
-    <header className="hdr"><img className="hdr-logo" src="/icon.svg" alt="United Delhi" width={34} height={34}/><div className="search"><Icon n="search" size={18}/><input type="search" inputMode="search" enterKeyHint="search" autoComplete="off" aria-label="Search routes and stops" placeholder="Search routes or stops" value={q} onChange={e=>setQ(e.target.value)} onFocus={()=>setFocus(true)}/>{sBusy?<span className="spinner sm"/>:null}{q?<button className="clr" aria-label="Clear search" onClick={()=>{setQ('');setFocus(false)}}><Icon n="close" size={16}/></button>:null}</div><span className={'chip '+live} title={liveNote||undefined}><i/>{chip}</span></header>
-    {focus&&term.length>=2?<><div className="scrim" onClick={()=>setFocus(false)}/><section className="results" aria-live="polite">{sBusy&&!results.length?<div className="state"><span className="spinner"/><span>Searching…</span></div>:sErr?<div className="state err"><b>Search failed</b><span>{sErr}</span></div>:results.length?results.map((x:any,i:number)=>{const isRoute=x.type==='route',name=isRoute?(routeName(x.label)||String(x.label||'Route')):x.label;return <button key={x.type+x.id+i} className="row" onClick={()=>open((isRoute?'/routes/':'/stops/')+encodeURIComponent(x.id))}>{isRoute?<RouteBadge name={name} color={x.routeColor||undefined}/>:<span className="pin"><Icon n="pin" size={18}/></span>}<span className="row-t"><b>{isRoute?(x.fromStop||'Start')+' → '+(x.toStop||'End'):x.label}</b><small>{isRoute?'Bus route '+name:(x.stopContext||'Bus stop')+(x.routeCount?' · '+x.routeCount+' routes':'')}</small></span><Icon n="chev" size={18}/></button>}):<div className="state empty"><b>No results</b><span>Try a route number like 801, or a stop name.</span></div>}</section></>:null}
+    <header className="hdr"><img className="hdr-logo" src="/icon.svg" alt="United Delhi" width={34} height={34}/><div className={'search'+(focus?' is-focused':'')}><Icon n="search" size={18}/><input type="text" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false} aria-label="Search routes and stops" placeholder="Search routes or stops" value={q} onChange={e=>setQ(e.target.value)} onFocus={()=>setFocus(true)} onKeyDown={e=>{if(e.key==='Enter'&&results[0]){const x=results[0];open((x.type==='route'?'/routes/':'/stops/')+encodeURIComponent(x.id))}}}/>{sBusy?<span className="spinner sm"/>:null}{q?<button type="button" className="clr" aria-label="Clear search" onClick={()=>{setQ('');setResults([]);setSErr('');setFocus(true);document.querySelector<HTMLInputElement>('.search input')?.focus()}}><Icon n="close" size={16}/></button>:null}</div><span className={'chip '+live} title={liveNote||undefined}><i/>{chip}</span></header>
+    {focus&&term.length>=1?<><button type="button" className="scrim" aria-label="Close search results" onClick={()=>setFocus(false)}/><section className="results" aria-live="polite" aria-label="Search results">{sBusy&&!results.length?<div className="state"><span className="spinner"/><span>Searching…</span></div>:sErr?<div className="state err"><b>Search unavailable</b><span>{sErr}</span><button className="btn ghost sm" onClick={()=>{setQ(v=>v)}}>Try again</button></div>:results.length?results.map((x:any,i:number)=>{const isRoute=x.type==='route',name=isRoute?(routeName(x.label)||String(x.label||'Route')):x.label;return <button key={x.type+x.id+i} className="row search-result" onClick={()=>open((isRoute?'/routes/':'/stops/')+encodeURIComponent(x.id))}>{isRoute?<RouteBadge name={name} color={x.routeColor||undefined}/>:<span className="pin"><Icon n="pin" size={18}/></span>}<span className="row-t"><b>{isRoute?(x.fromStop||'Start')+' → '+(x.toStop||'End'):x.label}</b><small>{isRoute?'Bus route '+name:(x.stopContext||'Bus stop')+(x.routeCount?' · '+x.routeCount+' routes':'')}</small></span><Icon n="chev" size={18}/></button>}):<div className="state empty"><b>No results</b><span>Try a route number like 801, or a stop name.</span></div>}</section></>:null}
     <div className="home-body"><MapView vehicles={vehicles} location={location} onLocate={onLocate} onRefresh={onRetry} onLegend={onLegend} go={go}/>{live==='stale'||live==='unavailable'?<div className={'map-banner '+live} role="status"><span>{live==='stale'?(liveNote||'Showing last known bus positions.'):(vehicles.length?'Live data unavailable.':(liveNote||'Live data is unavailable.'))}</span><button onClick={onRetry}><Icon n="refresh" size={14}/>Retry</button></div>:null}<Sheet location={location} locState={locState} onLocate={onLocate} go={go}/></div>
   </div>;
 }

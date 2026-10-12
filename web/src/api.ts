@@ -61,7 +61,7 @@ export const api={
       return{status:'UNAVAILABLE',count:0,vehicles:[],stale:true,source:'client-empty',reason:SERVICE_WAKING_MESSAGE};
     }
   },
-  search:(q:string)=>request<{status:string;results:any[]}>(`/search?q=${encodeURIComponent(q)}`,{},8000,1),
+  search:(q:string,options:Pick<RequestInit,'signal'>={})=>request<{status:string;results:any[]}>(`/search?q=${encodeURIComponent(q)}`,{signal:options.signal},12000,0),
   route:(id:string)=>request<any>(`/routes/${encodeURIComponent(id)}`,{},8000,1),
   stop:async(id:string)=>{const stopResult=await request<any>(`/stops/${encodeURIComponent(id)}`);let arrivals:any={status:'UNAVAILABLE',arrivals:[],reason:'Live arrival data is unavailable.'};try{arrivals=await request<any>(`/stops/${encodeURIComponent(id)}/arrivals`,{},8000,1)}catch{}return [stopResult,arrivals] as const},
   metro:()=>request<any>('/metro',{},12000,1),
