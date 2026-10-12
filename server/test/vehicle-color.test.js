@@ -6,6 +6,7 @@ import {
   apiVehicleColorOnly,
   resolveEvidenceBackedColor,
   estimateFleetLiveryColor,
+  classifyFleetTypeFromRegistration,
   getRouteLiveryProfile,
   scanEntities,
   extractColorsByVehicle,
@@ -110,6 +111,15 @@ test('auto-detection ignores field numbers outside GTFS extension ranges', () =>
 test('invalid API colour values are ignored by the raw feed decoder', () => {
   assert.equal(extractColorsByVehicle(feed({ extVal: 'orange' })).size, 0);
   assert.equal(extractColorsByVehicle(feed({ extVal: null })).size, 0);
+});
+
+test('fleet registration classification includes the current Delhi EV prefix families', () => {
+  assert.deepEqual(classifyFleetTypeFromRegistration('DL1GD5288'), {serviceType:'electric',busType:'EV AC (9 mtr)'});
+  assert.deepEqual(classifyFleetTypeFromRegistration('DL7GD1234'), {serviceType:'electric',busType:'EV AC (9 mtr)'});
+  assert.deepEqual(classifyFleetTypeFromRegistration('DL3EV1234'), {serviceType:'electric',busType:'EV AC (12 mtr)'});
+  assert.deepEqual(classifyFleetTypeFromRegistration('DL51GD1234'), {serviceType:'electric',busType:'EV DEVI AC (9 mtr)'});
+  assert.deepEqual(classifyFleetTypeFromRegistration('unknown-id','DL6EV9123'), {serviceType:'electric',busType:'EV AC (12 mtr)'});
+  assert.deepEqual(classifyFleetTypeFromRegistration('random-id'), {serviceType:'unknown',busType:'Unknown'});
 });
 
 test('route 772 profile stays blue AC for both directional route labels', () => {

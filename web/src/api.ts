@@ -71,5 +71,6 @@ export const api={
   metro:()=>request<any>('/metro',{},12000,1),
   metroRoute:(id:string)=>request<any>('/metro/routes/'+encodeURIComponent(id),{},10000,1),
   nearby:(lat:number,lon:number)=>request<any>('/stops/nearby',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat,lon,limit:30})},8000,1),
-  plan:(from:string,to:string,fromStopId?:string,toStopId?:string)=>{const params=new URLSearchParams({from,to});if(fromStopId)params.set('fromStopId',fromStopId);if(toStopId)params.set('toStopId',toStopId);return request<any>('/plan?'+params.toString(),{},15000,1)}
+  plan:(from:string,to:string,fromStopId?:string,toStopId?:string)=>{const params=new URLSearchParams({from,to});if(fromStopId)params.set('fromStopId',fromStopId);if(toStopId)params.set('toStopId',toStopId);return request<any>('/plan?'+params.toString(),{},15000,1)},
+  planMultimodal:(fromType:'bus'|'metro',toType:'bus'|'metro',fromStopId:string,toStopId:string)=>{const params=new URLSearchParams({fromType,toType,fromStopId,toStopId});return request<any>('/plan/multimodal?'+params.toString(),{},20000,0)}
 };

@@ -18,6 +18,22 @@ export function resolveEvidenceBackedColor(upstreamColor, verifiedLiveryColor) {
 
 // Best-effort visual estimates when the API and reviewed vehicle records have no colour.
 // Route colours and route IDs are never used as physical-livery evidence.
+// Classify only the known fleet-registration families; registration alone does not prove paint colour.
+export function classifyFleetTypeFromRegistration(...values) {
+  const candidates=values.map(value=>String(value||'').toUpperCase().replace(/[-_\\s]/g,'')).filter(Boolean);
+  const electricNine=['DL1GD','DL2GD','DL5GD','DL7GD','DL11GD','DL12GD','DL13GD'];
+  const electricTwelve=['DL3EV','DL6EV','DL8EV','DL9EV','DL10EV'];
+  const knownPrefix=value=>value.startsWith('DL51EV')||value.startsWith('DL51GD')||electricNine.some(prefix=>value.startsWith(prefix))||electricTwelve.some(prefix=>value.startsWith(prefix))||value.startsWith('DL1PB')||value.startsWith('DL1PC')||value.startsWith('DL1PD')||value.startsWith('DL1PE');
+  const v=candidates.find(knownPrefix)||candidates[0]||'';
+  if(v.startsWith('DL51EV'))return {serviceType:'electric',busType:'EV AC (12 mtr)'};
+  if(v.startsWith('DL51GD'))return {serviceType:'electric',busType:'EV DEVI AC (9 mtr)'};
+  if(electricNine.some(prefix=>v.startsWith(prefix)))return {serviceType:'electric',busType:'EV AC (9 mtr)'};
+  if(electricTwelve.some(prefix=>v.startsWith(prefix)))return {serviceType:'electric',busType:'EV AC (12 mtr)'};
+  if(v.startsWith('DL1PE'))return {serviceType:'dtc',busType:'CNG AC (12 mtr)'};
+  if(v.startsWith('DL1PB')||v.startsWith('DL1PC')||v.startsWith('DL1PD'))return {serviceType:'dtc',busType:'CNG NonAC (12 mtr)'};
+  return {serviceType:'unknown',busType:'Unknown'};
+}
+
 // User-confirmed route-specific profile. Route 772 is reported to use blue AC buses;
 // this is a route rule, not evidence that GTFS-RT supplies physical livery per vehicle.
 export function getRouteLiveryProfile(routeShortName, routeId) {
@@ -43,6 +59,7 @@ export function estimateFleetLiveryColor({ busType, serviceType, routeAgency, op
   const electric = serviceType === 'electric' || /\bev\b|electric/.test(type);
   if (mohalla) return null;
   if (devi && ac) return '#229552';
+  if (electric && /9\\s*mtr/.test(type) && ac) return '#229552';
   if (electric && ac) return '#52C2D6';
   if (cng && nonAc) return dotRoute ? '#F97316' : '#238B45';
   if (cng && ac) return dotRoute ? '#2563EB' : '#D83B3B';

@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {AnimatePresence,motion,useReducedMotion} from 'framer-motion';
 import {api} from './api';
 import type {Vehicle} from './api';
 import {parsePath,storageGet,storageSet} from './lib';
@@ -24,6 +25,7 @@ export default function App(){
   const[location,setLocation]=useState<Point|null>(null);
   const[locState,setLocState]=useState<'idle'|'asking'|'denied'|'unavailable'|'cached'>('idle');
   const[legend,setLegend]=useState(false);
+  const reduceMotion=useReducedMotion();
   const busy=useRef(false);
   const refreshPending=useRef(false);
   const loadRef=useRef<()=>void>(()=>{});
@@ -125,19 +127,27 @@ export default function App(){
   return <div className="app">
     {!online?<div className="banner off" role="status">You're offline. Showing the last saved data.</div>:null}
     <main className={'view'+(page.kind==='home'?' view-home':'')}>
-      {page.kind==='home'?<Home vehicles={vehicles} live={live} liveNote={liveNote} onRetry={()=>void load()} location={location} locState={locState} onLocate={locate} onLegend={()=>setLegend(true)} go={go} services={services}/>
-      :page.kind==='plan'?<Planner go={go}/>
-      :page.kind==='metro'?<Metro go={go}/>
-      :page.kind==='metroRoute'?<MetroRoute id={page.id||''} go={go}/>
-      :page.kind==='settings'?<Hub go={go} onLegend={()=>setLegend(true)}/>
-      :page.kind==='hub'?<Hub go={go} onLegend={()=>setLegend(true)}/>
-      :page.kind==='help'?<Help go={go}/>
-      :page.kind==='legal'?<Legal go={go}/>
-      :page.kind==='privacy'?<Privacy go={go}/>
-      :page.kind==='terms'?<Terms go={go}/>
-      :page.kind==='about'?<About go={go}/>
-      :page.kind==='route'?<RoutePage id={page.id||''} go={go} services={services}/>
-      :<StopPage id={page.id||''} go={go} services={services}/>}
+      <AnimatePresence mode="wait" initial={false}>
+       <motion.div key={page.kind+':'+String(page.id||'')} className="page-transition"
+        initial={reduceMotion?{opacity:1}:{opacity:0,y:8}}
+        animate={{opacity:1,y:0}}
+        exit={reduceMotion?{opacity:1}:{opacity:0,y:-4}}
+        transition={{duration:reduceMotion?0:.18,ease:'easeOut'}}>
+        {page.kind==='home'?<Home vehicles={vehicles} live={live} liveNote={liveNote} onRetry={()=>void load()} location={location} locState={locState} onLocate={locate} onLegend={()=>setLegend(true)} go={go} services={services}/>
+        :page.kind==='plan'?<Planner go={go}/>
+        :page.kind==='metro'?<Metro go={go}/>
+        :page.kind==='metroRoute'?<MetroRoute id={page.id||''} go={go}/>
+        :page.kind==='settings'?<Hub go={go} onLegend={()=>setLegend(true)}/>
+        :page.kind==='hub'?<Hub go={go} onLegend={()=>setLegend(true)}/>
+        :page.kind==='help'?<Help go={go}/>
+        :page.kind==='legal'?<Legal go={go}/>
+        :page.kind==='privacy'?<Privacy go={go}/>
+        :page.kind==='terms'?<Terms go={go}/>
+        :page.kind==='about'?<About go={go}/>
+        :page.kind==='route'?<RoutePage id={page.id||''} go={go} services={services}/>
+        :<StopPage id={page.id||''} go={go} services={services}/>}
+       </motion.div>
+      </AnimatePresence>
     </main>
     <nav className="nav" aria-label="Main">
       {nav.map(([k,path,ic,label])=><button key={k} className={tab===k?'on':''} aria-current={tab===k?'page':undefined} onClick={()=>go(path)}><Icon n={ic}/><span>{label}</span></button>)}
