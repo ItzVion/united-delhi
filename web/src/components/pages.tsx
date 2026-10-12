@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
+import type {ReactNode} from 'react';
 import {api} from '../api';
 import type {Vehicle} from '../api';
 import {busColor,dist,routeName,fullRouteName,secText,storageGet,storageSet,metroColor} from '../lib';
@@ -131,45 +132,169 @@ function StopField({label,value,onChange,placeholder,active,setActive,onEdit}:{l
  </div>;
 }
 export function Planner({go}:{go:Go}){
- const[from,setFrom]=useState<StopPick>({id:null,label:'',mode:'bus'}),[to,setTo]=useState<StopPick>({id:null,label:'',mode:'bus'});
- const[act,setAct]=useState<'from'|'to'|null>(null),[busy,setBusy]=useState(false),[err,setErr]=useState('');
- const[opts,setOpts]=useState<any[]|null>(null),[recent,setRecent]=useState(readRecent),[filter,setFilter]=useState<'all'|'bus'|'metro'|'mixed'>('all');
+ const[from,setFrom]=useState<StopPick>({id:null,label:'',mode:'bus'});
+ const[to,setTo]=useState<StopPick>({id:null,label:'',mode:'bus'});
+ const[act,setAct]=useState<'from'|'to'|null>(null);
+ const[busy,setBusy]=useState(false);
+ const[err,setErr]=useState('');
+ const[opts,setOpts]=useState<any[]|null>(null);
+ const[recent,setRecent]=useState(readRecent);
+ const[filter,setFilter]=useState<'all'|'bus'|'metro'|'mixed'>('all');
+
  const clearResults=()=>{setOpts(null);setErr('');setFilter('all')};
- const run=async(f=from,t=to)=>{
+ const run=async(f:StopPick=from,t:StopPick=to)=>{
   setAct(null);setBusy(true);setErr('');setOpts(null);setFilter('all');
   try{
-   if(!f.id||!t.id){setErr('Choose a bus stop or Metro station from the suggestions in both fields.');return}
-   if(f.id===t.id&&f.mode===t.mode){setErr('Choose two different stops or stations.');return}
-   const fromMode=f.mode==='metro'?'metro':'bus',toMode=t.mode==='metro'?'metro':'bus';
+   if(!f.id||!t.id){
+    setErr('Choose a bus stop or Metro station from the suggestions in both fields.');
+    return;
+   }
+   if(f.id===t.id&&f.mode===t.mode){
+    setErr('Choose two different stops or stations.');
+    return;
+   }
+   const fromMode=f.mode==='metro'?'metro':'bus';
+   const toMode=t.mode==='metro'?'metro':'bus';
    let result:any;
    if(fromMode==='bus'&&toMode==='bus'){
-    const replies=await Promise.allSettled([api.plan(f.label,t.label,f.id,t.id),api.planMultimodal(fromMode,toMode,f.id,t.id)]);
+    const replies=await Promise.allSettled([
+     api.plan(f.label,t.label,f.id,t.id),
+     api.planMultimodal(fromMode,toMode,f.id,t.id)
+    ]);
     const busReply=replies[0].status==='fulfilled'?replies[0].value:null;
     const multiReply=replies[1].status==='fulfilled'?replies[1].value:null;
-    const merged=[...(Array.isArray(busReply?.options)?busReply.options:[]),...(Array.isArray(multiReply?.options)?multiReply.options:[])];
+    const merged=[
+     ...(Array.isArray(busReply?.options)?busReply.options:[]),
+     ...(Array.isArray(multiReply?.options)?multiReply.options:[])
+    ];
     const unique=new Map<string,any>();
     for(const option of merged){
-     const key=(option.legs||[]).map((leg:any)=>String(leg.mode||'bus')+':'+String(leg.routeId||'walk')+':'+String(leg.fromStopId||leg.fromStop||'')+':'+String(leg.toStopId||leg.toStop||'')).join('|');
+     const legs=Array.isArray(option.legs)?option.legs:[];
+     const key=legs.map((leg:any)=>[
+      String(leg.mode||'bus'),String(leg.routeId||'walk'),
+      String(leg.fromStopId||leg.fromStop||''),String(leg.toStopId||leg.toStop||'')
+     ].join(':')).join('|');
      if(!unique.has(key))unique.set(key,option);
     }
     const options=[...unique.values()].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999)).slice(0,8);
     result={status:busReply?.status==='OK'||multiReply?.status==='OK'?'OK':'ERROR',options,reason:busReply?.reason||multiReply?.reason};
-   }else result=await api.planMultimodal(fromMode,toMode,f.id,t.id);
-   if(result.status==='OK'){
-    const options=Array.isArray(result.options)?result.options:[];
-    setOpts(options);
-    const same=(x:any)=>x.from.id===f.id&&x.to.id===t.id&&x.from.mode===fromMode&&x.to.mode===toMode;
-    const next=[{from:{...f,mode:fromMode},to:{...t,mode:toMode}},...readRecent().filter((x:any)=>!same(x))].slice(0,5);
-    storageSet(RECENT,JSON.stringify(next));setRecent(next);setFrom({...f,mode:fromMode});setTo({...t,mode:toMode});
-   }else setErr(result.reason||'No journey could be found. Try another stop or station.');
-  }catch(e){setErr((e as Error).message||'Trip planning is temporarily unavailable.')}
-  finally{setBusy(false)}
+   }else{
+    result=await api.planMultimodal(fromMode,toMode,f.id,t.id);
+   }
+   if(result.status!=='OK'){
+    setErr(result.reason||'No journey could be found. Try another stop or station.');
+    return;
+   }
+   const options=Array.isArray(result.options)?result.options:[];
+   setOpts(options);
+   const same=(x:any)=>x.from.id===f.id&&x.to.id===t.id&&x.from.mode===fromMode&&x.to.mode===toMode;
+   const next=[
+    {from:{...f,mode:fromMode},to:{...t,mode:toMode}},
+    ...readRecent().filter((x:any)=>!same(x))
+   ].slice(0,5);
+   storageSet(RECENT,JSON.stringify(next));
+   setRecent(next);setFrom({...f,mode:fromMode});setTo({...t,mode:toMode});
+  }catch(e){
+   setErr((e as Error).message||'Trip planning is temporarily unavailable.');
+  }finally{
+   setBusy(false);
+  }
  };
- const modeCounts={all:opts?.length||0,bus:(opts||[]).filter(o=>optionMode(o)==='bus').length,metro:(opts||[]).filter(o=>optionMode(o)==='metro').length,mixed:(opts||[]).filter(o=>optionMode(o)==='mixed').length};
+
+ const modeCounts={
+  all:opts?.length||0,
+  bus:(opts||[]).filter(o=>optionMode(o)==='bus').length,
+  metro:(opts||[]).filter(o=>optionMode(o)==='metro').length,
+  mixed:(opts||[]).filter(o=>optionMode(o)==='mixed').length
+ };
  const visibleOptions=(opts||[]).filter(o=>filter==='all'||optionMode(o)===filter);
+
+ const renderLeg=(l:any,j:number,o:any)=>{
+  const mode=String(l.mode||'bus');
+  if(mode==='walk'){
+   const walkMinutes=l.walkingMinutes||o.walkingMinutes||1;
+   const walkText=l.walkMeters?' · '+Math.round(l.walkMeters)+' m':'';
+   return <div className="leg-walk" key={'walk:'+j}>
+    <span className="leg-walk-icon"><Icon n="walk" size={16}/></span>
+    <span className="row-t">
+     <b>Walk · {walkMinutes} min</b>
+     <small>{l.fromStop} → {l.toStop}{walkText}</small>
+    </span>
+   </div>;
+  }
+  const routeLabel=routeName(l.routeName)||String(l.routeName||(mode==='metro'?'Metro':'Bus'));
+  const fallback=mode==='metro'?metroColor(l.routeLongName||l.routeName):'#0B6B57';
+  const color=plannerColor(l.routeColor,fallback);
+  const target=mode==='metro'?'/metro/routes/':'/routes/';
+  return <button type="button" className={'leg leg-'+mode} key={mode+':'+String(l.routeId)+':'+j} onClick={()=>go(target+encodeURIComponent(l.routeId||''))}>
+   <RouteBadge name={routeLabel} color={color}/>
+   <span className={'leg-mode-label '+mode}>{mode==='metro'?'METRO':'BUS'}</span>
+   <span className="row-t"><b>{l.fromStop}</b><small>to {l.toStop}</small></span>
+   <Icon n="chev" size={16}/>
+  </button>;
+ };
+
+ const resultCards=visibleOptions.map((o:any,i:number)=>{
+  const journeyMode=optionMode(o);
+  const legs=Array.isArray(o.legs)?o.legs:[];
+  const legCount=legs.filter((l:any)=>l.mode==='bus'||l.mode==='metro').length;
+  const description=o.type==='direct'?'Direct ride':legCount>1?'Transfers included':'Estimated journey';
+  const walking=o.walkingMinutes?' · '+o.walkingMinutes+' min walking':'';
+  const delay=Math.min(i,5)*45;
+  const key=String(o.type)+':'+legs.map((l:any)=>String(l.mode||'bus')+':'+String(l.routeId||'walk')).join('|')+':'+i;
+  return <div className={'card trip trip-'+journeyMode} key={key} style={{animationDelay:delay+'ms'}}>
+   <div className="trip-h">
+    <div className="trip-summary">
+     <b>~{o.durationMinutes} min</b>
+     <span className={'journey-kind '+journeyMode}>{modeText(journeyMode)}</span>
+    </div>
+    <small>{description}{walking}</small>
+   </div>
+   <div className="trip-legs">
+    {legs.map((leg:any,index:number)=>renderLeg(leg,index,o))}
+   </div>
+  </div>;
+ });
+
+ let journeysView:ReactNode=null;
+ if(opts!==null&&!busy){
+  if(!opts.length){
+   journeysView=<Empty title="No journey matched" text="Try another nearby stop or Metro station. Some older feeds may not have a complete route sequence."/>;
+  }else{
+   const cards=visibleOptions.length?resultCards:<Empty title={'No '+modeText(filter==='all'?'bus':filter)+' options in this set'} text="Choose All to see every journey returned for these stops."/>;
+   journeysView=<>
+    <div className="planner-results-head">
+     <div><h2 className="sec">Suggested journeys</h2><p>{opts.length} option{opts.length===1?'':'s'} ranked by estimated travel time</p></div>
+    </div>
+    <div className="mode-filters" role="group" aria-label="Filter journey options">
+     {([['all','All',modeCounts.all],['bus','Bus',modeCounts.bus],['metro','Metro',modeCounts.metro],['mixed','Bus + Metro',modeCounts.mixed]] as const).map(([key,label,count])=>
+      <button type="button" key={key} className={'mode-filter'+(filter===key?' active':'')} aria-pressed={filter===key} disabled={!count} onClick={()=>setFilter(key)}>
+       <span>{label}</span><b>{count}</b>
+      </button>
+     )}
+    </div>
+    {cards}
+   </>;
+  }
+ }
+ const recentView=opts===null&&!busy&&!err&&recent.length>0?<>
+  <h2 className="sec">Recent journeys</h2>
+  <div className="list">
+   {recent.map((item,index)=><button className="row" key={index} onClick={()=>{setFrom(item.from);setTo(item.to);void run(item.from,item.to)}}>
+    <span className="pin"><Icon n="refresh" size={16}/></span>
+    <span className="row-t"><b>{item.from.label}</b><small>{item.to.label} · {item.from.mode==='metro'?'Metro origin':'Bus stop origin'} → {item.to.mode==='metro'?'Metro destination':'Bus stop destination'}</small></span>
+    <Icon n="chev" size={16}/>
+   </button>)}
+  </div>
+ </>:null;
+ const emptyView=opts===null&&!busy&&!err&&!recent.length?<Empty title="Plan a journey" text="Type a stop or Metro station and choose a suggestion in both fields."/>:null;
+
  return <div className="page planner-page">
   <TopBar title="Trip Plan" sub="Compare bus, Metro and combined journeys" go={go} back={null}/>
-  <div className="planner-intro"><span className="planner-intro-icon"><Icon n="route" size={18}/></span><div><b>Find the best way</b><p>Choose a bus stop or Metro station for each end. Compare direct rides and transfers.</p></div></div>
+  <div className="planner-intro">
+   <span className="planner-intro-icon"><Icon n="route" size={18}/></span>
+   <div><b>Find the best way</b><p>Choose a bus stop or Metro station for each end. Compare direct rides and transfers.</p></div>
+  </div>
   <div className="card planner">
    <div className="rail"><i/><b/><i className="end"/></div>
    <div className="fields">
@@ -178,42 +303,15 @@ export function Planner({go}:{go:Go}){
    </div>
    <button className="icon-btn swap" aria-label="Swap origin and destination" onClick={()=>{setFrom(to);setTo(from);clearResults()}}><Icon n="swap"/></button>
   </div>
-  <button className="btn wide planner-find" disabled={busy||!from.label.trim()||!to.label.trim()} onClick={()=>void run()}>{busy?<><span className="spinner sm"/> Finding journeys…</>:'Find journeys'}</button>
+  <button className="btn wide planner-find" disabled={busy||!from.label.trim()||!to.label.trim()} onClick={()=>void run()}>
+   {busy?<><span className="spinner sm"/> Finding journeys…</>:'Find journeys'}
+  </button>
   <p className="planner-hint"><Icon n="info" size={14}/>Times are estimates. Metro data is static; live metro train positions are not available.</p>
   {err?<ErrorState text={err}/>:null}
   {busy?<Loading text="Finding bus and Metro combinations…"/>:null}
-  {opts&&!busy?(opts.length?<>
-   <div className="planner-results-head"><div><h2 className="sec">Suggested journeys</h2><p>{opts.length} option{opts.length===1?'':'s'} ranked by estimated travel time</p></div></div>
-   <div className="mode-filters" role="group" aria-label="Filter journey options">
-    {([['all','All',modeCounts.all],['bus','Bus',modeCounts.bus],['metro','Metro',modeCounts.metro],['mixed','Bus + Metro',modeCounts.mixed]] as const).map(([key,label,count])=><button type="button" key={key} className={'mode-filter'+(filter===key?' active':'')} aria-pressed={filter===key} disabled={!count} onClick={()=>setFilter(key)}><span>{label}</span><b>{count}</b></button>)}
-   </div>
-   {visibleOptions.length?visibleOptions.map((o,i)=>{
-    const journeyMode=optionMode(o),legs=Array.isArray(o.legs)?o.legs:[];
-    return <div className={'card trip trip-'+journeyMode} key={String(o.type)+':'+legs.map((l:any)=>String(l.mode||'bus')+':'+String(l.routeId||'walk')).join('|')+':'+i} style={{animationDelay:String(Math.min(i,5)*45)+'ms'}}>
-     <div className="trip-h">
-      <div className="trip-summary"><b>~{o.durationMinutes} min</b><span className={'journey-kind '+journeyMode}>{modeText(journeyMode)}</span></div>
-      <small>{o.type==='direct'?'Direct ride':legs.filter((l:any)=>l.mode==='bus'||l.mode==='metro').length>1?'Transfers included':'Estimated journey'}{o.walkingMinutes?' · '+o.walkingMinutes+' min walking':''}</small>
-     </div>
-     <div className="trip-legs">
-      {legs.map((l:any,j:number)=>{
-       const mode=l.mode||'bus';
-       if(mode==='walk')return <div className="leg-walk" key={'walk:'+j}><span className="leg-walk-icon"><Icon n="walk" size={16}/></span><span className="row-t"><b>Walk · {l.walkingMinutes||o.walkingMinutes||1} min</b><small>{l.fromStop} → {l.toStop}{l.walkMeters?' · '+Math.round(l.walkMeters)+' m':''}</small></span></div>;
-       const routeNameText=routeName(l.routeName)||String(l.routeName|| (mode==='metro'?'Metro':'Bus'));
-       const fallback=mode==='metro'?metroColor(l.routeLongName||l.routeName):'#0B6B57';
-       const color=plannerColor(l.routeColor,fallback);
-       const target=mode==='metro'?'/metro/routes/':'/routes/';
-       return <button type="button" className={'leg leg-'+mode} key={mode+':'+String(l.routeId)+':'+j} onClick={()=>go(target+encodeURIComponent(l.routeId||''))}>
-        <RouteBadge name={routeNameText} color={color}/>
-        <span className={'leg-mode-label '+mode}>{mode==='metro'?'METRO':'BUS'}</span>
-        <span className="row-t"><b>{l.fromStop}</b><small>to {l.toStop}</small></span><Icon n="chev" size={16}/>
-       </button>;
-      })}
-     </div>
-    </div>;
-   }):<Empty title={'No '+modeText(filter==='all'?'bus':filter)+' options in this set'} text="Choose All to see every journey returned for these stops."/>}
-  </>:<Empty title="No journey matched" text="Try another nearby stop or Metro station. Some older feeds may not have a complete route sequence."/>):null}
-  {!opts&&!busy&&!err&&recent.length?<><h2 className="sec">Recent journeys</h2><div className="list">{recent.map((r,i)=><button className="row" key={i} onClick={()=>{setFrom(r.from);setTo(r.to);void run(r.from,r.to)}}><span className="pin"><Icon n="refresh" size={16}/></span><span className="row-t"><b>{r.from.label}</b><small>{r.to.label} · {r.from.mode==='metro'?'Metro origin':'Bus stop origin'} → {r.to.mode==='metro'?'Metro destination':'Bus stop destination'}</small></span><Icon n="chev" size={16}/></button>)}</div>:null}
-  {!opts&&!busy&&!err&&!recent.length?<Empty title="Plan a journey" text="Type a stop or Metro station and choose a suggestion in both fields."/>:null}
+  {journeysView}
+  {recentView}
+  {emptyView}
  </div>;
 }
 const Item=({icon,title,sub,onClick}:{icon:Parameters<typeof Icon>[0]['n'];title:string;sub?:string;onClick:()=>void})=><button className="row" onClick={onClick}><span className="pin"><Icon n={icon} size={18}/></span><span className="row-t"><b>{title}</b>{sub?<small>{sub}</small>:null}</span><Icon n="chev" size={18}/></button>;
