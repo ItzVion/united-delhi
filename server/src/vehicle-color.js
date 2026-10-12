@@ -18,19 +18,25 @@ export function resolveEvidenceBackedColor(upstreamColor, verifiedLiveryColor) {
 
 // Best-effort visual estimates when the API and reviewed vehicle records have no colour.
 // Route colours and route IDs are never used as physical-livery evidence.
-export function estimateFleetLiveryColor({ busType, serviceType, operator } = {}) {
+export function estimateFleetLiveryColor({ busType, serviceType, routeAgency, operator } = {}) {
   const type = String(busType || '').toLowerCase().replace(/[_-]+/g, ' ');
-  const operatorText = String(operator || '').toLowerCase();
+  // This field is the GTFS route agency, not verified vehicle ownership. Treat it as a clue only.
+  const agency = String(routeAgency || operator || '').trim().toUpperCase();
+  const dotRoute = agency === 'DOT' || /DIMTS|CLUSTER/.test(agency);
   const nonAc = /non\s*ac|non\s*air\s*conditioned/.test(type);
   const ac = !nonAc && (/\bac\b|air\s*conditioned/.test(type));
-  const cluster = /dimts|cluster/.test(operatorText);
-  const mohalla = /mohalla/.test(type + ' ' + operatorText);
+  const cluster = /dimts|cluster/.test(agency);
+  const mohalla = /mohalla/.test(type + ' ' + agency);
+  const devi = /\bdevi\b/.test(type);
+  const cng = /cng/.test(type);
+  const electric = serviceType === 'electric' || /\bev\b|electric/.test(type);
   if (mohalla) return null;
+  if (devi && ac) return '#229552';
+  if (electric && ac) return '#52C2D6';
+  if (cng && nonAc) return dotRoute ? '#F97316' : '#238B45';
+  if (cng && ac) return dotRoute ? '#2563EB' : '#D83B3B';
   if (cluster && nonAc) return '#F97316';
   if (cluster && ac) return '#2563EB';
-  if ((serviceType === 'electric' || /\bev\b|electric/.test(type)) && ac) return '#2563EB';
-  if (serviceType === 'dtc' && /cng/.test(type) && nonAc) return '#238B45';
-  if (serviceType === 'dtc' && /cng/.test(type) && ac) return '#D83B3B';
   return null;
 }
 

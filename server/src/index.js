@@ -98,7 +98,7 @@ const applyFleetRegistry=v=>{
  const verified=vehicleIdentityKeys(v).map(key=>verifiedLiveryByKey.get(key)).find(Boolean)||null;
  const vehicle={...v,...(row?{busType:row.busType,serviceType:row.serviceType}:{})};
  const exactColor=resolveEvidenceBackedColor(upstreamColor,verified?.colorHex);
- const estimatedColor=exactColor?null:estimateFleetLiveryColor({busType:vehicle.busType,serviceType:vehicle.serviceType,operator:vehicle.operator});
+ const estimatedColor=exactColor?null:estimateFleetLiveryColor({busType:vehicle.busType,serviceType:vehicle.serviceType,routeAgency:vehicle.operator});
  const serviceColor=exactColor||estimatedColor;
  const fleetColorSource=upstreamColor?'upstream-api':verified?'verified-livery-record':estimatedColor?'estimated-fleet-type':'not-provided-by-realtime-feed';
  return {...vehicle,serviceColor,fleetColorSource,

@@ -111,13 +111,16 @@ test('invalid API colour values are ignored by the raw feed decoder', () => {
   assert.equal(extractColorsByVehicle(feed({ extVal: null })).size, 0);
 });
 
-test('fleet-colour estimates use explicit fleet type and service, not route colour', () => {
-  assert.equal(estimateFleetLiveryColor({busType:'CNG NonAC (12 mtr)',serviceType:'dtc'}), '#238B45');
-  assert.equal(estimateFleetLiveryColor({busType:'CNG AC (12 mtr)',serviceType:'dtc'}), '#D83B3B');
-  assert.equal(estimateFleetLiveryColor({busType:'EV AC (12 mtr)',serviceType:'electric'}), '#2563EB');
-  assert.equal(estimateFleetLiveryColor({busType:'Non-AC',serviceType:'unknown',operator:'DIMTS Cluster'}), '#F97316');
-  assert.equal(estimateFleetLiveryColor({busType:'AC',serviceType:'unknown',operator:'DIMTS'}), '#2563EB');
-  assert.equal(estimateFleetLiveryColor({busType:'Unknown',serviceType:'unknown',operator:'OTD'}), null);
+test('fleet-colour estimates distinguish common vehicle and cluster categories', () => {
+  assert.equal(estimateFleetLiveryColor({busType:'CNG NonAC (12 mtr)',serviceType:'dtc',routeAgency:'DTC'}), '#238B45');
+  assert.equal(estimateFleetLiveryColor({busType:'CNG NonAC (12 mtr)',serviceType:'dtc',routeAgency:'DOT'}), '#F97316');
+  assert.equal(estimateFleetLiveryColor({busType:'CNG AC (12 mtr)',serviceType:'dtc',routeAgency:'DTC'}), '#D83B3B');
+  assert.equal(estimateFleetLiveryColor({busType:'CNG AC (12 mtr)',serviceType:'dtc',routeAgency:'DOT'}), '#2563EB');
+  assert.equal(estimateFleetLiveryColor({busType:'EV AC (12 mtr)',serviceType:'electric',routeAgency:'DTC'}), '#52C2D6');
+  assert.equal(estimateFleetLiveryColor({busType:'EV DEVI AC (9 mtr)',serviceType:'electric',routeAgency:'DTC'}), '#229552');
+  assert.equal(estimateFleetLiveryColor({busType:'Non-AC',serviceType:'unknown',routeAgency:'DIMTS Cluster'}), '#F97316');
+  assert.equal(estimateFleetLiveryColor({busType:'AC',serviceType:'unknown',routeAgency:'DIMTS'}), '#2563EB');
+  assert.equal(estimateFleetLiveryColor({busType:'Unknown',serviceType:'unknown',routeAgency:'OTD'}), null);
   assert.equal(estimateFleetLiveryColor({busType:'Mohalla EV AC',serviceType:'electric'}), null);
 });
 
