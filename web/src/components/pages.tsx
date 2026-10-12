@@ -68,6 +68,12 @@ const readRecent=():{from:StopPick;to:StopPick}[]=>{
 };
 let plannerMetroStopsCache:any[]|null=null;
 let plannerMetroStopsPromise:Promise<any[]>|null=null;
+function normalisePlannerPlace(value:unknown):string{
+ return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase()
+  .replace(/\bmetro\s*(?:station|stop|stn)\b/g,' ')
+  .replace(/\bbus\s*(?:stop|stand)\b/g,' ')
+  .replace(/\s+/g,' ').trim().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+}
 function getPlannerMetroStops():Promise<any[]>{
  if(plannerMetroStopsCache)return Promise.resolve(plannerMetroStopsCache);
  if(!plannerMetroStopsPromise)plannerMetroStopsPromise=api.metro().then(d=>{
@@ -88,9 +94,9 @@ const optionMode=(option:any):'bus'|'metro'|'mixed'=>{
 };
 const modeText=(mode:'bus'|'metro'|'mixed')=>mode==='mixed'?'Bus + Metro':mode==='metro'?'Metro':'Bus';
 function StopField({label,value,onChange,placeholder,active,setActive,onEdit}:{label:string;value:StopPick;onChange:(v:StopPick)=>void;placeholder:string;active:boolean;setActive:(b:boolean)=>void;onEdit:()=>void}){
- const[list,setList]=useState<any[]>([]),[busy,setBusy]=useState(false),term=value.label.trim(),termLower=term.toLocaleLowerCase();
+ const[list,setList]=useState<any[]>([]),[busy,setBusy]=useState(false),term=value.label.trim(),termLower=term.toLocaleLowerCase(),searchTerm=normalisePlannerPlace(term);
  useEffect(()=>{
-  if(value.id||term.length<2){setList([]);setBusy(false);return}
+  if(value.id||searchTerm.length<2){setList([]);setBusy(false);return}
   let on=true;
   const controller=new AbortController();
   setBusy(true);
@@ -101,16 +107,20 @@ function StopField({label,value,onChange,placeholder,active,setActive,onEdit}:{l
     const bus=(Array.isArray(busResult?.results)?busResult.results:[])
      .filter((x:any)=>x.type==='stop'&&x.id&&x.label)
      .map((x:any)=>({...x,mode:'bus',stopContext:x.stopContext||'Bus stop'}));
-    const metro=metroStops.filter((s:any)=>String(s.name||'').toLocaleLowerCase().includes(termLower))
+    const metro=metroStops.filter((s:any)=>normalisePlannerPlace(s.name).includes(searchTerm))
      .map((s:any)=>({id:String(s.stop_id),label:String(s.name),mode:'metro',type:'metro',stopContext:'Metro station'}));
     const unique=new Map<string,any>();
     for(const item of [...bus,...metro]){
      const key=String(item.mode)+':'+String(item.id);
      if(!unique.has(key))unique.set(key,item);
     }
+    const wantsMetro=/\b(?:metro|station|stn)\b/.test(termLower);
+    const wantsBus=/\b(?:bus|stop|stand)\b/.test(termLower)&&!wantsMetro;
     const rank=(item:any)=>{
-     const name=String(item.label||'').toLocaleLowerCase();
-     return (name===termLower?0:name.startsWith(termLower)?1:2)+(item.mode==='bus'?0:0.1);
+     const name=normalisePlannerPlace(item.label);
+     const textRank=name===searchTerm?0:name.startsWith(searchTerm)?1:name.includes(searchTerm)?2:3;
+     const modeRank=wantsMetro?(item.mode==='metro'?0:.6):wantsBus?(item.mode==='bus'?0:.6):(item.mode==='bus'?0:.12);
+     return textRank+modeRank;
     };
     setList([...unique.values()].sort((a,b)=>rank(a)-rank(b)).slice(0,9));
    }catch(error){
@@ -118,15 +128,15 @@ function StopField({label,value,onChange,placeholder,active,setActive,onEdit}:{l
    }finally{if(on)setBusy(false)}
   },140);
   return()=>{on=false;controller.abort();window.clearTimeout(t)};
- },[term,value.id,termLower]);
- return <div className={'field'+(active?' field-active':'')}>
+ },[term,value.id,termLower,searchTerm]);
+ return <div className={'field'+(active?' field-active':'')+(value.id?' field-selected':'')}>
   <label>{label}</label>
   <input value={value.label} placeholder={placeholder} autoComplete="off" aria-label={label+' stop or station'} aria-expanded={active&&!value.id&&term.length>=2} onFocus={()=>setActive(true)} onChange={e=>{onEdit();onChange({id:null,label:e.target.value,mode:'bus'});setActive(true)}} onKeyDown={e=>{if(e.key==='Escape')setActive(false)}}/>
-  {value.id?<span className={'picked-mode '+(value.mode==='metro'?'metro':'bus')} title={value.mode==='metro'?'Metro station selected':'Bus stop selected'}><Icon n={value.mode==='metro'?'metro':'bus'} size={16}/></span>:busy?<span className="spinner sm"/>:null}
+  {value.id?<span className={'picked-mode '+(value.mode==='metro'?'metro':'bus')} title={value.mode==='metro'?'Metro station selected':'Bus stop selected'}><Icon n={value.mode==='metro'?'metro':'bus'} size={13}/><span>{value.mode==='metro'?'METRO':'BUS STOP'}</span></span>:busy?<span className="spinner sm"/>:null}
   {active&&!value.id&&term.length>=2?<div className="suggest" role="listbox" aria-label={label+' suggestions'}>
    {list.length?list.map((x:any)=><button type="button" role="option" key={x.mode+':'+x.id} onMouseDown={e=>e.preventDefault()} onClick={()=>{onChange({id:String(x.id),label:String(x.label),mode:x.mode==='metro'?'metro':'bus'});setActive(false)}}>
     <span className={'suggest-mode '+(x.mode==='metro'?'metro':'bus')}><Icon n={x.mode==='metro'?'metro':'bus'} size={16}/></span>
-    <span className="row-t"><b>{x.label}</b><small>{x.mode==='metro'?'Metro station':x.stopContext||'Bus stop'}</small></span>
+    <span className="row-t"><b>{x.label}</b><small className={'suggest-meta '+(x.mode==='metro'?'metro':'bus')}>{x.mode==='metro'?'METRO STATION':'BUS STOP'}</small></span>
    </button>):!busy?<div className="state empty sm"><span>No bus stops or metro stations matched. Try another spelling.</span></div>:null}
   </div>:null}
  </div>;
@@ -176,7 +186,19 @@ export function Planner({go}:{go:Go}){
      ].join(':')).join('|');
      if(!unique.has(key))unique.set(key,option);
     }
-    const options=[...unique.values()].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999)).slice(0,8);
+    const ranked=[...unique.values()].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
+    // Keep at least one result from every available mode before filling the list by time.
+    // Otherwise eight quick bus-only routes can accidentally hide every Bus + Metro option.
+    const options:any[]=[];
+    for(const mode of ['bus','mixed','metro']){
+     const best=ranked.find(option=>optionMode(option)===mode);
+     if(best)options.push(best);
+    }
+    for(const option of ranked){
+     if(options.length>=8)break;
+     if(!options.includes(option))options.push(option);
+    }
+    options.sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
     result={status:busReply?.status==='OK'||multiReply?.status==='OK'?'OK':'ERROR',options,reason:busReply?.reason||multiReply?.reason};
    }else{
     result=await api.planMultimodal(fromMode,toMode,f.id,t.id);
@@ -224,9 +246,14 @@ export function Planner({go}:{go:Go}){
   }
   const routeLabel=routeName(l.routeName)||String(l.routeName||(mode==='metro'?'Metro':'Bus'));
   const fallback=mode==='metro'?metroColor(l.routeLongName||l.routeName):'#0B6B57';
-  const color=plannerColor(l.routeColor,fallback);
+  // Bus legs use the dominant colour of currently tracked vehicles on that route when
+  // available. Metro legs use the official GTFS line colour. Missing livery stays mode-green.
+  const color=mode==='metro'?plannerColor(l.routeColor,fallback):plannerColor(l.busLiveryColor,fallback);
   const target=mode==='metro'?'/metro/routes/':'/routes/';
-  return <button type="button" className={'leg leg-'+mode} key={mode+':'+String(l.routeId)+':'+j} onClick={()=>go(target+encodeURIComponent(l.routeId||''))}>
+  const colourTitle=mode!=='bus'?'Metro line colour':l.busLiveryColor
+   ?'Bus colour '+(l.busLiverySource==='upstream-api'?'from live data':l.busLiverySource==='verified-livery-record'?'from a reviewed vehicle record':'estimated from currently tracked buses')+'; colours can vary by vehicle'
+   :'Bus route; individual vehicle livery is not available for this route';
+  return <button type="button" title={colourTitle} className={'leg leg-'+mode} key={mode+':'+String(l.routeId)+':'+j} onClick={()=>go(target+encodeURIComponent(l.routeId||''))}>
    <RouteBadge name={routeLabel} color={color}/>
    <span className={'leg-mode-label '+mode}>{mode==='metro'?'METRO':'BUS'}</span>
    <span className="row-t"><b>{l.fromStop}</b><small>to {l.toStop}</small></span>

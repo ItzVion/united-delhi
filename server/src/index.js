@@ -6,7 +6,7 @@ import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { rateLimit } from 'express-rate-limit';
 import { spawn } from 'node:child_process';
 import {syncMetroStatic} from './metro-sync.js';
-import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,estimateFleetLiveryColor,classifyFleetTypeFromRegistration,getRouteLiveryProfile,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
+import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,estimateFleetLiveryColor,classifyFleetTypeFromRegistration,getRouteLiveryProfile,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
 const COLOR_FIELD=parseColorFieldSpec(process.env.TRANSPORT_STACK_COLOR_FIELD);
 
 const {Pool}=pg,app=express();
@@ -100,6 +100,16 @@ const applyFleetRegistry=v=>{
 
 async function loadRouteMeta(){if(!pool)return;try{const rows=(await pool.query(`SELECT r.route_id,r.agency_id,r.short_name,r.long_name,r.route_color,r.route_text_color,first_stop.name AS from_stop,last_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.stop_id ASC LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true`)).rows;routeMeta.clear();for(const x of rows)routeMeta.set(String(x.route_id),x);routeMetaLoadedAt=Date.now();console.log('Loaded route metadata: '+routeMeta.size+' routes.')}catch(e){console.error('Route metadata load failed:',e?.message||e)}}
 const applyRouteMeta=v=>{const x=routeMeta.get(String(v.routeId||''));const svc=service(v.id,x?.agency_id,x?.short_name,v.routeId,v.licensePlate,v.vehicleLabel);return applyFleetRegistry({...v,routeShortName:x?.short_name||v.routeShortName||v.routeId||null,routeColor:x?.route_color||null,routeTextColor:x?.route_text_color||null,routeLongName:x?.long_name||null,fromStop:x?.from_stop||null,toStop:x?.to_stop||null,operator:x?.agency_id||null,...svc})};
+const busLiveryForRoute=routeId=>{
+ const id=String(routeId||'').trim();
+ if(!id)return {};
+ const active=cache.vehicles.filter(v=>String(v.routeId||'')===id);
+ const summary=summarizeRouteLivery(active);
+ if(summary)return summary;
+ const meta=routeMeta.get(id),profile=getRouteLiveryProfile(meta?.short_name,id);
+ return profile?{busLiveryColor:profile.color,busLiverySource:'estimated-route-profile',busType:profile.busType,trackedBuses:0,matchingVehicles:0}:{};
+};
+const decoratePlannerOptions=options=>(Array.isArray(options)?options:[]).map(option=>({...option,legs:(Array.isArray(option.legs)?option.legs:[]).map(leg=>!leg.mode||leg.mode==='bus'?{...leg,...busLiveryForRoute(leg.routeId)}:leg)}));
 const DTC_STATIC_SOURCE_KEY='uploaded-dtc-static-gtfs-v1-20260902';
 const DTC_STATIC_BUNDLE_URL='https://br-long-salad-b3b9l7ld.storage.c-4.ap-southeast-1.aws.neon.tech/united-delhi-static-v1/dtc-static-gtfs-v1.zip';
 function scheduleDtcStaticRetry(){
@@ -532,7 +542,7 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
    }
   }
   options.sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
-  return r.json({status:'OK',origin:{type:fromType,id:fromId},destination:{type:toType,id:toId},options:options.slice(0,8),reason:options.length?null:'No mixed or metro journey could be matched in the current static network data.'});
+  return r.json({status:'OK',origin:{type:fromType,id:fromId},destination:{type:toType,id:toId},options:decoratePlannerOptions(options.slice(0,8)),reason:options.length?null:'No mixed or metro journey could be matched in the current static network data.'});
  }catch(error){
   console.error('Multimodal planner failed:',error?.message||error);
   return r.status(500).json({status:'ERROR',options:[],reason:'Trip planning is temporarily unavailable. Please try again.'});
@@ -564,7 +574,7 @@ app.get('/api/plan',async(q,r)=>{
   const options=[...direct,...transfers].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999)).slice(0,5);
   const origin=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[fromId])).rows[0]||null;
   const destination=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[toId])).rows[0]||null;
-  return r.json({status:'OK',origin,destination,options,reason:options.length?null:'No bus journey was found between the selected stops.'});
+  return r.json({status:'OK',origin,destination,options:decoratePlannerOptions(options),reason:options.length?null:'No bus journey was found between the selected stops.'});
  }catch(e){console.error('Journey planner failed:',e?.message||e);return r.status(500).json({status:'ERROR',options:[],reason:'Journey planner is temporarily unavailable. Please try again.'})}
 });
 function scheduleMetroStaticRetry(){

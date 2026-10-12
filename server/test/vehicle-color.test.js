@@ -6,6 +6,7 @@ import {
   apiVehicleColorOnly,
   resolveEvidenceBackedColor,
   estimateFleetLiveryColor,
+  summarizeRouteLivery,
   classifyFleetTypeFromRegistration,
   getRouteLiveryProfile,
   scanEntities,
@@ -132,7 +133,7 @@ test('route 772 profile stays blue AC for both directional route labels', () => 
 test('fleet-colour estimates distinguish common vehicle and cluster categories', () => {
   assert.equal(estimateFleetLiveryColor({busType:'CNG NonAC (12 mtr)',serviceType:'dtc',routeAgency:'DTC'}), '#238B45');
   assert.equal(estimateFleetLiveryColor({busType:'CNG NonAC (12 mtr)',serviceType:'dtc',routeAgency:'DOT'}), '#F97316');
-  assert.equal(estimateFleetLiveryColor({busType:'CNG AC (12 mtr)',serviceType:'dtc',routeAgency:'DTC'}), '#D83B3B');
+  assert.equal(estimateFleetLiveryColor({busType:'CNG AC (12 mtr)',serviceType:'dtc',routeAgency:'DTC'}), '#2563EB');
   assert.equal(estimateFleetLiveryColor({busType:'CNG AC (12 mtr)',serviceType:'dtc',routeAgency:'DOT'}), '#2563EB');
   assert.equal(estimateFleetLiveryColor({busType:'EV AC (12 mtr)',serviceType:'electric',routeAgency:'DTC'}), '#52C2D6');
   assert.equal(estimateFleetLiveryColor({busType:'EV DEVI AC (9 mtr)',serviceType:'electric',routeAgency:'DTC'}), '#229552');
@@ -140,6 +141,18 @@ test('fleet-colour estimates distinguish common vehicle and cluster categories',
   assert.equal(estimateFleetLiveryColor({busType:'AC',serviceType:'unknown',routeAgency:'DIMTS'}), '#2563EB');
   assert.equal(estimateFleetLiveryColor({busType:'Unknown',serviceType:'unknown',routeAgency:'OTD'}), null);
   assert.equal(estimateFleetLiveryColor({busType:'Mohalla EV AC',serviceType:'electric'}), null);
+});
+
+test('route livery colour follows the dominant currently tracked bus colour', () => {
+  assert.deepEqual(summarizeRouteLivery([
+    {serviceColor:'#2563EB',fleetColorSource:'estimated-fleet-type',busType:'CNG AC'},
+    {serviceColor:'#2563EB',fleetColorSource:'upstream-api',busType:'CNG AC'},
+    {serviceColor:'#F97316',fleetColorSource:'estimated-fleet-type',busType:'CNG NonAC'}
+  ]), {
+    busLiveryColor:'#2563EB',busLiverySource:'upstream-api',busType:'CNG AC',
+    trackedBuses:3,matchingVehicles:2
+  });
+  assert.equal(summarizeRouteLivery([{serviceColor:null,fleetColorSource:'not-provided-by-realtime-feed'}]), null);
 });
 
 test('malformed bytes never throw', () => {

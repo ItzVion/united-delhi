@@ -45,6 +45,34 @@ export function getRouteLiveryProfile(routeShortName, routeId) {
   return null;
 }
 
+export function summarizeRouteLivery(vehicles = []) {
+  const byColor = new Map();
+  let trackedBuses = 0;
+  for (const vehicle of Array.isArray(vehicles) ? vehicles : []) {
+    const color = validHexColor(vehicle?.serviceColor);
+    if (!color) continue;
+    trackedBuses++;
+    const key = color.toUpperCase();
+    let row = byColor.get(key);
+    if (!row) {
+      row = { color: key, count: 0, sources: new Map(), types: new Map() };
+      byColor.set(key, row);
+    }
+    row.count++;
+    const source = String(vehicle?.fleetColorSource || 'estimated-fleet-type');
+    row.sources.set(source, (row.sources.get(source) || 0) + 1);
+    const type = String(vehicle?.busType || 'Unknown');
+    row.types.set(type, (row.types.get(type) || 0) + 1);
+  }
+  if (!trackedBuses) return null;
+  const sourceWeight = source => source === 'upstream-api' ? 4 : source === 'verified-livery-record' ? 3 : source === 'estimated-route-profile' ? 2 : 1;
+  const ranked = [...byColor.values()].sort((a, b) => b.count - a.count || b.color.localeCompare(a.color));
+  const winner = ranked[0];
+  const source = [...winner.sources.entries()].sort((a, b) => b[1] - a[1] || sourceWeight(b[0]) - sourceWeight(a[0]))[0]?.[0] || 'estimated-fleet-type';
+  const busType = [...winner.types.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || 'Unknown';
+  return { busLiveryColor: winner.color, busLiverySource: source, busType, trackedBuses, matchingVehicles: winner.count };
+}
+
 export function estimateFleetLiveryColor({ busType, serviceType, routeAgency, operator } = {}) {
   const type = String(busType || '').toLowerCase().replace(/[_-]+/g, ' ');
   // This field is the GTFS route agency, not verified vehicle ownership. Treat it as a clue only.
@@ -62,7 +90,9 @@ export function estimateFleetLiveryColor({ busType, serviceType, routeAgency, op
   if (electric && /9\\s*mtr/.test(type) && ac) return '#229552';
   if (electric && ac) return '#52C2D6';
   if (cng && nonAc) return dotRoute ? '#F97316' : '#238B45';
-  if (cng && ac) return dotRoute ? '#2563EB' : '#D83B3B';
+  // DTC's old red AC low-floor fleet has been retired; currently visible AC CNG
+  // services are generally blue cluster/contracted buses. Exact API/reviewed colours win.
+  if (cng && ac) return '#2563EB';
   if (cluster && nonAc) return '#F97316';
   if (cluster && ac) return '#2563EB';
   return null;
