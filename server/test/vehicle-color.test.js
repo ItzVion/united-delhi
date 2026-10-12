@@ -6,6 +6,7 @@ import {
   apiVehicleColorOnly,
   resolveEvidenceBackedColor,
   estimateFleetLiveryColor,
+  getRouteLiveryProfile,
   scanEntities,
   extractColorsByVehicle,
   parseColorFieldSpec
@@ -109,6 +110,13 @@ test('auto-detection ignores field numbers outside GTFS extension ranges', () =>
 test('invalid API colour values are ignored by the raw feed decoder', () => {
   assert.equal(extractColorsByVehicle(feed({ extVal: 'orange' })).size, 0);
   assert.equal(extractColorsByVehicle(feed({ extVal: null })).size, 0);
+});
+
+test('route 772 profile stays blue AC for both directional route labels', () => {
+  assert.deepEqual(getRouteLiveryProfile('772DOWN', '778'), {routeNumber:'772',busType:'CNG AC (12 mtr)',color:'#2563EB'});
+  assert.deepEqual(getRouteLiveryProfile('772UP', '779'), {routeNumber:'772',busType:'CNG AC (12 mtr)',color:'#2563EB'});
+  assert.equal(getRouteLiveryProfile('7721DOWN', '7721'), null);
+  assert.equal(getRouteLiveryProfile('778', '778'), null);
 });
 
 test('fleet-colour estimates distinguish common vehicle and cluster categories', () => {

@@ -57,7 +57,7 @@ export default function RouteDetailsScreen(){
     if(!mapReady)return;
     const payload={
       stops:stops.map(s=>({id:s.stop_id,name:s.name,lat:s.latitude,lon:s.longitude})),
-      buses:vehicles.flatMap(v=>{const name=displayRouteName(v.routeShortName)||displayRouteName(v.routeId);if(!name)return [];const c=resolveVehicleColor(v);const vehicle=String(v.vehicleLabel||v.licensePlate||v.id||'BUS');return[{id:v.id,route:name,vehicle,color:c.background,textColor:c.text,colourKnown:hasEvidenceBackedVehicleColor(v),colourEstimated:String(v.fleetColorSource||'')==='estimated-fleet-type',lat:v.latitude,lon:v.longitude}];})
+      buses:vehicles.flatMap(v=>{const name=displayRouteName(v.routeShortName)||displayRouteName(v.routeId);if(!name)return [];const c=resolveVehicleColor(v);const vehicle=name;return[{id:v.id,route:name,vehicle,color:c.background,textColor:c.text,colourKnown:hasEvidenceBackedVehicleColor(v),colourEstimated:['estimated-fleet-type','estimated-route-profile'].includes(String(v.fleetColorSource||'')),lat:v.latitude,lon:v.longitude}];})
     };
     mapRef.current?.injectJavaScript(`window.updateRouteMap(${JSON.stringify(payload)});true;`);
   },[mapReady,stops,vehicles]);

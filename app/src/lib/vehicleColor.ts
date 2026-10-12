@@ -44,7 +44,7 @@ export function hasEvidenceBackedVehicleColor(v:Partial<Vehicle>|Partial<Arrival
 }
 
 export function hasEstimatedVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):boolean{
-  return String((v as any).fleetColorSource||'')==='estimated-fleet-type'&&validApiColor(v.serviceColor)!==null;
+  return ['estimated-fleet-type','estimated-route-profile'].includes(String((v as any).fleetColorSource||''))&&validApiColor(v.serviceColor)!==null;
 }
 
 export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{

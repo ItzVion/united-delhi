@@ -18,6 +18,17 @@ export function resolveEvidenceBackedColor(upstreamColor, verifiedLiveryColor) {
 
 // Best-effort visual estimates when the API and reviewed vehicle records have no colour.
 // Route colours and route IDs are never used as physical-livery evidence.
+// User-confirmed route-specific profile. Route 772 is reported to use blue AC buses;
+// this is a route rule, not evidence that GTFS-RT supplies physical livery per vehicle.
+export function getRouteLiveryProfile(routeShortName, routeId) {
+  const normalise = value => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const labels = [routeShortName, routeId].map(normalise);
+  if (labels.some(value => /^772(?:UP|DOWN|DWN)?$/.test(value))) {
+    return { routeNumber: '772', busType: 'CNG AC (12 mtr)', color: '#2563EB' };
+  }
+  return null;
+}
+
 export function estimateFleetLiveryColor({ busType, serviceType, routeAgency, operator } = {}) {
   const type = String(busType || '').toLowerCase().replace(/[_-]+/g, ' ');
   // This field is the GTFS route agency, not verified vehicle ownership. Treat it as a clue only.
