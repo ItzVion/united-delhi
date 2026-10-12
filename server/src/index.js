@@ -348,7 +348,7 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
  try{
   const options=[];
   if(fromType==='bus'&&toType==='bus'){
-   const rows=(await pool.query(\`
+   const rows=(await pool.query(`
     SELECT br1.route_id AS first_bus_route,br1.short_name AS first_bus_short,br1.long_name AS first_bus_long,
       br1.route_color AS first_bus_color,br1.route_text_color AS first_bus_text,
       origin.stop_id AS origin_id,origin.name AS origin_name,
@@ -387,7 +387,7 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
       AND SQRT(POWER((transfer_bus1.latitude-metro_start.latitude)*111.0,2)+POWER((transfer_bus1.longitude-metro_start.longitude)*111.0*COS(RADIANS(metro_start.latitude)),2))<=0.35
       AND SQRT(POWER((transfer_bus2.latitude-metro_end.latitude)*111.0,2)+POWER((transfer_bus2.longitude-metro_end.longitude)*111.0*COS(RADIANS(metro_end.latitude)),2))<=0.35
     ORDER BY (b1.stop_sequence-a.stop_sequence)*2.2+(mb.stop_sequence-ma.stop_sequence)*2.25+(d.stop_sequence-c.stop_sequence)*2.2 LIMIT 10
-   \`,[fromId,toId])).rows;
+   `,[fromId,toId])).rows;
    for(const x of rows){
     const walkA=Math.max(1,Math.ceil(Number(x.first_walk_meters||100)/80)),walkB=Math.max(1,Math.ceil(Number(x.second_walk_meters||100)/80));
     options.push({
@@ -402,7 +402,7 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
     });
    }
   }else if(fromType==='metro'&&toType==='metro'){
-   const direct=(await pool.query(\`
+   const direct=(await pool.query(`
     SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,
       a.stop_id AS from_id,fs.name AS from_name,b.stop_id AS to_id,ts.name AS to_name,
       GREATEST(1,b.stop_sequence-a.stop_sequence) AS station_count
@@ -413,13 +413,13 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
     JOIN metro_stops ts ON ts.stop_id=b.stop_id
     WHERE a.stop_id=$1 AND b.stop_id=$2
     ORDER BY (b.stop_sequence-a.stop_sequence),r.route_id LIMIT 6
-   \`,[fromId,toId])).rows;
+   `,[fromId,toId])).rows;
    for(const x of direct)options.push({
     type:'metro',journeyMode:'metro',durationMinutes:Math.max(4,Math.ceil(Number(x.station_count)*2.3+4)),durationIsEstimate:true,walkingMinutes:0,
     legs:[{mode:'metro',routeId:String(x.route_id),routeName:x.short_name||x.long_name||'Metro',routeLongName:x.long_name,routeColor:x.route_color,routeTextColor:x.route_text_color,fromStop:x.from_name,toStop:x.to_name,fromStopId:x.from_id,toStopId:x.to_id}]
    });
    if(direct.length<4){
-    const changes=(await pool.query(\`
+    const changes=(await pool.query(`
      SELECT r1.route_id AS first_route_id,r1.short_name AS first_short_name,r1.long_name AS first_long_name,
       r1.route_color AS first_color,r1.route_text_color AS first_text,
       fs.name AS from_name,sx.stop_id AS first_transfer_id,sx.name AS first_transfer_name,
@@ -443,7 +443,7 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
      WHERE a.stop_id=$1
        AND SQRT(POWER((sx.latitude-sy.latitude)*111.0,2)+POWER((sx.longitude-sy.longitude)*111.0*COS(RADIANS(sx.latitude)),2))<=0.30
      ORDER BY (x.stop_sequence-a.stop_sequence)+(z.stop_sequence-y.stop_sequence)+8 LIMIT 5
-    \`,[fromId,toId])).rows;
+    `,[fromId,toId])).rows;
     for(const x of changes){
      const walk=Math.max(1,Math.ceil(Number(x.walk_meters||100)/80));
      options.push({
@@ -457,7 +457,7 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
     }
    }
   }else if(fromType==='bus'&&toType==='metro'){
-   const rows=(await pool.query(\`
+   const rows=(await pool.query(`
     SELECT br.route_id AS bus_route_id,br.short_name AS bus_short_name,br.long_name AS bus_long_name,
       br.route_color AS bus_color,br.route_text_color AS bus_text,
       fs.stop_id AS origin_id,fs.name AS origin_name,bs.stop_id AS bus_transfer_id,bs.name AS bus_transfer_name,
@@ -481,7 +481,7 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
     WHERE a.stop_id=$1 AND bs.latitude IS NOT NULL AND mt.latitude IS NOT NULL
       AND SQRT(POWER((bs.latitude-mt.latitude)*111.0,2)+POWER((bs.longitude-mt.longitude)*111.0*COS(RADIANS(mt.latitude)),2))<=0.35
     ORDER BY (b.stop_sequence-a.stop_sequence)*2.3+(mb.stop_sequence-ma.stop_sequence)*2.2 LIMIT 10
-   \`,[fromId,toId])).rows;
+   `,[fromId,toId])).rows;
    for(const x of rows){
     const walk=Math.max(1,Math.ceil(Number(x.walk_meters||100)/80));
     options.push({
@@ -494,7 +494,7 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
     });
    }
   }else if(fromType==='metro'&&toType==='bus'){
-   const rows=(await pool.query(\`
+   const rows=(await pool.query(`
     SELECT mr.route_id AS metro_route_id,mr.short_name AS metro_short_name,mr.long_name AS metro_long_name,
       mr.route_color AS metro_color,mr.route_text_color AS metro_text,
       fs.stop_id AS origin_id,fs.name AS origin_name,mt.stop_id AS metro_transfer_id,mt.name AS metro_transfer_name,
@@ -518,7 +518,7 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
     WHERE ma.stop_id=$1 AND bs.latitude IS NOT NULL AND mt.latitude IS NOT NULL
       AND SQRT(POWER((bs.latitude-mt.latitude)*111.0,2)+POWER((bs.longitude-mt.longitude)*111.0*COS(RADIANS(mt.latitude)),2))<=0.35
     ORDER BY (mb.stop_sequence-ma.stop_sequence)*2.2+(b.stop_sequence-a.stop_sequence)*2.3 LIMIT 10
-   \`,[fromId,toId])).rows;
+   `,[fromId,toId])).rows;
    for(const x of rows){
     const walk=Math.max(1,Math.ceil(Number(x.walk_meters||100)/80));
     options.push({
