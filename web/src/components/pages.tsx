@@ -188,8 +188,8 @@ export function Planner({go}:{go:Go}){
    const options=Array.isArray(result.options)?result.options:[];
    setOpts(options);
    const same=(x:any)=>x.from.id===f.id&&x.to.id===t.id&&x.from.mode===fromMode&&x.to.mode===toMode;
-   const next=[
-    {from:{...f,mode:fromMode},to:{...t,mode:toMode}},
+   const next:{from:StopPick;to:StopPick}[]=[
+    {from:{...f,mode:fromMode as 'bus'|'metro'},to:{...t,mode:toMode as 'bus'|'metro'}},
     ...readRecent().filter((x:any)=>!same(x))
    ].slice(0,5);
    storageSet(RECENT,JSON.stringify(next));
