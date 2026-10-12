@@ -22,6 +22,10 @@ async function request<T>(path:string,init:RequestInit={},timeoutMs=10000,retrie
   let lastError:Error|null=null;
   for(let attempt=0;attempt<=retries;attempt++){
     const controller=new AbortController();
+    const externalSignal=init.signal;
+    const abortFromCaller=()=>controller.abort();
+    if(externalSignal?.aborted)controller.abort();
+    else externalSignal?.addEventListener('abort',abortFromCaller,{once:true});
     const timer=window.setTimeout(()=>controller.abort(),timeoutMs);
     try{
       const response=await fetch(API+path,{...init,signal:controller.signal,headers:{Accept:'application/json','Cache-Control':'no-cache',...(init.headers??{})},cache:'no-store'});
@@ -45,7 +49,7 @@ async function request<T>(path:string,init:RequestInit={},timeoutMs=10000,retrie
         lastError=new ApiError(SERVICE_WAKING_MESSAGE,0);
       }
       if(attempt<retries)await new Promise(resolve=>window.setTimeout(resolve,Math.min(1500,350*2**attempt)));
-    }finally{window.clearTimeout(timer);}
+    }finally{window.clearTimeout(timer);externalSignal?.removeEventListener('abort',abortFromCaller);}
   }
   throw lastError||new ApiError(SERVICE_WAKING_MESSAGE,0);
 }
