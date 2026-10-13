@@ -56,6 +56,7 @@ if ! id uddeploy >/dev/null 2>&1; then
   useradd --create-home --home-dir /home/uddeploy --shell /bin/bash uddeploy
 fi
 install -d -o uddeploy -g uddeploy -m 0755 /opt/united-delhi /opt/united-delhi/releases
+install -d -o root -g united-delhi -m 0750 /opt/united-delhi/data
 install -d -o uddeploy -g uddeploy -m 0700 /home/uddeploy/.ssh
 touch /home/uddeploy/.ssh/authorized_keys
 if ! grep -Fq -- "$DEPLOY_PUBLIC_KEY" /home/uddeploy/.ssh/authorized_keys; then
@@ -75,6 +76,11 @@ APP_ORIGINS=https://united-delhi.vercel.app
 DATABASE_URL=
 TRANSPORT_STACK_API_KEY=
 TRANSPORT_STACK_REALTIME_URL=https://dts-backend.transportstack.in/api/dataset/otd/get-file?agency=delhi-buses&category=realtime_gtfs&filename=VehiclePositions.pb
+DTC_STATIC_FILE=/opt/united-delhi/data/dtc-static.zip
+DTC_STATIC_SOURCE_KEY=uploaded-dtc-static-local-v1-20261013
+DTC_STATIC_AUTO_IMPORT=true
+METRO_STATIC_FILE=/opt/united-delhi/data/metro-static.zip
+METRO_STATIC_SOURCE_KEY=uploaded-dmrc-static-local-v1-20261013
 METRO_AUTO_SYNC=true
 ENV
 fi
@@ -92,5 +98,7 @@ systemctl enable united-delhi
 echo
 echo "VPS prepared. Node: $(node --version)"
 echo "Service is enabled but not started until a release is deployed."
-echo "Next: edit /etc/united-delhi/server.env and fill DATABASE_URL and TRANSPORT_STACK_API_KEY."
+echo "Next: configure DATABASE_URL for the local united_delhi PostgreSQL database."
+echo "Add TRANSPORT_STACK_API_KEY if live vehicle tracking is required."
+echo "Place dtc-static.zip and metro-static.zip in /opt/united-delhi/data/ before starting the API."
 echo "Then add the SSH host/key secrets and set GitHub repository variable VPS_DEPLOY_ENABLED=true."

@@ -5,8 +5,9 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 
 const execFileAsync=promisify(execFile);
-const URL='https://br-long-salad-b3b9l7ld.storage.c-4.ap-southeast-1.aws.neon.tech/united-delhi-static-v1/dmrc-static-gtfs-v1.zip';
-const SOURCE_KEY='uploaded-dmrc-static-gtfs-v1-20230810';
+const URL=String(process.env.METRO_STATIC_URL||'').trim();
+const STATIC_FILE=String(process.env.METRO_STATIC_FILE||'').trim();
+const SOURCE_KEY=String(process.env.METRO_STATIC_SOURCE_KEY||'uploaded-dmrc-static-local-v1-20261013').trim();
 let syncRunning=false;
 
 function csv(text){
@@ -48,14 +49,26 @@ export async function syncMetroStatic(pool){
     if(meta?.source_key===SOURCE_KEY&&Number(meta.route_count)>=18&&Number(meta.stop_count)>=260){
       return {ok:true,unchanged:true,routes:Number(meta.route_count),stops:Number(meta.stop_count)};
     }
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),120000);
     let body,sourceUrl=URL;
-    try{
-      const response=await fetch(URL,{headers:{accept:'application/zip','user-agent':'United-Delhi/2.0'},signal:controller.signal});
-      if(!response.ok)throw new Error('Uploaded DMRC static ZIP HTTP '+response.status);
-      body=Buffer.from(await response.arrayBuffer());
-      if(!body.slice(0,2).equals(Buffer.from([0x50,0x4b])))throw new Error('Uploaded DMRC response is not a ZIP archive');
-    }finally{clearTimeout(timer)}
+    if(STATIC_FILE){
+      try{
+        const stat=await fs.stat(STATIC_FILE);
+        if(!stat.isFile()||stat.size<=0)throw new Error('Configured file is empty or is not a regular file');
+        body=await fs.readFile(STATIC_FILE);
+        sourceUrl='local-file:'+path.resolve(STATIC_FILE);
+      }catch(error){
+        throw new Error('Local DMRC static ZIP failed: '+(error?.message||error));
+      }
+    }else{
+      if(!URL)throw new Error('Set METRO_STATIC_FILE to a local GTFS ZIP or METRO_STATIC_URL to an explicit ZIP URL.');
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),120000);
+      try{
+        const response=await fetch(URL,{headers:{accept:'application/zip','user-agent':'United-Delhi/2.0'},signal:controller.signal});
+        if(!response.ok)throw new Error('DMRC static ZIP HTTP '+response.status);
+        body=Buffer.from(await response.arrayBuffer());
+      }finally{clearTimeout(timer)}
+    }
+    if(!Buffer.isBuffer(body)||!body.slice(0,2).equals(Buffer.from([0x50,0x4b])))throw new Error('DMRC static source is not a ZIP archive');
     const feed=await unzipFeed(body,dir);
     if(!feed.routes.length||!feed.stops.length||!feed.trips.length||!feed.stopTimes.length)throw new Error('DMRC feed is missing required GTFS files');
 

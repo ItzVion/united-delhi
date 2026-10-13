@@ -1,12 +1,14 @@
 import 'dotenv/config';
 import { createInflateRaw } from 'node:zlib';
 import { Readable } from 'node:stream';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
 const STATIC_URL_OVERRIDE = String(process.env.DTC_STATIC_URL || '').trim();
-const UPLOADED_DTC_STATIC_URL = 'https://br-long-salad-b3b9l7ld.storage.c-4.ap-southeast-1.aws.neon.tech/united-delhi-static-v1/dtc-static-gtfs-v1.zip';
-const STATIC_URLS = STATIC_URL_OVERRIDE ? [STATIC_URL_OVERRIDE] : [UPLOADED_DTC_STATIC_URL];
-const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'uploaded-dtc-static-gtfs-v1-20260902').trim();
+const STATIC_FILE_OVERRIDE = String(process.env.DTC_STATIC_FILE || '').trim();
+const STATIC_URLS = STATIC_URL_OVERRIDE ? [STATIC_URL_OVERRIDE] : [];
+const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'uploaded-dtc-static-local-v1-20261013').trim();
 const MAX_COMPRESSED_BYTES = 100 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES = 300 * 1024 * 1024;
 
@@ -167,6 +169,29 @@ const batches = (items, size) => {
 };
 
 async function downloadZip() {
+  if (STATIC_FILE_OVERRIDE) {
+    try {
+      const stat = await fs.stat(STATIC_FILE_OVERRIDE);
+      if (!stat.isFile() || stat.size <= 0) throw new Error('Configured file is empty or is not a regular file');
+      if (stat.size > MAX_COMPRESSED_BYTES) throw new Error('ZIP exceeds the compressed-size safety limit');
+      const data = await fs.readFile(STATIC_FILE_OVERRIDE);
+      if (data.length > MAX_COMPRESSED_BYTES) throw new Error('ZIP exceeds the compressed-size safety limit');
+      const archive = new ZipArchive(data);
+      const requiredFiles = ['routes.txt', 'stops.txt', 'trips.txt', 'stop_times.txt'];
+      const missing = requiredFiles.filter((name) => !archive.find(name));
+      if (missing.length) throw new Error('ZIP is missing required GTFS files: ' + missing.join(', '));
+      const requiredExpandedBytes = requiredFiles.reduce((sum, name) => sum + archive.find(name).uncompressedSize, 0);
+      if (requiredExpandedBytes > MAX_UNCOMPRESSED_BYTES) throw new Error('Required GTFS files exceed the expanded-size safety limit');
+      console.log('Using local DTC static ZIP: ' + path.resolve(STATIC_FILE_OVERRIDE));
+      console.log('Local DTC static ZIP size: ' + Math.round(data.length / 1024 / 1024 * 100) / 100 + ' MB');
+      return { data, sourceUrl: 'local-file:' + path.resolve(STATIC_FILE_OVERRIDE) };
+    } catch (error) {
+      throw new Error('Local DTC static ZIP failed: ' + (error?.message || error));
+    }
+  }
+  if (STATIC_URLS.length === 0) {
+    throw new Error('Set DTC_STATIC_FILE to a local GTFS ZIP or DTC_STATIC_URL to an explicit ZIP URL.');
+  }
   let lastError = null;
   for (const url of STATIC_URLS) {
     const controller = new AbortController();

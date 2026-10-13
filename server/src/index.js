@@ -5,6 +5,7 @@ import pg from 'pg';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { rateLimit } from 'express-rate-limit';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs/promises';
 import {syncMetroStatic} from './metro-sync.js';
 import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,estimateFleetLiveryColor,classifyFleetTypeFromRegistration,getRouteLiveryProfile,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
 const COLOR_FIELD=parseColorFieldSpec(process.env.TRANSPORT_STACK_COLOR_FIELD);
@@ -24,7 +25,7 @@ const dist=(a,b,c,d)=>{const R=6371000,r=Math.PI/180,la=(c-a)*r,lo=(d-b)*r,x=Mat
 const UNKNOWN_BUS_MARKER_COLOR='#64748B';
 const classifyFleet=(id,...aliases)=>classifyFleetTypeFromRegistration(id,...aliases);
 const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>classifyFleet(id,licensePlate,vehicleLabel);
-const cache={vehicles:[],status:TRANSPORT_STACK_KEY?'STARTING':'UNAVAILABLE',reason:TRANSPORT_STACK_KEY?'Render API is starting':'TRANSPORT_STACK_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
+const cache={vehicles:[],status:TRANSPORT_STACK_KEY?'STARTING':'UNAVAILABLE',reason:TRANSPORT_STACK_KEY?'United Delhi API is starting':'TRANSPORT_STACK_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
 let refreshing=null,poll=null,routeMetaLoadedAt=0,persistPromise=null,lastPersistAt=0,dtcAutoImportRunning=false;
 const routeMeta=new Map();
 const fleetRegistry=new Map();
@@ -110,8 +111,9 @@ const busLiveryForRoute=routeId=>{
  return profile?{busLiveryColor:profile.color,busLiverySource:'estimated-route-profile',busType:profile.busType,trackedBuses:0,matchingVehicles:0}:{};
 };
 const decoratePlannerOptions=options=>(Array.isArray(options)?options:[]).map(option=>({...option,legs:(Array.isArray(option.legs)?option.legs:[]).map(leg=>!leg.mode||leg.mode==='bus'?{...leg,...busLiveryForRoute(leg.routeId)}:leg)}));
-const DTC_STATIC_SOURCE_KEY='uploaded-dtc-static-gtfs-v1-20260902';
-const DTC_STATIC_BUNDLE_URL='https://br-long-salad-b3b9l7ld.storage.c-4.ap-southeast-1.aws.neon.tech/united-delhi-static-v1/dtc-static-gtfs-v1.zip';
+const DTC_STATIC_SOURCE_KEY=String(process.env.DTC_STATIC_SOURCE_KEY||'uploaded-dtc-static-local-v1-20261013').trim();
+const DTC_STATIC_FILE=String(process.env.DTC_STATIC_FILE||'').trim();
+const DTC_STATIC_BUNDLE_URL=String(process.env.DTC_STATIC_URL||'').trim();
 function scheduleDtcStaticRetry(){
  const retry=setTimeout(autoImportDtcStaticIfEmpty,5*60*1000);
  retry.unref?.();
@@ -127,22 +129,42 @@ function autoImportDtcStaticIfEmpty(){
    const routeCount=Number(countResult.rows[0]?.count)||0;
    const meta=metaResult.rows[0]||{};
    if(meta.source_key===DTC_STATIC_SOURCE_KEY&&routeCount>=2500&&Number(meta.imported_stop_count)>=6000)return;
-   // Don't touch existing rows until the uploaded ZIP is present and reachable.
-   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
-   let response;
-   try{response=await fetch(DTC_STATIC_BUNDLE_URL,{method:'HEAD',signal:controller.signal})}
-   finally{clearTimeout(timer)}
-   if(!response.ok){
-    console.warn('Uploaded DTC GTFS ZIP is not available yet (HTTP '+response.status+'); retaining existing static data and retrying shortly.');
+   // Keep current rows until the configured local archive or explicitly configured URL is available.
+   let sourceAvailable=false;
+   const sourceDescription=DTC_STATIC_FILE||DTC_STATIC_BUNDLE_URL||'(not configured)';
+   if(DTC_STATIC_FILE){
+    try{
+     const fileStat=await fs.stat(DTC_STATIC_FILE);
+     sourceAvailable=fileStat.isFile()&&fileStat.size>0;
+    }catch(error){
+     console.warn('Local DTC GTFS archive is unavailable:',error?.message||error);
+    }
+   }else if(DTC_STATIC_BUNDLE_URL){
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+    try{
+     const response=await fetch(DTC_STATIC_BUNDLE_URL,{method:'HEAD',signal:controller.signal});
+     sourceAvailable=response.ok;
+     if(!response.ok)console.warn('DTC GTFS URL returned HTTP '+response.status+'.');
+    }catch(error){
+     console.warn('DTC GTFS source check failed:',error?.message||error);
+    }finally{clearTimeout(timer)}
+   }
+   if(!sourceAvailable){
+    console.warn('DTC GTFS source is unavailable ('+sourceDescription+'); retaining existing static data and retrying shortly.');
     scheduleDtcStaticRetry();
     return;
    }
    if(dtcAutoImportRunning)return;
    dtcAutoImportRunning=true;
-   console.log('Uploaded DTC GTFS ZIP is available; importing the supplied static feed.');
-   const child=spawn(process.execPath,['scripts/import-dtc-static.mjs'],{cwd:process.cwd(),env:{...process.env,DTC_STATIC_URL:DTC_STATIC_BUNDLE_URL,DTC_STATIC_SOURCE_KEY:DTC_STATIC_SOURCE_KEY},stdio:['ignore','pipe','pipe']});
-   child.stdout.setEncoding('utf8');
-   child.stderr.setEncoding('utf8');
+   console.log('DTC GTFS source is available; importing static data from '+sourceDescription+'.');
+   const importEnv={...process.env,DTC_STATIC_SOURCE_KEY};
+   if(DTC_STATIC_FILE){
+    importEnv.DTC_STATIC_FILE=DTC_STATIC_FILE;
+    delete importEnv.DTC_STATIC_URL;
+   }else{
+    importEnv.DTC_STATIC_URL=DTC_STATIC_BUNDLE_URL;
+   }
+   const child=spawn(process.execPath,['scripts/import-dtc-static.mjs'],{cwd:process.cwd(),env:importEnv,stdio:['ignore','pipe','pipe']});
    child.stdout.on('data',chunk=>console.log('[DTC static importer] '+String(chunk).trimEnd()));
    child.stderr.on('data',chunk=>console.warn('[DTC static importer] '+String(chunk).trimEnd()));
    child.on('error',error=>{
@@ -192,11 +214,11 @@ async function loadDatabaseVehicleCache(){
   const newest=timestamps.length?Math.max(...timestamps):NaN;
   cache.fetchedAt=Number.isFinite(newest)?new Date(newest).toISOString():null;
   cache.status='STALE';
-  cache.source='neon-cache';
+  cache.source='database-cache';
   cache.reason='Showing the last known cached bus positions while live data reconnects.';
   cache.persistedAt=new Date().toISOString();
-  console.log('Loaded Neon realtime cache: '+cache.vehicles.length+' vehicles.');
- }catch(e){console.error('Neon realtime cache load failed:',e?.message||e)}
+  console.log('Loaded database realtime cache: '+cache.vehicles.length+' vehicles.');
+ }catch(e){console.error('Database realtime cache load failed:',e?.message||e)}
 }
 
 app.disable('x-powered-by');app.set('trust proxy',1);
@@ -243,7 +265,7 @@ async function ensureRuntimeSchema(){if(!pool)return;const c=await pool.connect(
 }finally{c.release()}}
 
 
-/* Static GTFS is DB-only: the current feed is imported into Neon outside the web service. */
+/* Static GTFS is stored in PostgreSQL; VPS imports use local archives when configured. */
 function parseVehicle(e,feedTs,colors){
  const v=e?.vehicle,p=v?.position;if(!p)return null;
  const lat=coord(p.latitude,-90,90),lon=coord(p.longitude,-180,180),id=str(v?.vehicle?.id||v?.id||e?.id);if(lat===null||lon===null||!id)return null;
@@ -283,7 +305,7 @@ async function refresh(){
    cache.source='transport-stack-live';
    queuePersist(cache.vehicles);
    const exactUpstreamColors=raw.reduce((count,vehicle)=>count+(validHexColor(vehicle.serviceColor)?1:0),0);
-   console.log('Transport Stack realtime feed decoded: '+raw.length+' vehicles; '+exactUpstreamColors+' exact per-vehicle colours supplied; Neon/client caches refreshed.');
+   console.log('Transport Stack realtime feed decoded: '+raw.length+' vehicles; '+exactUpstreamColors+' exact per-vehicle colours supplied; local database/client caches refreshed.');
   }catch(e){
    cache.status=cache.fetchedAt?'STALE':'UNAVAILABLE';
    const message=e instanceof Error?e.message:String(e||'Realtime request failed');

@@ -1,7 +1,11 @@
 name: Debounced VPS backend deploy
 
 on:
-  # Manual-only until the owner explicitly asks to deploy the VPS backend.
+  push:
+    branches:
+      - main
+    paths:
+      - 'server/**'
   workflow_dispatch:
 
 permissions:

@@ -1,66 +1,94 @@
 UNITED DELHI — VPS BACKEND DEPLOYMENT
 
-OVERVIEW
-The GitHub workflow .github/workflows/deploy-vps.yml deploys only when server/** changes on main.
-It waits 20 seconds, compares the event's server tree with current main, and skips stale snapshots.
-GitHub concurrency permits one active workflow and only the newest pending workflow. A burst of source commits therefore gets one deployment of the final server snapshot, not one backend build for every intermediate commit.
+ARCHITECTURE
+- Website frontend remains on Vercel.
+- Node.js API runs on this Ubuntu/Debian VPS as the unprivileged united-delhi service user.
+- PostgreSQL is local to the VPS: database united_delhi, role united_delhi_app.
+- API hostname: https://ud-api.mangotyping.fun, published by Cloudflare Tunnel to http://localhost:10000.
+- Adminer hostname: https://ud-db.mangotyping.fun, published only after a Cloudflare Access policy limits access to your own email.
+- Static GTFS ZIPs are kept outside release directories at /opt/united-delhi/data/dtc-static.zip and /opt/united-delhi/data/metro-static.zip. Never commit these archives or database credentials.
 
-The VPS deployment is disabled until the repository variable VPS_DEPLOY_ENABLED is exactly "true".
-The deployment uses an isolated release directory, runs Node.js 22 checks/tests on GitHub and the VPS, atomically switches /opt/united-delhi/current, restarts systemd, checks Neon connectivity, and rolls back to the previous release if the new one fails.
+AUTOMATIC DEPLOYMENT
+The GitHub Actions workflow .github/workflows/deploy-vps.yml deploys automatically when a push to main changes server/**. It also supports a manual workflow_dispatch run.
+It waits 20 seconds and compares the event's server tree with current main, so stale snapshots are skipped. It runs Node.js 22 checks and tests, uploads an isolated release, tests on the VPS, switches the current symlink, restarts systemd, checks /health and /api/status, and rolls back on failure.
+Deployment stays disabled until repository variable VPS_DEPLOY_ENABLED is exactly true. Configure all secrets, bootstrap the VPS and test a manual deployment before enabling automatic deployment. Web-only and Android-only commits do not deploy the backend.
 
-REQUIREMENTS
-- Ubuntu 22.04/24.04 or a supported Debian release.
-- VPS public IP/hostname and SSH access as root for initial setup.
-- A dedicated Ed25519 SSH key for GitHub Actions.
-- A Neon DATABASE_URL and Transport Stack API key.
-- A public HTTPS API hostname will be needed before switching app/ and web/ off the current Render URL.
+VPS PREPARATION
+The VPS must have Node.js 22 and systemd. The bootstrap script creates the unprivileged service account, the uddeploy SSH account, /opt/united-delhi/releases, /opt/united-delhi/data, and /etc/united-delhi/server.env. It does not start the app before a release is deployed.
+From a local clone of this repository, run these commands in PowerShell from the repository root after creating the target directory on the VPS:
 
-INITIAL VPS SETUP
-1. From a local clone after pulling main, copy server/deploy files to the VPS:
-   scp -r server/deploy/* root@YOUR_VPS_HOST:/tmp/united-delhi-deploy/
-   (Create /tmp/united-delhi-deploy on the VPS first if scp reports that the directory is missing.)
-2. Run interactively:
-   ssh -t root@YOUR_VPS_HOST "bash /tmp/united-delhi-deploy/bootstrap-vps.sh"
-   Paste the SSH PUBLIC key when asked. Never paste the private key into the VPS setup prompt.
-3. Edit /etc/united-delhi/server.env as root. Fill DATABASE_URL and TRANSPORT_STACK_API_KEY. Keep the file mode 0640. Do not commit these values.
-4. The bootstrap script enables systemd but does not start the API until a release is deployed.
+  ssh root@20.235.141.72 "mkdir -p /tmp/united-delhi-deploy"
+  scp -r server/deploy/* root@20.235.141.72:/tmp/united-delhi-deploy/
 
-GENERATE A DEDICATED WINDOWS SSH KEY
-Run in PowerShell:
-   ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\united-delhi-vps-deploy" -C "united-delhi-vps-deploy"
-Press Enter twice when asked for a passphrase, so the unattended GitHub runner can use the key. Use this key only for deployment.
-The public key is:
-   $env:USERPROFILE\.ssh\united-delhi-vps-deploy.pub
-The private key is the file without ".pub". Never share the private key in chat.
+Generate a dedicated key for GitHub Actions on Windows (press Enter twice for an empty passphrase because the key is used by an unattended runner):
 
-GITHUB REPOSITORY CONFIGURATION
-Repository Settings -> Secrets and variables -> Actions -> Secrets:
-- VPS_HOST: VPS IP/hostname
+  ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\united-delhi-vps-deploy" -C "united-delhi-vps-deploy"
+
+Copy the PUBLIC key from:
+  $env:USERPROFILE\.ssh\united-delhi-vps-deploy.pub
+
+Then on the VPS run:
+  bash /tmp/united-delhi-deploy/bootstrap-vps.sh
+
+Paste only the public key when prompted. Never paste the private key into the VPS bootstrap prompt. The bootstrap script installs Node.js 22 if needed and enables the service without starting it.
+
+LOCAL DATABASE
+Use the local PostgreSQL database restored from the Neon backup. Set DATABASE_URL in /etc/united-delhi/server.env to:
+  postgresql://united_delhi_app:<PASSWORD>@127.0.0.1:5432/united_delhi
+Use the password saved at /root/united-delhi-db-credentials.txt. It is a hex-generated password, so URL encoding is not required. Keep /etc/united-delhi/server.env owned by root:united-delhi with mode 0640. Never put this URL in GitHub, source files or chat.
+Do not run server/sql/001_reset_and_schema.sql; it drops existing public tables. Keep the Neon database and /root/united-delhi-backups/neon-before-migration-20261013.sql as fallbacks until the migration and API are verified.
+
+STATIC GTFS FILES
+Download the supplied DTC and DMRC ZIPs to the Windows PC. Copy them to the VPS with PowerShell, adjusting the local Downloads paths if needed:
+
+  scp "$env:USERPROFILE\Downloads\delhi_buses_static_gtfs_v1 (1).zip" root@20.235.141.72:/opt/united-delhi/data/dtc-static.zip
+  scp "$env:USERPROFILE\Downloads\dmrc_static_gtfs_v1.zip" root@20.235.141.72:/opt/united-delhi/data/metro-static.zip
+
+Then on the VPS, ensure the service user can read them:
+  chown root:united-delhi /opt/united-delhi/data/*.zip
+  chmod 0640 /opt/united-delhi/data/*.zip
+
+The configured source keys deliberately identify the local feed import. Startup imports only when the source key/counts do not match; failed/missing local ZIPs retain existing database rows and retry. The database importer uses transactions. Keep a fresh backup before manually forcing any static-feed import.
+
+SERVICE ENVIRONMENT
+Set:
+- PORT=10000
+- APP_ORIGINS=https://united-delhi.vercel.app
+- DATABASE_URL to local PostgreSQL as described above
+- DTC_STATIC_FILE=/opt/united-delhi/data/dtc-static.zip
+- DTC_STATIC_SOURCE_KEY=uploaded-dtc-static-local-v1-20261013
+- DTC_STATIC_AUTO_IMPORT=true
+- METRO_STATIC_FILE=/opt/united-delhi/data/metro-static.zip
+- METRO_STATIC_SOURCE_KEY=uploaded-dmrc-static-local-v1-20261013
+- METRO_AUTO_SYNC=true
+- TRANSPORT_STACK_API_KEY to the key required by the live Transport Stack feed, if live vehicle positions are required
+
+Edit the service environment as root. Do not print or share it. To apply environment changes after a release is active, run:
+  systemctl restart united-delhi
+
+GITHUB ACTIONS CONFIGURATION
+Repository Settings → Secrets and variables → Actions → Secrets:
+- VPS_HOST: current VPS public IP or hostname
 - VPS_USER: uddeploy
-- VPS_SSH_PRIVATE_KEY: entire content of the private key (without .pub)
-- VPS_KNOWN_HOSTS: verified SSH host-key line(s) for the VPS
-Optional secret:
-- VPS_SSH_PORT: SSH port, normally 22; when using a non-default port, VPS_KNOWN_HOSTS must use the [host]:port form.
+- VPS_SSH_PRIVATE_KEY: full private key from the file without .pub
+- VPS_KNOWN_HOSTS: verified SSH host-key line(s) for this VPS
+- VPS_SSH_PORT: optional, normally 22
 
-Verify the VPS host-key fingerprint from the VPS provider console before trusting the known-hosts entry. Do not disable StrictHostKeyChecking.
+Verify the host-key fingerprint using your VPS provider console before trusting it. Do not disable StrictHostKeyChecking.
 
-Repository Settings -> Secrets and variables -> Actions -> Variables:
-- VPS_DEPLOY_ENABLED = true
+Repository Settings → Secrets and variables → Actions → Variables:
+- VPS_DEPLOY_ENABLED = true (set this only after the VPS service environment, data files and local database are prepared)
 
-The workflow cannot deploy until the VPS is reachable by SSH, the public key is installed, secrets are saved, and /opt/united-delhi/releases is writable by uddeploy.
+Initially run the workflow manually under Actions → Debounced VPS backend deploy. After it passes, a push to main that modifies server/** triggers deployment automatically. Your local Git commit and push still happen manually; the VPS deployment is automatic after the commit reaches GitHub.
 
-DATABASE AND SERVICE
-The VPS connects to Neon using DATABASE_URL. This setup does not migrate, erase or create a new database. Do not run server/sql/001_reset_and_schema.sql manually; the app manages compatible runtime schema migrations.
-The systemd unit runs as an unprivileged united-delhi user. uddeploy can restart only the united-delhi service through passwordless sudo; it cannot read the root-owned service environment file.
+CLOUDFLARE AND CUTOVER
+Tunnel published application routes:
+- ud-api.mangotyping.fun → http://localhost:10000
+- ud-db.mangotyping.fun → http://127.0.0.1:18080, protected by a Cloudflare Access allow policy for your own email
 
-NETWORK AND CUTOVER
-Keep port 10000 private using the VPS firewall; expose SSH and, once configured, ports 80/443 for a reverse proxy. The API app itself listens on port 10000.
-Before moving the public app to the VPS, configure a domain with HTTPS (for example, with Caddy) and test:
-- https://YOUR_API_HOST/health
-- https://YOUR_API_HOST/api/status (database should be OK)
-- https://YOUR_API_HOST/api/realtime/vehicles
+Keep PostgreSQL private and do not open port 5432 publicly. Keep the API origin on localhost behind the tunnel. Confirm these URLs before changing Vercel/Android API configuration:
+- https://ud-api.mangotyping.fun/health
+- https://ud-api.mangotyping.fun/api/status (database must be OK)
+- https://ud-api.mangotyping.fun/api/realtime/vehicles
 
-Only after those checks pass should app/src/config.ts, app/eas.json, web/vite.config.ts, web/vercel.json and the CSP API origin be changed to the new HTTPS hostname. Until then both clients remain pointed at the current Render fallback.
-
-RENDER FALLBACK
-server/render.yaml now declares autoDeploy: false so blueprint-managed Render deployments do not duplicate VPS deployments. If the existing Render service is configured directly in the Render dashboard rather than synchronized from this blueprint, turn its Auto-Deploy setting off after confirming the VPS is healthy. Leave the currently running Render service available as a fallback until public API cutover succeeds.
+Only after those pass should the web and app API URLs/CSP be switched away from Render. Keep Render and Neon available as fallback until public client cutover and smoke tests succeed.
