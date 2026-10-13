@@ -1,6 +1,6 @@
 [Unit]
 Description=United Delhi API
-After=network-online.target
+After=network-online.target postgresql.service
 Wants=network-online.target
 
 [Service]
@@ -10,7 +10,7 @@ Group=united-delhi
 WorkingDirectory=/opt/united-delhi/current
 EnvironmentFile=/etc/united-delhi/server.env
 Environment=NODE_ENV=production
-Environment=NODE_OPTIONS=--max-old-space-size=2048
+Environment=NODE_OPTIONS=--max-old-space-size=1536
 ExecStart=/usr/bin/node /opt/united-delhi/current/src/index.js
 Restart=on-failure
 RestartSec=4

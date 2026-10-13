@@ -1,0 +1,19 @@
+[Unit]
+Description=United Delhi self-hosted fetch/build/deploy from main
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=uddeploy
+Group=uddeploy
+WorkingDirectory=/opt/united-delhi
+EnvironmentFile=/etc/united-delhi/deploy.env
+Environment=HOME=/home/uddeploy
+Environment=JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+Environment=ANDROID_HOME=/opt/android-sdk
+Environment=ANDROID_SDK_ROOT=/opt/android-sdk
+Environment=GRADLE_USER_HOME=/home/uddeploy/.gradle
+Environment=PATH=/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/united-delhi/repo/server/deploy/vps-autodeploy.sh
+TimeoutStartSec=3600
