@@ -278,3 +278,29 @@ body,#root{background:var(--bg)}
  .page:not(.view-home)>.list,.page:not(.view-home)>.card,.page:not(.view-home)>.stats,.page:not(.view-home)>.timeline,.page:not(.view-home)>.route-top{animation:none!important}
  .btn,.row,.leg,.icon-btn,.mode-filter,.suggest button,.faq button,.nav button,.nav button .ic{transition:none!important}
 }
+
+/* Trip planner: make each transport mode visually distinct without adding heavy animation code. */
+.planner-mode-key{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin:0 0 12px;padding:9px 11px;border:1px solid var(--line);background:#fff;color:var(--mut);font-size:11px;font-weight:700}
+.planner-mode-key span{display:inline-flex;align-items:center;gap:6px}
+.planner-mode-key i{display:inline-block;width:10px;height:10px;flex:none;border-radius:2px}
+.key-bus{background:#0b8062}.key-metro{background:#2f63b7}.key-mixed{background:#8054b8}.key-walk{background:#a78bca}
+.planner-mode-key-intro{margin-top:-4px}
+.planner-page .trip{border-top:3px solid #0b8062;transition:box-shadow .2s ease,border-color .2s ease}
+.planner-page .trip-metro{border-top-color:#2f63b7}
+.planner-page .trip-mixed{border-top-color:#8054b8}
+.planner-page .trip-h{background:#f8faf9}
+.planner-page .trip-metro .trip-h{background:#f7f9ff}
+.planner-page .trip-mixed .trip-h{background:#fbf8ff}
+.planner-page .leg-bus{border-left-color:#0b8062}
+.planner-page .leg-metro{border-left-color:#2f63b7}
+.planner-page .leg:focus-visible{outline-offset:-3px}
+.planner-page .mode-filter{border-radius:3px}
+.planner-page .mode-filter.active{box-shadow:inset 0 -2px 0 var(--g)}
+.planner-page .suggest{animation:ud-suggest-enter .16s ease-out both;transform-origin:top center}
+.planner-page .suggest button{transition:background-color .14s ease,transform .14s ease}
+.planner-page .suggest button:active{transform:scale(.995)}
+@keyframes ud-suggest-enter{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){
+ .planner-page .suggest{animation:none!important}
+ .planner-page .trip{transition:none!important}
+}

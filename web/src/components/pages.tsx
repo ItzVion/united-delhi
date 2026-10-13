@@ -293,6 +293,9 @@ export function Planner({go}:{go:Go}){
     <div className="planner-results-head">
      <div><h2 className="sec">Suggested journeys</h2><p>{opts.length} option{opts.length===1?'':'s'} ranked by estimated travel time</p></div>
     </div>
+    <div className="planner-mode-key" aria-label="Journey mode colour key">
+     <span><i className="key-bus"/>Bus</span><span><i className="key-metro"/>Metro</span><span><i className="key-mixed"/>Bus + Metro</span><span><i className="key-walk"/>Walking</span>
+    </div>
     <div className="mode-filters" role="group" aria-label="Filter journey options">
      {([['all','All',modeCounts.all],['bus','Bus',modeCounts.bus],['metro','Metro',modeCounts.metro],['mixed','Bus + Metro',modeCounts.mixed]] as const).map(([key,label,count])=>
       <button type="button" key={key} className={'mode-filter'+(filter===key?' active':'')} aria-pressed={filter===key} disabled={!count} onClick={()=>setFilter(key)}>
@@ -320,7 +323,10 @@ export function Planner({go}:{go:Go}){
   <TopBar title="Trip Plan" sub="Compare bus, Metro and combined journeys" go={go} back={null}/>
   <div className="planner-intro">
    <span className="planner-intro-icon"><Icon n="route" size={18}/></span>
-   <div><b>Find the best way</b><p>Choose a bus stop or Metro station for each end. Compare direct rides and transfers.</p></div>
+   <div><b>Find the best way</b><p>Pick a bus stop or Metro station at each end. United Delhi compares direct rides, Metro trips and bus-to-Metro transfers.</p></div>
+  </div>
+  <div className="planner-mode-key planner-mode-key-intro" aria-label="Available travel modes">
+   <span><i className="key-bus"/>Bus</span><span><i className="key-metro"/>Metro</span><span><i className="key-mixed"/>Combined transfers</span>
   </div>
   <div className="card planner">
    <div className="rail"><i/><b/><i className="end"/></div>
@@ -333,7 +339,7 @@ export function Planner({go}:{go:Go}){
   <button className="btn wide planner-find" disabled={busy||!from.label.trim()||!to.label.trim()} onClick={()=>void run()}>
    {busy?<><span className="spinner sm"/> Finding journeys…</>:'Find journeys'}
   </button>
-  <p className="planner-hint"><Icon n="info" size={14}/>Times are estimates. Metro data is static; live metro train positions are not available.</p>
+  <p className="planner-hint"><Icon n="info" size={14}/>Compare bus-only, Metro-only and combined journeys. Times are estimates; Metro train positions are not live-tracked. Bus marker colours are best-effort hints and may vary by vehicle.</p>
   {err?<ErrorState text={err}/>:null}
   {busy?<Loading text="Finding bus and Metro combinations…"/>:null}
   {journeysView}

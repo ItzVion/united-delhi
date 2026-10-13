@@ -129,10 +129,10 @@ export default function App(){
     <main className={'view'+(page.kind==='home'?' view-home':'')}>
       <AnimatePresence mode="wait" initial={false}>
        <motion.div key={page.kind+':'+String(page.id||'')} className="page-transition"
-        initial={reduceMotion?{opacity:1}:{opacity:0,y:12,scale:.99}}
+        initial={reduceMotion?{opacity:1}:{opacity:0,y:18,scale:.985}}
         animate={{opacity:1,y:0,scale:1}}
-        exit={reduceMotion?{opacity:1}:{opacity:0,y:-7,scale:.996}}
-        transition={{duration:reduceMotion?0:.26,ease:[.22,1,.36,1]}}>
+        exit={reduceMotion?{opacity:1}:{opacity:0,y:-10,scale:.99}}
+        transition={{duration:reduceMotion?0:.32,ease:[.22,1,.36,1]}}>
         {page.kind==='home'?<Home vehicles={vehicles} live={live} liveNote={liveNote} onRetry={()=>void load()} location={location} locState={locState} onLocate={locate} onLegend={()=>setLegend(true)} go={go} services={services}/>
         :page.kind==='plan'?<Planner go={go}/>
         :page.kind==='metro'?<Metro go={go}/>
