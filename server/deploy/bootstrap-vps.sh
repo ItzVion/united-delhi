@@ -89,7 +89,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 install -o root -g root -m 0644 "$SCRIPT_DIR/united-delhi.service" /etc/systemd/system/united-delhi.service
 install -o root -g root -m 0644 "$SCRIPT_DIR/united-delhi-autodeploy.service" /etc/systemd/system/united-delhi-autodeploy.service
 install -o root -g root -m 0644 "$SCRIPT_DIR/united-delhi-autodeploy.timer" /etc/systemd/system/united-delhi-autodeploy.timer
-printf '%s\n' 'uddeploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart united-delhi' > /etc/sudoers.d/united-delhi-deploy
+printf '%s\n' 'uddeploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart united-delhi, /usr/bin/systemctl stop united-delhi' > /etc/sudoers.d/united-delhi-deploy
 chmod 0440 /etc/sudoers.d/united-delhi-deploy
 visudo -cf /etc/sudoers.d/united-delhi-deploy
 systemctl daemon-reload
