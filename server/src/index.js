@@ -358,6 +358,24 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
  try{
   const options=[];
   if(fromType==='bus'&&toType==='bus'){
+   // Always include direct bus services before looking for bus+Metro+bus transfers.
+   // Otherwise a valid one-seat ride can be hidden by a much longer mixed itinerary.
+   const directBuses=(await pool.query(`
+    SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,
+      a.stop_id AS from_id,fs.name AS from_name,b.stop_id AS to_id,ts.name AS to_name,
+      GREATEST(1,b.stop_sequence-a.stop_sequence) AS stop_count
+    FROM route_stops a
+    JOIN route_stops b ON b.route_id=a.route_id AND b.stop_sequence>a.stop_sequence
+    JOIN routes r ON r.route_id=a.route_id
+    JOIN stops fs ON fs.stop_id=a.stop_id
+    JOIN stops ts ON ts.stop_id=b.stop_id
+    WHERE a.stop_id=$1 AND b.stop_id=$2
+    ORDER BY (b.stop_sequence-a.stop_sequence),r.short_name,r.route_id LIMIT 12
+   `,[fromId,toId])).rows;
+   for(const x of directBuses)options.push({
+    type:'bus',journeyMode:'bus',durationMinutes:Math.max(5,Math.ceil(Number(x.stop_count)*2.2+4)),durationIsEstimate:true,walkingMinutes:0,
+    legs:[{mode:'bus',routeId:String(x.route_id),routeName:x.short_name||x.long_name||'Bus',routeLongName:x.long_name,routeColor:x.route_color,routeTextColor:x.route_text_color,fromStop:x.from_name,toStop:x.to_name,fromStopId:x.from_id,toStopId:x.to_id}]
+   });
    const rows=(await pool.query(`
     SELECT br1.route_id AS first_bus_route,br1.short_name AS first_bus_short,br1.long_name AS first_bus_long,
       br1.route_color AS first_bus_color,br1.route_text_color AS first_bus_text,
