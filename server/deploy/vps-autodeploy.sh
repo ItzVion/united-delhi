@@ -139,19 +139,41 @@ web_build_deploy() {
     fail 'WEB_DEPLOY_ENABLED=1 but VERCEL_TOKEN, VERCEL_ORG_ID or VERCEL_PROJECT_ID is missing in /etc/united-delhi/deploy.env.'
     return 1
   fi
+  if [[ "$API_BASE" != https://* ]]; then
+    fail "Refusing to build production web output with a non-HTTPS API origin: $API_BASE"
+    return 1
+  fi
   log 'Building the Vercel frontend on this VPS and uploading the prebuilt output (no GitHub Actions).'
-  python3 - "$REPO/web/.vercel/project.json" "$VERCEL_ORG_ID" "$VERCEL_PROJECT_ID" <<'PY'
+  # Patch the build checkout's Vercel rewrite targets and CSP to the VPS API.
+  # The next fetch/checkout restores tracked files; this is a build-time transform only.
+  python3 - "$REPO/web/vercel.json" "$API_BASE" "$REPO/web/.vercel/project.json" "$VERCEL_ORG_ID" "$VERCEL_PROJECT_ID" <<'PY'
 import json, os, sys, tempfile
-path, org, project = sys.argv[1:]
-os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
-fd, temp = tempfile.mkstemp(prefix='.project-', dir=os.path.dirname(path), text=True)
+config_path, api_base, project_path, org, project = sys.argv[1:]
+api_base = api_base.rstrip('/')
+with open(config_path, encoding='utf-8') as f:
+    original = f.read()
+old_origin = 'https://united-delhi-api.onrender.com'
+if old_origin in original:
+    updated = original.replace(old_origin, api_base)
+elif api_base in original:
+    updated = original
+else:
+    raise SystemExit('Could not identify the known API origin in web/vercel.json; refusing to deploy the wrong backend.')
+json.loads(updated)
+fd, temp = tempfile.mkstemp(prefix='.vercel-json-', dir=os.path.dirname(config_path), text=True)
+with os.fdopen(fd, 'w', encoding='utf-8') as f:
+    f.write(updated)
+os.chmod(temp, 0o644)
+os.replace(temp, config_path)
+print('Vercel config rewrite/CSP API origin set to ' + api_base)
+os.makedirs(os.path.dirname(project_path), mode=0o700, exist_ok=True)
+fd, temp = tempfile.mkstemp(prefix='.project-', dir=os.path.dirname(project_path), text=True)
 with os.fdopen(fd, 'w', encoding='utf-8') as f:
     json.dump({'orgId': org, 'projectId': project, 'projectName': 'united-delhi'}, f)
     f.write('\n')
 os.chmod(temp, 0o600)
-os.replace(temp, path)
+os.replace(temp, project_path)
 PY
-  if [[ $? -ne 0 ]]; then return 1; fi
   (
     cd "$REPO/web" &&
     npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN" &&
