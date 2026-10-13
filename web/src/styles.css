@@ -312,3 +312,18 @@ body,#root{background:var(--bg)}
 .planner-page .planner:has(.field-active){position:relative;z-index:100}
 .planner-page .planner:has(.field-active) .suggest{z-index:101;max-height:min(260px,40vh)}
 .planner-page .planner-find{position:relative;z-index:0}
+
+/* Restrained page/navigation motion; map tiles and markers stay untouched. */
+.nav button{position:relative;overflow:hidden}
+.nav button::before{content:"";position:absolute;top:0;left:22%;right:22%;height:3px;background:var(--accent);transform:scaleX(0);transform-origin:center;transition:transform .22s cubic-bezier(.22,1,.36,1)}
+.nav button.on::before{transform:scaleX(1)}
+.nav button.on{background:linear-gradient(180deg,rgba(184,239,92,.12),transparent 75%)}
+.planner-page .trip-direct-recommended{border-color:#9bd6b1;box-shadow:0 5px 17px rgba(20,120,70,.09)}
+.planner-page .trip-direct-recommended .trip-h{background:#f1fbf4}
+.planner-page .trip-direct-recommended .trip-summary>b{color:#145b36}
+.planner-page .trip{transition:box-shadow .2s ease,border-color .2s ease,transform .2s ease}
+.planner-page .trip:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(20,40,33,.09)}
+@media(prefers-reduced-motion:reduce){
+ .nav button::before{transition:none!important}
+ .planner-page .trip{transition:none!important}
+}

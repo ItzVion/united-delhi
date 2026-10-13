@@ -104,9 +104,22 @@ function StopField({label,value,onChange,placeholder,active,setActive,onEdit}:{l
    try{
     const [busResult,metroStops]=await Promise.all([api.search(term,{signal:controller.signal}),getPlannerMetroStops()]);
     if(!on)return;
-    const bus=(Array.isArray(busResult?.results)?busResult.results:[])
+    const busRaw=(Array.isArray(busResult?.results)?busResult.results:[])
      .filter((x:any)=>x.type==='stop'&&x.id&&x.label)
      .map((x:any)=>({...x,mode:'bus',stopContext:x.stopContext||'Bus stop'}));
+    const bus:any[]=[];
+    for(const item of busRaw){
+     const lat=Number(item.latitude),lon=Number(item.longitude);
+     const matchIndex=bus.findIndex(existing=>{
+      if(normalisePlannerPlace(existing.label)!==normalisePlannerPlace(item.label))return false;
+      const elat=Number(existing.latitude),elon=Number(existing.longitude);
+      if(!Number.isFinite(lat)||!Number.isFinite(lon)||!Number.isFinite(elat)||!Number.isFinite(elon))return String(existing.id)===String(item.id);
+      const dy=(lat-elat)*111000,dx=(lon-elon)*111000*Math.cos(lat*Math.PI/180);
+      return Math.hypot(dx,dy)<=120;
+     });
+     if(matchIndex<0)bus.push(item);
+     else if((Number(item.routeCount)||0)>(Number(bus[matchIndex].routeCount)||0))bus[matchIndex]=item;
+    }
     const metro=metroStops.filter((s:any)=>normalisePlannerPlace(s.name).includes(searchTerm))
      .map((s:any)=>({id:String(s.stop_id),label:String(s.name),mode:'metro',type:'metro',stopContext:'Metro station'}));
     const unique=new Map<string,any>();
@@ -173,20 +186,42 @@ export function Planner({go}:{go:Go}){
     ]);
     const busReply=replies[0].status==='fulfilled'?replies[0].value:null;
     const multiReply=replies[1].status==='fulfilled'?replies[1].value:null;
+    const originIds=new Set<string>([
+     String(f.id),...(Array.isArray(busReply?.originStopIds)?busReply.originStopIds:[]).map(String),
+     ...(Array.isArray(multiReply?.originStopIds)?multiReply.originStopIds:[]).map(String)
+    ]);
+    const destinationIds=new Set<string>([
+     String(t.id),...(Array.isArray(busReply?.destinationStopIds)?busReply.destinationStopIds:[]).map(String),
+     ...(Array.isArray(multiReply?.destinationStopIds)?multiReply.destinationStopIds:[]).map(String)
+    ]);
     const merged=[
      ...(Array.isArray(busReply?.options)?busReply.options:[]),
      ...(Array.isArray(multiReply?.options)?multiReply.options:[])
-    ];
+    ].filter((option:any)=>{
+     const legs=(Array.isArray(option?.legs)?option.legs:[]).filter((leg:any)=>leg&&leg.mode!=='walk');
+     if(!legs.length)return false;
+     const first=legs[0],last=legs[legs.length-1];
+     const fromId=String(first.fromStopId||''),toId=String(last.toStopId||'');
+     const fromMatches=!fromId||originIds.has(fromId)||normalisePlannerPlace(first.fromStop)===normalisePlannerPlace(f.label);
+     const toMatches=!toId||destinationIds.has(toId)||normalisePlannerPlace(last.toStop)===normalisePlannerPlace(t.label);
+     return fromMatches&&toMatches;
+    });
     const unique=new Map<string,any>();
     for(const option of merged){
      const legs=Array.isArray(option.legs)?option.legs:[];
      const key=legs.map((leg:any)=>[
       String(leg.mode||'bus'),String(leg.routeId||'walk'),
-      String(leg.fromStopId||leg.fromStop||''),String(leg.toStopId||leg.toStop||'')
+      normalisePlannerPlace(leg.fromStop),normalisePlannerPlace(leg.toStop)
      ].join(':')).join('|');
-     if(!unique.has(key))unique.set(key,option);
+     const previous=unique.get(key);
+     if(!previous||(Number(option.durationMinutes)||999)<(Number(previous.durationMinutes)||999))unique.set(key,option);
     }
-    const ranked=[...unique.values()].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
+    const sortedByEta=[...unique.values()].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
+    const bestDirect=sortedByEta.filter(option=>option.type==='direct'&&(Array.isArray(option.legs)?option.legs.filter((leg:any)=>leg.mode!=='walk').length:0)===1)
+     .sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999))[0];
+    const bestOther=sortedByEta.find(option=>option!==bestDirect);
+    const preferDirect=!!bestDirect&&(!bestOther||(Number(bestDirect.durationMinutes)||999)<=(Number(bestOther.durationMinutes)||999)+15);
+    const ranked=preferDirect?[bestDirect,...sortedByEta.filter(option=>option!==bestDirect)]:sortedByEta;
     // Keep at least one result from every available mode before filling the list by time.
     // Otherwise eight quick bus-only routes can accidentally hide every Bus + Metro option.
     const options:any[]=[];
@@ -199,6 +234,10 @@ export function Planner({go}:{go:Go}){
      if(!options.includes(option))options.push(option);
     }
     options.sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
+    if(preferDirect&&bestDirect&&options.includes(bestDirect)){
+     options.splice(options.indexOf(bestDirect),1);
+     options.unshift(bestDirect);
+    }
     result={status:busReply?.status==='OK'||multiReply?.status==='OK'?'OK':'ERROR',options,reason:busReply?.reason||multiReply?.reason};
    }else{
     result=await api.planMultimodal(fromMode,toMode,f.id,t.id);
@@ -265,15 +304,15 @@ export function Planner({go}:{go:Go}){
   const journeyMode=optionMode(o);
   const legs=Array.isArray(o.legs)?o.legs:[];
   const legCount=legs.filter((l:any)=>l.mode==='bus'||l.mode==='metro').length;
-  const description=o.type==='direct'?'Direct ride':legCount>1?'Transfers included':'Estimated journey';
+  const description=o.type==='direct'?'No transfers · stay on one bus':legCount>1?'Transfers included':'Estimated journey';
   const walking=o.walkingMinutes?' · '+o.walkingMinutes+' min walking':'';
   const delay=Math.min(i,5)*45;
   const key=String(o.type)+':'+legs.map((l:any)=>String(l.mode||'bus')+':'+String(l.routeId||'walk')).join('|')+':'+i;
-  return <div className={'card trip trip-'+journeyMode} key={key} style={{animationDelay:delay+'ms'}}>
+  return <div className={'card trip trip-'+journeyMode+(o.type==='direct'&&i===0?' trip-direct-recommended':'')} key={key} style={{animationDelay:delay+'ms'}}>
    <div className="trip-h">
     <div className="trip-summary">
      <b>~{o.durationMinutes} min</b>
-     <span className={'journey-kind '+journeyMode}>{modeText(journeyMode)}</span>
+     <span className={'journey-kind '+journeyMode}>{o.type==='direct'?'Direct bus':modeText(journeyMode)}</span>
     </div>
     <small>{description}{walking}</small>
    </div>
@@ -291,7 +330,7 @@ export function Planner({go}:{go:Go}){
    const cards=visibleOptions.length?resultCards:<Empty title={'No '+modeText(filter==='all'?'bus':filter)+' options in this set'} text="Choose All to see every journey returned for these stops."/>;
    journeysView=<>
     <div className="planner-results-head">
-     <div><h2 className="sec">Suggested journeys</h2><p>{opts.length} option{opts.length===1?'':'s'} ranked by estimated travel time</p></div>
+     <div><h2 className="sec">Suggested journeys</h2><p>Direct rides are prioritised when their estimated time is close; choose another option for a transfer or Metro alternative.</p></div>
     </div>
     <div className="planner-mode-key" aria-label="Journey mode colour key">
      <span><i className="key-bus"/>Bus</span><span><i className="key-metro"/>Metro</span><span><i className="key-mixed"/>Bus + Metro</span><span><i className="key-walk"/>Walking</span>

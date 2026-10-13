@@ -349,13 +349,39 @@ app.get('/api/routes/:id',async(q,r)=>{if(!pool)return r.status(503).json({statu
 app.get('/api/stops/:id',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',reason:'Database is not configured'});try{const id=str(q.params.id),stop=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[id])).rows[0];if(!stop)return r.status(404).json({status:'NOT_FOUND',reason:'Stop not found'});const routes=(await pool.query(`SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,MIN(rs.stop_sequence) AS stop_sequence,first_stop.name AS from_stop,last_stop.name AS to_stop FROM route_stops rs JOIN routes r ON r.route_id=rs.route_id LEFT JOIN LATERAL (SELECT s.name FROM route_stops x JOIN stops s ON s.stop_id=x.stop_id WHERE x.route_id=r.route_id ORDER BY x.stop_sequence ASC,s.stop_id ASC LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops x JOIN stops s ON s.stop_id=x.stop_id WHERE x.route_id=r.route_id ORDER BY x.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true WHERE rs.stop_id=$1 GROUP BY r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,first_stop.name,last_stop.name ORDER BY MIN(rs.stop_sequence),r.short_name,r.route_id LIMIT 100`,[id])).rows;r.json({status:'OK',stop,routes})}catch{r.status(500).json({status:'ERROR',reason:'Failed to load stop'})}});
 app.get('/api/stops/:id/arrivals',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',arrivals:[],reason:'Database is not configured'});try{const st=(await pool.query('SELECT latitude,longitude FROM stops WHERE stop_id=$1',[str(q.params.id)])).rows[0];if(!st)return r.status(404).json({status:'NOT_FOUND',arrivals:[],reason:'Stop not found'});const a=cache.vehicles.map(v=>({...v,distanceMeters:Math.round(dist(Number(st.latitude),Number(st.longitude),v.latitude,v.longitude))})).filter(v=>v.distanceMeters<=2500).sort((a,b)=>a.distanceMeters-b.distanceMeters).slice(0,20).map(v=>({vehicleId:v.id,routeId:v.routeId,routeShortName:v.routeShortName||v.routeId||null,routeName:v.routeShortName||v.routeId||'Bus',routeColor:v.routeColor,routeTextColor:v.routeTextColor,serviceType:v.serviceType,serviceColor:v.serviceColor,busType:v.busType,fleetColorSource:v.fleetColorSource,distanceMeters:v.distanceMeters,observedAt:v.observedAt,observedAgeSeconds:Math.max(0,Math.round((Date.now()-Date.parse(v.observedAt))/1000)),toStop:v.toStop||null,tripHeadsign:v.tripHeadsign||null}));r.json({status:a.length?'OK':'UNAVAILABLE',arrivals:a,reason:a.length?null:'No nearby live buses are available right now.'})}catch{r.status(500).json({status:'ERROR',arrivals:[],reason:'Failed to load arrivals'})}});
 app.post('/api/stops/nearby',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',stops:[],reason:'Database is not configured'});const lat=coord(q.body?.lat,-90,90),lon=coord(q.body?.lon,-180,180),limit=Math.min(50,Math.max(1,Number(q.body?.limit)||30));if(lat===null||lon===null)return r.status(400).json({status:'ERROR',stops:[],reason:'Valid latitude and longitude are required'});try{const rows=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE latitude BETWEEN $1 AND $2 AND longitude BETWEEN $3 AND $4 LIMIT 10000',[lat-.15,lat+.15,lon-.15,lon+.15])).rows,stops=rows.map(x=>({...x,distanceMeters:Math.round(dist(lat,lon,Number(x.latitude),Number(x.longitude)))})).filter(x=>x.distanceMeters<=15000).sort((a,b)=>a.distanceMeters-b.distanceMeters).slice(0,limit);r.json({status:'OK',stops})}catch{r.status(500).json({status:'ERROR',stops:[],reason:'Nearby stops are temporarily unavailable'})}});
-app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',results:[],reason:'Database is not configured'});const raw=String(req.query.q||'').trim().slice(0,80);if(raw.length<2)return res.json({status:'OK',results:[]});const x=raw.replace(/[%_]/g,'');const like='%'+x+'%';try{const routes=(await pool.query(`SELECT r.route_id AS id,COALESCE(r.short_name,r.long_name,r.route_id) AS label,r.long_name,r.route_color AS "routeColor",r.route_text_color AS "routeTextColor",first_stop.name AS "fromStop",last_stop.name AS "toStop",'route' AS type,CASE WHEN lower(r.short_name)=lower($1) OR lower(r.route_id)=lower($1) THEN 0 WHEN r.short_name ILIKE $2 OR r.route_id ILIKE $2 OR r.long_name ILIKE $2 THEN 1 ELSE 2 END AS rank FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence,s.stop_id LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true WHERE r.short_name ILIKE $2 OR r.route_id ILIKE $2 OR r.long_name ILIKE $2 ORDER BY rank,r.short_name,r.route_id LIMIT 30`,[x,like])).rows;const live=(await pool.query(`SELECT vp.route_id AS id,vp.route_id AS label,NULL::text AS long_name,NULL::text AS "routeColor",NULL::text AS "routeTextColor",NULL::text AS "fromStop",NULL::text AS "toStop",'route' AS type,0 AS rank FROM vehicle_positions vp WHERE vp.observed_at>NOW()-INTERVAL '30 minutes' AND vp.route_id IS NOT NULL AND vp.route_id ILIKE $1 AND NOT EXISTS(SELECT 1 FROM routes r WHERE r.route_id=vp.route_id) GROUP BY vp.route_id LIMIT 15`,[like])).rows;const stops=(await pool.query(`SELECT s.stop_id AS id,s.name AS label,s.latitude,s.longitude,'Stop ID '||s.stop_id||' · '||ROUND(s.latitude::numeric,5)||', '||ROUND(s.longitude::numeric,5) AS "stopContext",(SELECT COUNT(DISTINCT rs.route_id)::int FROM route_stops rs WHERE rs.stop_id=s.stop_id) AS "routeCount",'stop' AS type,CASE WHEN lower(s.name)=lower($1) THEN 0 WHEN s.name ILIKE $2 THEN 1 ELSE 2 END AS rank FROM stops s WHERE s.name ILIKE $2 ORDER BY rank,s.name,s.stop_id LIMIT 30`,[x,like])).rows;const seen=new Set();const merged=[...routes,...live,...stops].filter(v=>{const k=v.type+':'+v.id;if(seen.has(k))return false;seen.add(k);return true}).sort((p,q)=>(p.rank??9)-(q.rank??9));return res.json({status:'OK',results:merged.slice(0,60)})}catch(e){console.error('Search failed:',e?.message||e);return res.status(500).json({status:'ERROR',results:[],reason:'Search is temporarily unavailable'})}});app.get('/api/plan/multimodal',async(q,r)=>{
+app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({status:'UNAVAILABLE',results:[],reason:'Database is not configured'});const raw=String(req.query.q||'').trim().slice(0,80);if(raw.length<2)return res.json({status:'OK',results:[]});const x=raw.replace(/[%_]/g,'');const like='%'+x+'%';try{const routes=(await pool.query(`SELECT r.route_id AS id,COALESCE(r.short_name,r.long_name,r.route_id) AS label,r.long_name,r.route_color AS "routeColor",r.route_text_color AS "routeTextColor",first_stop.name AS "fromStop",last_stop.name AS "toStop",'route' AS type,CASE WHEN lower(r.short_name)=lower($1) OR lower(r.route_id)=lower($1) THEN 0 WHEN r.short_name ILIKE $2 OR r.route_id ILIKE $2 OR r.long_name ILIKE $2 THEN 1 ELSE 2 END AS rank FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence,s.stop_id LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true WHERE r.short_name ILIKE $2 OR r.route_id ILIKE $2 OR r.long_name ILIKE $2 ORDER BY rank,r.short_name,r.route_id LIMIT 30`,[x,like])).rows;const live=(await pool.query(`SELECT vp.route_id AS id,vp.route_id AS label,NULL::text AS long_name,NULL::text AS "routeColor",NULL::text AS "routeTextColor",NULL::text AS "fromStop",NULL::text AS "toStop",'route' AS type,0 AS rank FROM vehicle_positions vp WHERE vp.observed_at>NOW()-INTERVAL '30 minutes' AND vp.route_id IS NOT NULL AND vp.route_id ILIKE $1 AND NOT EXISTS(SELECT 1 FROM routes r WHERE r.route_id=vp.route_id) GROUP BY vp.route_id LIMIT 15`,[like])).rows;const stops=(await pool.query(`SELECT s.stop_id AS id,s.name AS label,s.latitude,s.longitude,'Stop ID '||s.stop_id||' · '||ROUND(s.latitude::numeric,5)||', '||ROUND(s.longitude::numeric,5) AS "stopContext",(SELECT COUNT(DISTINCT rs.route_id)::int FROM route_stops rs WHERE rs.stop_id=s.stop_id) AS "routeCount",'stop' AS type,CASE WHEN lower(s.name)=lower($1) THEN 0 WHEN s.name ILIKE $2 THEN 1 ELSE 2 END AS rank FROM stops s WHERE s.name ILIKE $2 ORDER BY rank,s.name,s.stop_id LIMIT 30`,[x,like])).rows;const seen=new Set();const merged=[...routes,...live,...stops].filter(v=>{const k=v.type+':'+v.id;if(seen.has(k))return false;seen.add(k);return true}).sort((p,q)=>(p.rank??9)-(q.rank??9));return res.json({status:'OK',results:merged.slice(0,60)})}catch(e){console.error('Search failed:',e?.message||e);return res.status(500).json({status:'ERROR',results:[],reason:'Search is temporarily unavailable'})}});async function plannerStopFamilyIds(mode, stopId){
+ const table=mode==='metro'?'metro_stops':'stops';
+ const id=String(stopId||'').trim();
+ if(!id||!pool)return id?[id]:[];
+ try{
+  const rows=(await pool.query(`
+   SELECT peer.stop_id::text AS stop_id
+   FROM ${table} selected
+   JOIN ${table} peer
+     ON LOWER(TRIM(peer.name))=LOWER(TRIM(selected.name))
+    AND selected.latitude IS NOT NULL AND selected.longitude IS NOT NULL
+    AND peer.latitude IS NOT NULL AND peer.longitude IS NOT NULL
+    AND ABS(peer.latitude-selected.latitude)<=0.0015
+    AND ABS(peer.longitude-selected.longitude)<=0.0015
+   WHERE selected.stop_id=$1
+   ORDER BY CASE WHEN peer.stop_id=selected.stop_id THEN 0 ELSE 1 END,peer.stop_id
+   LIMIT 12
+  `,[id])).rows;
+  return [...new Set([id,...rows.map(row=>String(row.stop_id))])].slice(0,12);
+ }catch(error){
+  console.warn('Planner stop-family lookup failed:',error?.message||error);
+  return [id];
+ }
+}
+app.get('/api/plan/multimodal',async(q,r)=>{
  if(!pool)return r.status(503).json({status:'UNAVAILABLE',options:[],reason:'Database is not configured'});
  const fromType=q.query.fromType==='metro'?'metro':'bus';
  const toType=q.query.toType==='metro'?'metro':'bus';
  const fromId=str(q.query.fromStopId),toId=str(q.query.toStopId);
  if(!fromId||!toId||fromId===toId)return r.status(400).json({status:'ERROR',options:[],reason:'Choose two different stops or stations.'});
  try{
+  const [fromIds,toIds]=await Promise.all([plannerStopFamilyIds(fromType,fromId),plannerStopFamilyIds(toType,toId)]);
+  if(fromType===toType&&fromIds.some(id=>toIds.includes(id)))return r.status(400).json({status:'ERROR',options:[],reason:'Choose two different physical stops or stations.'});
   const options=[];
   if(fromType==='bus'&&toType==='bus'){
    // Always include direct bus services before looking for bus+Metro+bus transfers.
@@ -369,9 +395,9 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
     JOIN routes r ON r.route_id=a.route_id
     JOIN stops fs ON fs.stop_id=a.stop_id
     JOIN stops ts ON ts.stop_id=b.stop_id
-    WHERE a.stop_id=$1 AND b.stop_id=$2
+    WHERE a.stop_id=ANY($1::text[]) AND b.stop_id=ANY($2::text[])
     ORDER BY (b.stop_sequence-a.stop_sequence),r.short_name,r.route_id LIMIT 12
-   `,[fromId,toId])).rows;
+   `,[fromIds,toIds])).rows;
    for(const x of directBuses)options.push({
     type:'bus',journeyMode:'bus',durationMinutes:Math.max(5,Math.ceil(Number(x.stop_count)*2.2+4)),durationIsEstimate:true,walkingMinutes:0,
     legs:[{mode:'bus',routeId:String(x.route_id),routeName:x.short_name||x.long_name||'Bus',routeLongName:x.long_name,routeColor:x.route_color,routeTextColor:x.route_text_color,fromStop:x.from_name,toStop:x.to_name,fromStopId:x.from_id,toStopId:x.to_id}]
@@ -408,14 +434,14 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
     JOIN stops transfer_bus2 ON transfer_bus2.latitude IS NOT NULL AND transfer_bus2.longitude IS NOT NULL
       AND ABS(transfer_bus2.latitude-metro_end.latitude)<=0.0045 AND ABS(transfer_bus2.longitude-metro_end.longitude)<=0.005
     JOIN route_stops c ON c.stop_id=transfer_bus2.stop_id
-    JOIN route_stops d ON d.route_id=c.route_id AND d.stop_sequence>c.stop_sequence AND d.stop_id=$2
+    JOIN route_stops d ON d.route_id=c.route_id AND d.stop_sequence>c.stop_sequence AND d.stop_id=ANY($2::text[])
     JOIN routes br2 ON br2.route_id=c.route_id
     JOIN stops destination ON destination.stop_id=d.stop_id
-    WHERE a.stop_id=$1 AND br1.route_id<>br2.route_id
+    WHERE a.stop_id=ANY($1::text[]) AND br1.route_id<>br2.route_id
       AND SQRT(POWER((transfer_bus1.latitude-metro_start.latitude)*111.0,2)+POWER((transfer_bus1.longitude-metro_start.longitude)*111.0*COS(RADIANS(metro_start.latitude)),2))<=0.35
       AND SQRT(POWER((transfer_bus2.latitude-metro_end.latitude)*111.0,2)+POWER((transfer_bus2.longitude-metro_end.longitude)*111.0*COS(RADIANS(metro_end.latitude)),2))<=0.35
     ORDER BY (b1.stop_sequence-a.stop_sequence)*2.2+(mb.stop_sequence-ma.stop_sequence)*2.25+(d.stop_sequence-c.stop_sequence)*2.2 LIMIT 10
-   `,[fromId,toId])).rows;
+   `,[fromIds,toIds])).rows;
    for(const x of rows){
     const walkA=Math.max(1,Math.ceil(Number(x.first_walk_meters||100)/80)),walkB=Math.max(1,Math.ceil(Number(x.second_walk_meters||100)/80));
     options.push({
@@ -439,9 +465,9 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
     JOIN metro_routes r ON r.route_id=a.route_id
     JOIN metro_stops fs ON fs.stop_id=a.stop_id
     JOIN metro_stops ts ON ts.stop_id=b.stop_id
-    WHERE a.stop_id=$1 AND b.stop_id=$2
+    WHERE a.stop_id=ANY($1::text[]) AND b.stop_id=ANY($2::text[])
     ORDER BY (b.stop_sequence-a.stop_sequence),r.route_id LIMIT 6
-   `,[fromId,toId])).rows;
+   `,[fromIds,toIds])).rows;
    for(const x of direct)options.push({
     type:'metro',journeyMode:'metro',durationMinutes:Math.max(4,Math.ceil(Number(x.station_count)*2.3+4)),durationIsEstimate:true,walkingMinutes:0,
     legs:[{mode:'metro',routeId:String(x.route_id),routeName:x.short_name||x.long_name||'Metro',routeLongName:x.long_name,routeColor:x.route_color,routeTextColor:x.route_text_color,fromStop:x.from_name,toStop:x.to_name,fromStopId:x.from_id,toStopId:x.to_id}]
@@ -465,13 +491,13 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
      JOIN metro_stops sy ON sy.stop_id<>sx.stop_id
        AND ABS(sx.latitude-sy.latitude)<=0.0035 AND ABS(sx.longitude-sy.longitude)<=0.0045
      JOIN metro_route_stops y ON y.stop_id=sy.stop_id AND y.route_id<>x.route_id
-     JOIN metro_route_stops z ON z.route_id=y.route_id AND z.direction_id=y.direction_id AND z.stop_sequence>y.stop_sequence AND z.stop_id=$2
+     JOIN metro_route_stops z ON z.route_id=y.route_id AND z.direction_id=y.direction_id AND z.stop_sequence>y.stop_sequence AND z.stop_id=ANY($2::text[])
      JOIN metro_routes r2 ON r2.route_id=y.route_id
      JOIN metro_stops ts ON ts.stop_id=z.stop_id
-     WHERE a.stop_id=$1
+     WHERE a.stop_id=ANY($1::text[])
        AND SQRT(POWER((sx.latitude-sy.latitude)*111.0,2)+POWER((sx.longitude-sy.longitude)*111.0*COS(RADIANS(sx.latitude)),2))<=0.30
      ORDER BY (x.stop_sequence-a.stop_sequence)+(z.stop_sequence-y.stop_sequence)+8 LIMIT 5
-    `,[fromId,toId])).rows;
+    `,[fromIds,toIds])).rows;
     for(const x of changes){
      const walk=Math.max(1,Math.ceil(Number(x.walk_meters||100)/80));
      options.push({
@@ -503,13 +529,13 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
     JOIN stops bs ON bs.stop_id=b.stop_id
     JOIN metro_stops mt ON ABS(bs.latitude-mt.latitude)<=0.0045 AND ABS(bs.longitude-mt.longitude)<=0.005
     JOIN metro_route_stops ma ON ma.stop_id=mt.stop_id
-    JOIN metro_route_stops mb ON mb.route_id=ma.route_id AND mb.direction_id=ma.direction_id AND mb.stop_sequence>ma.stop_sequence AND mb.stop_id=$2
+    JOIN metro_route_stops mb ON mb.route_id=ma.route_id AND mb.direction_id=ma.direction_id AND mb.stop_sequence>ma.stop_sequence AND mb.stop_id=ANY($2::text[])
     JOIN metro_routes mr ON mr.route_id=ma.route_id
     JOIN metro_stops dest ON dest.stop_id=mb.stop_id
-    WHERE a.stop_id=$1 AND bs.latitude IS NOT NULL AND mt.latitude IS NOT NULL
+    WHERE a.stop_id=ANY($1::text[]) AND bs.latitude IS NOT NULL AND mt.latitude IS NOT NULL
       AND SQRT(POWER((bs.latitude-mt.latitude)*111.0,2)+POWER((bs.longitude-mt.longitude)*111.0*COS(RADIANS(mt.latitude)),2))<=0.35
     ORDER BY (b.stop_sequence-a.stop_sequence)*2.3+(mb.stop_sequence-ma.stop_sequence)*2.2 LIMIT 10
-   `,[fromId,toId])).rows;
+   `,[fromIds,toIds])).rows;
    for(const x of rows){
     const walk=Math.max(1,Math.ceil(Number(x.walk_meters||100)/80));
     options.push({
@@ -540,13 +566,13 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
     JOIN metro_stops mt ON mt.stop_id=mb.stop_id
     JOIN stops bs ON ABS(bs.latitude-mt.latitude)<=0.0045 AND ABS(bs.longitude-mt.longitude)<=0.005
     JOIN route_stops a ON a.stop_id=bs.stop_id
-    JOIN route_stops b ON b.route_id=a.route_id AND b.stop_sequence>a.stop_sequence AND b.stop_id=$2
+    JOIN route_stops b ON b.route_id=a.route_id AND b.stop_sequence>a.stop_sequence AND b.stop_id=ANY($2::text[])
     JOIN routes br ON br.route_id=a.route_id
     JOIN stops dest ON dest.stop_id=b.stop_id
-    WHERE ma.stop_id=$1 AND bs.latitude IS NOT NULL AND mt.latitude IS NOT NULL
+    WHERE ma.stop_id=ANY($1::text[]) AND bs.latitude IS NOT NULL AND mt.latitude IS NOT NULL
       AND SQRT(POWER((bs.latitude-mt.latitude)*111.0,2)+POWER((bs.longitude-mt.longitude)*111.0*COS(RADIANS(mt.latitude)),2))<=0.35
     ORDER BY (mb.stop_sequence-ma.stop_sequence)*2.2+(b.stop_sequence-a.stop_sequence)*2.3 LIMIT 10
-   `,[fromId,toId])).rows;
+   `,[fromIds,toIds])).rows;
    for(const x of rows){
     const walk=Math.max(1,Math.ceil(Number(x.walk_meters||100)/80));
     options.push({
@@ -559,8 +585,20 @@ app.get('/api/search',async(req,res)=>{if(!pool)return res.status(503).json({sta
     });
    }
   }
-  options.sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
-  return r.json({status:'OK',origin:{type:fromType,id:fromId},destination:{type:toType,id:toId},options:decoratePlannerOptions(options.slice(0,8)),reason:options.length?null:'No mixed or metro journey could be matched in the current static network data.'});
+  const directionMatches=option=>{
+   const legs=(Array.isArray(option?.legs)?option.legs:[]).filter(leg=>leg&&leg.mode!=='walk');
+   if(!legs.length)return false;
+   return fromIds.includes(String(legs[0].fromStopId||''))&&toIds.includes(String(legs[legs.length-1].toStopId||''));
+  };
+  const uniqueOptions=new Map();
+  for(const option of options.filter(directionMatches)){
+   const legs=Array.isArray(option.legs)?option.legs:[];
+   const key=legs.map(leg=>[String(leg.mode||'bus'),String(leg.routeId||'walk'),String(leg.fromStopId||leg.fromStop||''),String(leg.toStopId||leg.toStop||'')].join(':')).join('|');
+   const previous=uniqueOptions.get(key);
+   if(!previous||(Number(option.durationMinutes)||999)<(Number(previous.durationMinutes)||999))uniqueOptions.set(key,option);
+  }
+  const ranked=[...uniqueOptions.values()].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
+  return r.json({status:'OK',origin:{type:fromType,id:fromId},destination:{type:toType,id:toId},originStopIds:fromIds,destinationStopIds:toIds,options:decoratePlannerOptions(ranked.slice(0,8)),reason:ranked.length?null:'No journey could be found in the correct direction in the current static network data.'});
  }catch(error){
   console.error('Multimodal planner failed:',error?.message||error);
   return r.status(500).json({status:'ERROR',options:[],reason:'Trip planning is temporarily unavailable. Please try again.'});
@@ -573,18 +611,20 @@ app.get('/api/plan',async(q,r)=>{
   if(!fromId){const name=str(q.query.from);if(name)fromId=(await pool.query('SELECT stop_id FROM stops WHERE name=$1 ORDER BY stop_id LIMIT 1',[name])).rows[0]?.stop_id||null}
   if(!toId){const name=str(q.query.to);if(name)toId=(await pool.query('SELECT stop_id FROM stops WHERE name=$1 ORDER BY stop_id LIMIT 1',[name])).rows[0]?.stop_id||null}
   if(!fromId||!toId||fromId===toId)return r.status(400).json({status:'ERROR',options:[],reason:'Please select two different bus stops from the suggestions.'});
-  const directRows=(await pool.query("SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,a.stop_id from_stop_id,fs.name from_stop,b.stop_id to_stop_id,ts.name to_stop,a.stop_sequence from_sequence,b.stop_sequence to_sequence FROM route_stops a JOIN route_stops b ON b.route_id=a.route_id AND b.stop_sequence>a.stop_sequence JOIN routes r ON r.route_id=a.route_id JOIN stops fs ON fs.stop_id=a.stop_id JOIN stops ts ON ts.stop_id=b.stop_id WHERE a.stop_id=$1 AND b.stop_id=$2 ORDER BY (b.stop_sequence-a.stop_sequence),r.route_id LIMIT 12",[fromId,toId])).rows;
+  const [fromIds,toIds]=await Promise.all([plannerStopFamilyIds('bus',fromId),plannerStopFamilyIds('bus',toId)]);
+  if(fromIds.some(id=>toIds.includes(id)))return r.status(400).json({status:'ERROR',options:[],reason:'Choose two different physical bus stops.'});
+  const directRows=(await pool.query("SELECT r.route_id,r.short_name,r.long_name,r.route_color,r.route_text_color,a.stop_id from_stop_id,fs.name from_stop,b.stop_id to_stop_id,ts.name to_stop,a.stop_sequence from_sequence,b.stop_sequence to_sequence FROM route_stops a JOIN route_stops b ON b.route_id=a.route_id AND b.stop_sequence>a.stop_sequence JOIN routes r ON r.route_id=a.route_id JOIN stops fs ON fs.stop_id=a.stop_id JOIN stops ts ON ts.stop_id=b.stop_id WHERE a.stop_id=ANY($1::text[]) AND b.stop_id=ANY($2::text[]) ORDER BY (b.stop_sequence-a.stop_sequence),r.route_id LIMIT 30",[fromIds,toIds])).rows;
   const direct=directRows.map(x=>({type:'direct',durationMinutes:Math.max(3,Math.ceil((Number(x.to_sequence)-Number(x.from_sequence))*2.5)),durationIsEstimate:true,walkingMinutes:null,legs:[{routeId:String(x.route_id),routeName:x.short_name||x.long_name||'Bus',routeColor:x.route_color,routeTextColor:x.route_text_color,fromStop:x.from_stop,toStop:x.to_stop,fromStopId:x.from_stop_id,toStopId:x.to_stop_id}]}));
   let transfers=[];
   if(direct.length<5){
-   const rows=(await pool.query("WITH from_routes AS (SELECT route_id,stop_sequence AS from_seq FROM route_stops WHERE stop_id=$1), to_routes AS (SELECT route_id,stop_sequence AS to_seq FROM route_stops WHERE stop_id=$2), transfer_points AS (SELECT fr.route_id AS r1,fr.from_seq,x.stop_id AS transfer_stop_id,x.stop_sequence AS transfer_seq FROM from_routes fr JOIN route_stops x ON x.route_id=fr.route_id AND x.stop_sequence>fr.from_seq AND x.stop_sequence<=fr.from_seq+40), candidates AS (SELECT tp.r1,tp.from_seq,tp.transfer_stop_id,tp.transfer_seq,tr.route_id AS r2,tr.stop_sequence AS to_seq FROM transfer_points tp JOIN route_stops tr ON tr.stop_id=tp.transfer_stop_id JOIN to_routes tr2 ON tr2.route_id=tr.route_id AND tr2.to_seq>tr.stop_sequence WHERE tr.route_id<>tp.r1 AND tr.stop_sequence>tp.transfer_seq AND (tr2.to_seq-tr.stop_sequence)<=40) SELECT c.*,r1.short_name AS r1_name,r1.long_name AS r1_long,r1.route_color AS r1_color,r1.route_text_color AS r1_text,r2.short_name AS r2_name,r2.long_name AS r2_long,r2.route_color AS r2_color,r2.route_text_color AS r2_text,fs.name AS from_name,ts.name AS transfer_name,es.name AS to_name FROM candidates c JOIN routes r1 ON r1.route_id=c.r1 JOIN routes r2 ON r2.route_id=c.r2 JOIN stops fs ON fs.stop_id=$1 JOIN stops ts ON ts.stop_id=c.transfer_stop_id JOIN stops es ON es.stop_id=$2 ORDER BY (c.transfer_seq-c.from_seq)+(c.to_seq-c.transfer_seq),c.r1,c.r2 LIMIT 20",[fromId,toId])).rows;
+   const rows=(await pool.query("WITH from_routes AS (SELECT route_id,stop_id AS from_stop_id,stop_sequence AS from_seq FROM route_stops WHERE stop_id=ANY($1::text[])), to_routes AS (SELECT route_id,stop_id AS to_stop_id,stop_sequence AS to_seq FROM route_stops WHERE stop_id=ANY($2::text[])), transfer_points AS (SELECT fr.route_id AS r1,fr.from_stop_id,fr.from_seq,x.stop_id AS transfer_stop_id,x.stop_sequence AS transfer_seq FROM from_routes fr JOIN route_stops x ON x.route_id=fr.route_id AND x.stop_sequence>fr.from_seq AND x.stop_sequence<=fr.from_seq+40), candidates AS (SELECT tp.r1,tp.from_stop_id,tp.from_seq,tp.transfer_stop_id,tp.transfer_seq,tr.route_id AS r2,tr2.to_stop_id,tr2.to_seq FROM transfer_points tp JOIN route_stops tr ON tr.stop_id=tp.transfer_stop_id JOIN to_routes tr2 ON tr2.route_id=tr.route_id AND tr2.to_seq>tr.stop_sequence WHERE tr.route_id<>tp.r1 AND tr.stop_sequence>tp.transfer_seq AND (tr2.to_seq-tr.stop_sequence)<=40) SELECT c.*,r1.short_name AS r1_name,r1.long_name AS r1_long,r1.route_color AS r1_color,r1.route_text_color AS r1_text,r2.short_name AS r2_name,r2.long_name AS r2_long,r2.route_color AS r2_color,r2.route_text_color AS r2_text,fs.name AS from_name,ts.name AS transfer_name,es.name AS to_name FROM candidates c JOIN routes r1 ON r1.route_id=c.r1 JOIN routes r2 ON r2.route_id=c.r2 JOIN stops fs ON fs.stop_id=c.from_stop_id JOIN stops ts ON ts.stop_id=c.transfer_stop_id JOIN stops es ON es.stop_id=c.to_stop_id ORDER BY (c.transfer_seq-c.from_seq)+(c.to_seq-c.transfer_seq),c.r1,c.r2 LIMIT 30",[fromIds,toIds])).rows;
    const seen=new Set();
    for(const x of rows){
     const key=String(x.r1)+'>'+String(x.r2)+'@'+String(x.transfer_stop_id);
     if(seen.has(key))continue;seen.add(key);
     transfers.push({type:'transfer',durationMinutes:Math.max(8,Math.ceil(((Number(x.transfer_seq)-Number(x.from_seq))+(Number(x.to_seq)-Number(x.transfer_seq)))*2.5)+5),durationIsEstimate:true,walkingMinutes:5,legs:[
-      {routeId:String(x.r1),routeName:x.r1_name||x.r1_long||'Bus',routeColor:x.r1_color,routeTextColor:x.r1_text,fromStop:x.from_name,toStop:x.transfer_name,fromStopId:fromId,toStopId:x.transfer_stop_id},
-      {routeId:String(x.r2),routeName:x.r2_name||x.r2_long||'Bus',routeColor:x.r2_color,routeTextColor:x.r2_text,fromStop:x.transfer_name,toStop:x.to_name,fromStopId:x.transfer_stop_id,toStopId:toId}
+      {routeId:String(x.r1),routeName:x.r1_name||x.r1_long||'Bus',routeColor:x.r1_color,routeTextColor:x.r1_text,fromStop:x.from_name,toStop:x.transfer_name,fromStopId:String(x.from_stop_id),toStopId:x.transfer_stop_id},
+      {routeId:String(x.r2),routeName:x.r2_name||x.r2_long||'Bus',routeColor:x.r2_color,routeTextColor:x.r2_text,fromStop:x.transfer_name,toStop:x.to_name,fromStopId:x.transfer_stop_id,toStopId:String(x.to_stop_id)}
     ],transferStop:x.transfer_name});
     if(transfers.length>=6)break;
    }
@@ -592,7 +632,15 @@ app.get('/api/plan',async(q,r)=>{
   const options=[...direct,...transfers].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999)).slice(0,5);
   const origin=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[fromId])).rows[0]||null;
   const destination=(await pool.query('SELECT stop_id,name,latitude,longitude FROM stops WHERE stop_id=$1',[toId])).rows[0]||null;
-  return r.json({status:'OK',origin,destination,options:decoratePlannerOptions(options),reason:options.length?null:'No bus journey was found between the selected stops.'});
+  const uniqueOptions=new Map();
+  for(const option of options){
+   const legs=Array.isArray(option.legs)?option.legs:[];
+   const key=legs.map(leg=>[String(leg.routeId||''),String(leg.fromStopId||''),String(leg.toStopId||'')].join(':')).join('|');
+   const previous=uniqueOptions.get(key);
+   if(!previous||(Number(option.durationMinutes)||999)<(Number(previous.durationMinutes)||999))uniqueOptions.set(key,option);
+  }
+  const ranked=[...uniqueOptions.values()].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
+  return r.json({status:'OK',origin,destination,originStopIds:fromIds,destinationStopIds:toIds,options:decoratePlannerOptions(ranked.slice(0,10)),reason:ranked.length?null:'No bus journey was found between the selected stops.'});
  }catch(e){console.error('Journey planner failed:',e?.message||e);return r.status(500).json({status:'ERROR',options:[],reason:'Journey planner is temporarily unavailable. Please try again.'})}
 });
 function scheduleMetroStaticRetry(){
