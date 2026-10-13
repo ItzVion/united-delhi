@@ -304,3 +304,11 @@ body,#root{background:var(--bg)}
  .planner-page .suggest{animation:none!important}
  .planner-page .trip{transition:none!important}
 }
+
+
+/* Planner autocomplete must stack above the submit button while a field is active. */
+/* The suggestion list intentionally overlays the submit button. Elevate its card
+   while open so the later sibling button cannot cover the lower part of the list. */
+.planner-page .planner:has(.field-active){position:relative;z-index:100}
+.planner-page .planner:has(.field-active) .suggest{z-index:101;max-height:min(260px,40vh)}
+.planner-page .planner-find{position:relative;z-index:0}
