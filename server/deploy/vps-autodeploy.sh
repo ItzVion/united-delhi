@@ -143,6 +143,16 @@ web_build_deploy() {
     fail "Refusing to build production web output with a non-HTTPS API origin: $API_BASE"
     return 1
   fi
+  if ! curl -fsS --max-time 12 "$API_BASE/health" >/dev/null 2>&1; then
+    fail "Public API $API_BASE/health is not healthy; postponing the Vercel cutover."
+    return 1
+  fi
+  local status_body
+  status_body="$(curl -fsS --max-time 12 "$API_BASE/api/status" 2>/dev/null || true)"
+  if ! printf '%s' "$status_body" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("database")=="OK" else 1)' 2>/dev/null; then
+    fail "Public API database status is not OK; refusing to publish the frontend against an unhealthy backend."
+    return 1
+  fi
   log 'Building the Vercel frontend on this VPS and uploading the prebuilt output (no GitHub Actions).'
   # Patch the build checkout's Vercel rewrite targets and CSP to the VPS API.
   # The next fetch/checkout restores tracked files; this is a build-time transform only.
