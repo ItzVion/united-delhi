@@ -38,13 +38,13 @@ RUN ONE BUILD CYCLE
 After the read-only repo key and local env files are configured, set AUTODEPLOY_ENABLED=1 in deploy.env, then run:
   systemctl start united-delhi-autodeploy.service
   journalctl -u united-delhi-autodeploy.service -n 200 --no-pager
-The first pass fetches main, runs backend checks/tests, activates the backend only if its local /health and /api/status database checks pass, runs a Vercel CLI prebuilt deploy if WEB_DEPLOY_ENABLED=1 and Vercel settings are present, and builds an Android APK if the public API URL is healthy. APKs are saved under /opt/united-delhi/artifacts/united-delhi-<commit-prefix>.apk.
+The first pass fetches main, runs backend checks/tests, activates the backend only if its local /health and /api/status database checks pass, and runs a Vercel CLI prebuilt deploy only if WEB_DEPLOY_ENABLED=1 and Vercel settings are present. Android builds are opt-in and require ANDROID_BUILD_ENABLED=1 explicitly; they can exhaust RAM on a small VPS. Vercel native Git integration remains independent and is not disabled by this script. APKs are saved under /opt/united-delhi/artifacts/united-delhi-<commit-prefix>.apk.
 
 ENABLE AUTOMATIC FETCH
 After the first manual pass is good, run:
   systemctl enable --now united-delhi-autodeploy.timer
   systemctl list-timers united-delhi-autodeploy.timer
-It polls main roughly every two minutes. A changed server/ directory triggers a tested/rollback-safe backend deploy; changed web/ triggers a Vercel prebuilt build/deploy from the VPS; changed app/ triggers a local Android testing-APK build. Failed component phases remain unmarked and retry on later timer runs.
+It polls main roughly every two minutes. A changed server/ directory triggers a tested/rollback-safe backend deploy; changed web/ triggers a Vercel prebuilt build/deploy from the VPS; changed app/ triggers an APK build only when ANDROID_BUILD_ENABLED=1 is explicitly set. On this 3 GB RAM VPS, keep Android builds disabled until capacity and swap behaviour have been checked. Failed component phases remain unmarked and retry on later timer runs.
 
 VERCEL GIT INTEGRATION NOTE
 After the first successful VPS prebuilt deployment, you may configure Vercel Project Settings -> Git -> Ignored Build Step to skip source builds for main:
