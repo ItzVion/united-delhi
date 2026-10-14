@@ -233,7 +233,7 @@ if [[ "${WEB_DEPLOY_ENABLED:-0}" == 1 ]]; then
   else mark_done web; fi
 else log 'Vercel build/deploy is disabled until Vercel token and project IDs are configured.'; fi
 
-if [[ "${ANDROID_BUILD_ENABLED:-1}" == 1 ]]; then
+if [[ "${ANDROID_BUILD_ENABLED:-0}" == 1 ]]; then
   if component_due app app; then
     if android_build; then mark_done app; else log 'Android APK phase failed; it will retry on a later timer run.'; failed=1; fi
   else mark_done app; fi
