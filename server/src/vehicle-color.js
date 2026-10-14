@@ -80,7 +80,7 @@ export function estimateFleetLiveryColor({ busType, serviceType, routeAgency, op
   const dotRoute = agency === 'DOT' || /DIMTS|CLUSTER/.test(agency);
   const nonAc = /non\s*ac|non\s*air\s*conditioned/.test(type);
   const ac = !nonAc && (/\bac\b|air\s*conditioned/.test(type));
-  const cluster = /dimts|cluster/.test(agency);
+  const cluster = /DIMTS|CLUSTER/.test(agency);
   const mohalla = /mohalla/.test(type + ' ' + agency);
   const devi = /\bdevi\b/.test(type);
   const cng = /cng/.test(type);
