@@ -13,11 +13,12 @@ There are no GitHub Actions workflows in this repository. The VPS itself fetches
 Vercel's Git integration can independently build source on main unless its Ignored Build Step is configured after a successful VPS prebuilt deployment. See the supplied AutoBuild Kit instructions.
 
 ONE-TIME VPS KIT
-Use the separately provided United-Delhi-VPS-AutoBuild-Kit.zip with WinSCP. Upload it to /root/united-delhi-vps-kit.zip, then on the VPS run:
-  mkdir -p /root/ud-vps-kit
-  unzip -oq /root/united-delhi-vps-kit.zip -d /root/ud-vps-kit
-  bash /root/ud-vps-kit/install-vps-automation.sh
-The installer installs the Android SDK, copies the supplied GTFS ZIPs if the destination files do not already exist, writes service/timer configuration, and creates a GitHub read-only deploy key. It does not restore or reset PostgreSQL.
+Use the separately provided United-Delhi-VPS-Rebuild-Kit.zip. Upload it to /root/United-Delhi-VPS-Rebuild-Kit.zip with Termius SFTP, then run:
+  sudo -i
+  mkdir -p /root/ud-rebuild-kit
+  unzip -oq /root/United-Delhi-VPS-Rebuild-Kit.zip -d /root/ud-rebuild-kit
+  bash /root/ud-rebuild-kit/United-Delhi-VPS-Rebuild-Kit/install.sh
+The installer removes only United Delhi deployment code/service artifacts, preserves PostgreSQL, /etc/united-delhi, /opt/united-delhi/data, backups and Cloudflare Tunnel configuration, installs base packages and Node.js 22, and creates a read-only GitHub deploy key. It does not restore/reset/migrate PostgreSQL, uninstall packages, change firewall rules, or alter cloudflared. After adding the printed key to GitHub with write access OFF, follow README-FIRST.txt for cloning and first backend verification. Android SDK/builds are intentionally not installed or enabled by default on the 3 GB RAM VPS.
 
 GITHUB READ-ONLY ACCESS
 Add the printed public key to https://github.com/ItzVion/united-delhi/settings/keys as a deploy key with write access unchecked. Then clone main:
@@ -57,3 +58,9 @@ Do not switch app/web URLs away from Render until:
 - The public realtime endpoint behaves as expected (may be unavailable if the Transport Stack key is not configured).
 Only then update web/vercel.json and app build settings for the new public API URL. Keep Render/Neon available as fallbacks until website and Android tests pass.
 Keep PostgreSQL port 5432 private; never expose it publicly. Do not enable UFW without confirming SSH rules. Do not expose Adminer without Cloudflare Access. A local APK is a testing artifact unless a production upload keystore is securely configured.
+
+
+RECOVERY SAFETY NOTE
+- The legacy server/sql/001_reset_and_schema.sql has been neutralized; it now raises an exception instead of deleting tables.
+- Read server/deploy/DATABASE-RECOVERY.md and server/deploy/VPS-REBUILD.md before database recovery or VPS rebuild.
+- The bootstrap keeps AUTODEPLOY_ENABLED=0, WEB_DEPLOY_ENABLED=0 and ANDROID_BUILD_ENABLED=0 by default. Enable each only after manual verification.
