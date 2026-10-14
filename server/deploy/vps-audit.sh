@@ -12,7 +12,7 @@ node --version 2>&1 || true
 npm --version 2>&1 || true
 df -h /
 free -h
-git -C "$REPO" fetch origin main 2>&1 || true
+runuser -u uddeploy -- env HOME=/home/uddeploy git -C "$REPO" fetch origin main 2>&1 || true
 printf 'HEAD='; git -C "$REPO" rev-parse HEAD 2>/dev/null || true
 printf 'ORIGIN_MAIN='; git -C "$REPO" rev-parse origin/main 2>/dev/null || true
 git -C "$REPO" status --short --branch 2>&1 || true
