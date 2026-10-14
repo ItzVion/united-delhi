@@ -40,7 +40,13 @@ git -C "$REPO" fetch --prune origin main
 target="$(git -C "$REPO" rev-parse "$MAIN_REF")"
 log "Latest main commit: $target"
 
-git -C "$REPO" checkout --detach --force "$target" >/dev/null
+# Refuse to silently discard local source changes. Hotfixes must be committed to main
+# and fetched through the read-only deploy key.
+if [[ -n "$(git -C "$REPO" status --porcelain --untracked-files=all)" ]]; then
+  fail "Working tree contains local modifications or untracked files. Review with git status; updater will not erase them."
+  exit 1
+fi
+git -C "$REPO" checkout --detach "$target" >/dev/null
 mkdir -p "$REPO/web/.vercel"
 if ! grep -Fxq '/web/.vercel/' "$REPO/.git/info/exclude" 2>/dev/null; then
   printf '\n/web/.vercel/\n' >> "$REPO/.git/info/exclude"
