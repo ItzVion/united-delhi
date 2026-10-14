@@ -50,3 +50,11 @@ runuser -u uddeploy -- env HOME=/home/uddeploy USER=uddeploy LOGNAME=uddeploy gi
 - Never run the disabled `server/sql/001_reset_and_schema.sql`.
 - The VPS has limited RAM. Android builds can exhaust memory; enable them only after API stability, with a single Gradle worker and a memory limit. Vercel prebuilt deployment remains off unless deliberately configured.
 - No GitHub Actions runner is needed for this flow. The VPS fetches read-only source; it never pushes commits.
+
+## Post-migration drift checks
+
+The default frontend/API targets must be kept in sync with the verified public VPS hostname, `https://ud-api.mangotyping.fun`. Check `web/vercel.json`, `app/eas.json`, and `app/src/config.ts` when rebuilding; do not silently fall back to Render in a fresh production build.
+
+The read-only Git deploy key means the VPS can fetch but cannot push hotfixes. Any runtime source fix must be committed through an authorized developer workflow; keep the live deployment healthy until the fixed commit is fetched and tested.
+
+Run `npm audit --omit=dev` in `server`, and `npm audit` in `web` and `app`. The web package currently has no lockfile in GitHub, so create and review a lockfile before treating web dependency installation as reproducible or audit results as lockfile-based. Do not use `npm audit fix --force` blindly.
