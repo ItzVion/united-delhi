@@ -8,7 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://united-delhi-api.onrender.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://ud-api.mangotyping.fun"
       }
     },
     "preview": {
@@ -17,13 +17,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://united-delhi-api.onrender.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://ud-api.mangotyping.fun"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://united-delhi-api.onrender.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://ud-api.mangotyping.fun"
       }
     }
   },
