@@ -22,7 +22,7 @@ test('embedded escapeHtml function has valid JavaScript syntax and escapes HTML'
   const tempFile = join(tmpdir(), `escapeHtml-test-${process.pid}-${Date.now()}.js`);
   const testCode = [
     escapeHtmlLine,
-    'const input = String.fromCharCode(60) + "script" + String.fromCharCode(62) + "&\\"\'" + String.fromCharCode(60) + "/script" + String.fromCharCode(62);',
+    'const input = ["<script>", "&", String.fromCharCode(34), String.fromCharCode(39), "</script>"].join("");',
     'const expected = "&lt;script&gt;&amp;&quot;&#39;&lt;/script&gt;";',
     'if (escapeHtml(input) !== expected) { throw new Error("escapeHtml output mismatch: " + escapeHtml(input)); }',
   ].join('\n') + '\n';
