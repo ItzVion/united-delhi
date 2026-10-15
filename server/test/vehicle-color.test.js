@@ -80,16 +80,11 @@ test('VehiclePosition.position field 2 is never mistaken for VehicleDescriptor',
   assert.equal(entity.vehicleId, 'DL1PD4669');
 });
 
-test('auto-detects exact colour in VehicleDescriptor extensions', () => {
-  assert.equal(extractColorsByVehicle(feed()).get('DL1PD4669'), '#F97316');
-});
-
-test('auto-detects exact colour in VehiclePosition extensions', () => {
-  assert.equal(extractColorsByVehicle(feed({ where: 'position' })).get('DL1PD4669'), '#F97316');
-});
-
-test('auto-detects exact colour in FeedEntity extensions', () => {
-  assert.equal(extractColorsByVehicle(feed({ where: 'entity' })).get('DL1PD4669'), '#F97316');
+test('unconfigured hex-looking GTFS-Realtime extensions are never treated as physical colours', () => {
+  assert.equal(extractColorsByVehicle(feed()).size, 0);
+  assert.equal(extractColorsByVehicle(feed({ where: 'position' })).size, 0);
+  assert.equal(extractColorsByVehicle(feed({ where: 'entity' })).size, 0);
+  assert.equal(extractColorsByVehicle(feed(), null).size, 0);
 });
 
 test('explicit extension configuration is respected exactly', () => {
@@ -103,8 +98,9 @@ test('explicit extension configuration is respected exactly', () => {
   assert.equal(parseColorFieldSpec('invalid:1001'), null);
 });
 
-test('auto-detection ignores field numbers outside GTFS extension ranges', () => {
+test('unconfigured fields are ignored regardless of whether their number looks like an extension', () => {
   assert.equal(extractColorsByVehicle(feed({ extNum: 99 })).size, 0);
+  assert.equal(extractColorsByVehicle(feed({ extNum: 1001 })).size, 0);
 });
 
 test('invalid API colour values are ignored by the raw feed decoder', () => {
