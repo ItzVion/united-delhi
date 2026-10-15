@@ -6,9 +6,14 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://united-delhi-api.onrender.com',
+        target: 'https://ud-api.mangotyping.fun',
         changeOrigin: true,
-        secure: true
+        secure: true,
+        configure: proxy => {
+          // Vite proxies same-origin local requests; let the API's CORS middleware
+          // treat this server-to-server development request as a non-browser call.
+          proxy.on('proxyReq', proxyReq => proxyReq.removeHeader('origin'));
+        }
       }
     }
   },

@@ -5,6 +5,10 @@ export type Page={kind:'home'|'plan'|'metro'|'settings'|'hub'|'help'|'legal'|'pr
 
 export const CENTER:[number,number]=[28.6139,77.209];
 export const BOUNDS:[[number,number],[number,number]]=[[28.40,76.84],[28.88,77.35]];
+export const roundCoordinate=(value:number,decimalPlaces:number)=>{
+  const scale=10**decimalPlaces;
+  return Math.round(value*scale)/scale;
+};
 
 export const storageGet=(k:string)=>{try{return window.localStorage.getItem(k)}catch{return null}};
 export const storageSet=(k:string,v:string)=>{try{window.localStorage.setItem(k,v);return true}catch{return false}};

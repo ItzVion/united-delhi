@@ -1,3 +1,5 @@
+import {roundCoordinate} from './lib';
+
 export const API=String(import.meta.env.VITE_API_BASE_URL || '/api').trim().replace(/\/+$/,'');
 const LIVE_CACHE_KEY='ud-live-vehicles-v9';
 export const SERVICE_WAKING_MESSAGE='The live service is waking up or reconnecting. It can take up to a minute after inactivity; we will retry automatically.';
@@ -70,7 +72,7 @@ export const api={
   stop:async(id:string)=>{const stopResult=await request<any>(`/stops/${encodeURIComponent(id)}`);let arrivals:any={status:'UNAVAILABLE',arrivals:[],reason:'Live arrival data is unavailable.'};try{arrivals=await request<any>(`/stops/${encodeURIComponent(id)}/arrivals`,{},8000,1)}catch{}return [stopResult,arrivals] as const},
   metro:()=>request<any>('/metro',{},12000,1),
   metroRoute:(id:string)=>request<any>('/metro/routes/'+encodeURIComponent(id),{},10000,1),
-  nearby:(lat:number,lon:number)=>request<any>('/stops/nearby',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat,lon,limit:30})},8000,1),
+  nearby:(lat:number,lon:number)=>request<any>('/stops/nearby',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:roundCoordinate(lat,4),lon:roundCoordinate(lon,4),limit:30})},8000,1),
   plan:(from:string,to:string,fromStopId?:string,toStopId?:string)=>{const params=new URLSearchParams({from,to});if(fromStopId)params.set('fromStopId',fromStopId);if(toStopId)params.set('toStopId',toStopId);return request<any>('/plan?'+params.toString(),{},15000,1)},
   planMultimodal:(fromType:'bus'|'metro',toType:'bus'|'metro',fromStopId:string,toStopId:string)=>{const params=new URLSearchParams({fromType,toType,fromStopId,toStopId});return request<any>('/plan/multimodal?'+params.toString(),{},20000,0)}
 };

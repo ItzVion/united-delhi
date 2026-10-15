@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
 import { useNavigation } from '@react-navigation/native';
 
-const EFFECTIVE_DATE='4 October 2026';
+const EFFECTIVE_DATE='16 October 2026';
 
 export default function LegalScreen() {
   const navigation=useNavigation();
@@ -20,13 +20,13 @@ export default function LegalScreen() {
         <Text style={styles.heading}>Information we collect</Text>
         <Text style={styles.body}>United Delhi is designed to work without an account. We do not intentionally request a name, phone number, email address, contacts, photos, microphone, camera, advertising identifier, or payment information.</Text>
         <Text style={styles.heading}>Location</Text>
-        <Text style={styles.body}>Location is optional. When you grant permission, foreground device location may be used to find nearby DTC stops and centre the map. The app does not intentionally upload a personal location history to the transit database. Location is processed only as needed for the feature you requested.</Text>
+        <Text style={styles.body}>Location is optional. When you enable it, foreground device location may be used to find nearby DTC stops and centre the map. Nearby-stop requests send coordinates rounded to four decimal places. The app keeps device location in memory while needed for these features and does not save a personal location history.</Text>
         <Text style={styles.heading}>Search and journey planning</Text>
         <Text style={styles.body}>Search terms and journey-planning inputs are sent to the United Delhi API so it can return transit information. They are not intentionally used to create a user profile.</Text>
         <Text style={styles.heading}>Technical information</Text>
         <Text style={styles.body}>Hosting, network, security and error-handling infrastructure may process ordinary technical information such as IP addresses, timestamps, request metadata and diagnostic information. Realtime vehicle data is transit data, not a record of a user's personal location.</Text>
         <Text style={styles.heading}>Third-party services</Text>
-        <Text style={styles.body}>The service uses Delhi Open Transit Data, OpenStreetMap/Leaflet, Render, Vercel and Neon. Those services may process information under their own terms and privacy policies. United Delhi does not control third-party services.</Text>
+        <Text style={styles.body}>United Delhi uses Delhi Open Transit Data and Transport Stack for transit data, OpenStreetMap/Leaflet for maps, a VPS for the API and PostgreSQL, and Vercel for the website. These services may process information under their own terms and privacy policies.</Text>
         <Text style={styles.heading}>Design and feature inspiration</Text>
         <Text style={styles.body}>United Delhi uses familiar transit interaction patterns and functions also found in apps such as Chartr and One Delhi, including live bus maps, route and stop information, route visualisation and journey planning. These are inspirations rather than a claim of identical design, code, or assets. United Delhi is an independent project and is not affiliated with, endorsed by, or operated by Chartr or One Delhi. Its branding, implementation and backend are independently maintained.</Text>
         <Text style={styles.heading}>Retention and deletion</Text>

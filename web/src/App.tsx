@@ -16,6 +16,7 @@ const LEGACY_CACHE_KEYS=['ud-live-vehicles-v8','ud-live-vehicles-v4'];
 const readCache=():Vehicle[]=>{for(const key of LEGACY_CACHE_KEYS){try{window.localStorage.removeItem(key)}catch{}}try{const d=JSON.parse(storageGet(CACHE_KEY)||'null');return Array.isArray(d?.vehicles)?d.vehicles:[]}catch{return[]}};
 
 export default function App(){
+  useEffect(()=>{try{window.localStorage.removeItem('ud-last-location')}catch{}},[]);
   const[page,setPage]=useState<Page>(()=>parsePath());
   const[accepted,setAccepted]=useState(()=>storageGet('ud-consent-v1')==='1');
   const[vehicles,setVehicles]=useState<Vehicle[]>([]);
@@ -47,7 +48,7 @@ export default function App(){
     setLocState('asking');
     navigator.geolocation.getCurrentPosition(p=>{
       const next={lat:p.coords.latitude,lon:p.coords.longitude};
-      setLocation(next);setLocState('idle');storageSet('ud-last-location',JSON.stringify(next));
+      setLocation(next);setLocState('idle');
     },err=>{setLocState(err?.code===1?'denied':'unavailable');},{enableHighAccuracy:true,maximumAge:10000,timeout:15000});
   },[]);
   useEffect(()=>{
@@ -60,7 +61,7 @@ export default function App(){
         const next={lat:p.coords.latitude,lon:p.coords.longitude};
         setLocation(next);
         setLocState('idle');
-        storageSet('ud-last-location',JSON.stringify(next));
+
       },err=>{
         if(err?.code===1)setLocState('denied');
         else if(!location)setLocState('unavailable');

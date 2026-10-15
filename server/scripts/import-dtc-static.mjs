@@ -2,11 +2,12 @@ import 'dotenv/config';
 import { createInflateRaw } from 'node:zlib';
 import { Readable } from 'node:stream';
 import fs from 'node:fs/promises';
-import path from 'node:path';
+import { resolveServerPath } from '../src/runtime-paths.js';
 
 const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
 const STATIC_URL_OVERRIDE = String(process.env.DTC_STATIC_URL || '').trim();
 const STATIC_FILE_OVERRIDE = String(process.env.DTC_STATIC_FILE || '').trim();
+const STATIC_FILE_PATH = STATIC_FILE_OVERRIDE ? resolveServerPath(STATIC_FILE_OVERRIDE) : '';
 const STATIC_URLS = STATIC_URL_OVERRIDE ? [STATIC_URL_OVERRIDE] : [];
 const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'uploaded-dtc-static-local-v1-20261013').trim();
 const MAX_COMPRESSED_BYTES = 100 * 1024 * 1024;
@@ -169,12 +170,12 @@ const batches = (items, size) => {
 };
 
 async function downloadZip() {
-  if (STATIC_FILE_OVERRIDE) {
+  if (STATIC_FILE_PATH) {
     try {
-      const stat = await fs.stat(STATIC_FILE_OVERRIDE);
+      const stat = await fs.stat(STATIC_FILE_PATH);
       if (!stat.isFile() || stat.size <= 0) throw new Error('Configured file is empty or is not a regular file');
       if (stat.size > MAX_COMPRESSED_BYTES) throw new Error('ZIP exceeds the compressed-size safety limit');
-      const data = await fs.readFile(STATIC_FILE_OVERRIDE);
+      const data = await fs.readFile(STATIC_FILE_PATH);
       if (data.length > MAX_COMPRESSED_BYTES) throw new Error('ZIP exceeds the compressed-size safety limit');
       const archive = new ZipArchive(data);
       const requiredFiles = ['routes.txt', 'stops.txt', 'trips.txt', 'stop_times.txt'];
@@ -182,9 +183,9 @@ async function downloadZip() {
       if (missing.length) throw new Error('ZIP is missing required GTFS files: ' + missing.join(', '));
       const requiredExpandedBytes = requiredFiles.reduce((sum, name) => sum + archive.find(name).uncompressedSize, 0);
       if (requiredExpandedBytes > MAX_UNCOMPRESSED_BYTES) throw new Error('Required GTFS files exceed the expanded-size safety limit');
-      console.log('Using local DTC static ZIP: ' + path.resolve(STATIC_FILE_OVERRIDE));
+      console.log('Using local DTC static ZIP: ' + STATIC_FILE_PATH);
       console.log('Local DTC static ZIP size: ' + Math.round(data.length / 1024 / 1024 * 100) / 100 + ' MB');
-      return { data, sourceUrl: 'local-file:' + path.resolve(STATIC_FILE_OVERRIDE) };
+      return { data, sourceUrl: 'local-file:' + STATIC_FILE_PATH };
     } catch (error) {
       throw new Error('Local DTC static ZIP failed: ' + (error?.message || error));
     }

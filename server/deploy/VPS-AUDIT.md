@@ -11,7 +11,7 @@ Use this checklist after a production change and before enabling the updater tim
 - Automatic deployment is separate from Vercel native Git integration. Keep the updater timer disabled until a manual run has been verified.
 - Android builds default off because the VPS is memory constrained.
 - Do not commit production environment files, API keys, backup dumps, deploy keys, or generated APKs.
-- The web workspace currently has no committed package-lock.json. Add/review one before claiming reproducible locked web dependencies.
+- The web workspace has a committed package-lock.json. Use `npm ci` to verify its reproducible dependency tree.
 
 ## Compare live code to GitHub main
 

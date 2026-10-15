@@ -51,12 +51,8 @@ After the first successful VPS prebuilt deployment, you may configure Vercel Pro
   if [ "$VERCEL_GIT_COMMIT_REF" = "main" ]; then exit 0; else exit 1; fi
 Vercel treats exit code 0 as skip. The VPS's Vercel CLI prebuilt deployment is independent of Git-triggered builds. Confirm in the Vercel UI before relying on it.
 
-CUTOVER CHECKS
-Do not switch app/web URLs away from Render until:
-- https://ud-api.mangotyping.fun/health returns status OK.
-- https://ud-api.mangotyping.fun/api/status reports database OK.
-- The public realtime endpoint behaves as expected (may be unavailable if the Transport Stack key is not configured).
-web/vercel.json, app/eas.json, and app/src/config.ts default to https://ud-api.mangotyping.fun; verify those targets in each production build and only keep overrides when intentionally testing another backend. Keep Render/Neon available as fallbacks until website and Android tests pass.
+CURRENT API TARGETS
+The current production API target is https://ud-api.mangotyping.fun. `web/vercel.json`, `app/eas.json`, `app/src/config.ts`, the local Android build script, and Vite's local proxy should stay aligned with it. Before changing this hostname or rebuilding production configuration, verify `/health`, `/api/status`, and the public realtime endpoint; realtime may be unavailable if the Transport Stack key is not configured. Retain any existing fallback resources until the VPS/data cutover has been independently verified.
 Keep PostgreSQL port 5432 private; never expose it publicly. Do not enable UFW without confirming SSH rules. Do not expose Adminer without Cloudflare Access. A local APK is a testing artifact unless a production upload keystore is securely configured.
 
 

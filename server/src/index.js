@@ -6,6 +6,7 @@ import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { rateLimit } from 'express-rate-limit';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
+import { SERVER_ROOT, STATIC_IMPORTER_PATH, resolveServerPath } from './runtime-paths.js';
 import {syncMetroStatic} from './metro-sync.js';
 import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,estimateFleetLiveryColor,classifyFleetTypeFromRegistration,getRouteLiveryProfile,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
 const COLOR_FIELD=parseColorFieldSpec(process.env.TRANSPORT_STACK_COLOR_FIELD);
@@ -112,7 +113,8 @@ const busLiveryForRoute=routeId=>{
 };
 const decoratePlannerOptions=options=>(Array.isArray(options)?options:[]).map(option=>({...option,legs:(Array.isArray(option.legs)?option.legs:[]).map(leg=>!leg.mode||leg.mode==='bus'?{...leg,...busLiveryForRoute(leg.routeId)}:leg)}));
 const DTC_STATIC_SOURCE_KEY=String(process.env.DTC_STATIC_SOURCE_KEY||'uploaded-dtc-static-local-v1-20261013').trim();
-const DTC_STATIC_FILE=String(process.env.DTC_STATIC_FILE||'').trim();
+const DTC_STATIC_FILE_INPUT=String(process.env.DTC_STATIC_FILE||'').trim();
+const DTC_STATIC_FILE=DTC_STATIC_FILE_INPUT?resolveServerPath(DTC_STATIC_FILE_INPUT):'';
 const DTC_STATIC_BUNDLE_URL=String(process.env.DTC_STATIC_URL||'').trim();
 function scheduleDtcStaticRetry(){
  const retry=setTimeout(autoImportDtcStaticIfEmpty,5*60*1000);
@@ -164,7 +166,7 @@ function autoImportDtcStaticIfEmpty(){
    }else{
     importEnv.DTC_STATIC_URL=DTC_STATIC_BUNDLE_URL;
    }
-   const child=spawn(process.execPath,['scripts/import-dtc-static.mjs'],{cwd:process.cwd(),env:importEnv,stdio:['ignore','pipe','pipe']});
+    const child=spawn(process.execPath,[STATIC_IMPORTER_PATH],{cwd:SERVER_ROOT,env:importEnv,stdio:['ignore','pipe','pipe']});
    child.stdout.on('data',chunk=>console.log('[DTC static importer] '+String(chunk).trimEnd()));
    child.stderr.on('data',chunk=>console.warn('[DTC static importer] '+String(chunk).trimEnd()));
    child.on('error',error=>{

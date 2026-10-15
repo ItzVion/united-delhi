@@ -1,7 +1,7 @@
 # United Delhi Privacy Policy
 
-**Effective date:** 4 October 2026  
-**Last updated:** 4 October 2026
+**Effective date:** 16 October 2026<br>
+**Last updated:** 16 October 2026
 
 United Delhi ("United Delhi", "we", "us", or "our") is a Delhi public-transit information application and website. This Privacy Policy explains what information the current implementation processes, why it is processed, and how you can make a privacy request.
 
@@ -15,7 +15,7 @@ United Delhi is designed to work without a user account. We do not currently ask
 
 Location is optional.
 
-After the Terms/Privacy consent screen, the client may request foreground location permission to support map centering and nearby DTC stop discovery. When location is allowed, the mobile client sends a reduced-precision latitude/longitude to the United Delhi API so the server can calculate nearby DTC stops. The web client may store the last successful map/location coordinates in your browser's local storage so it can restore the previous map area; this local browser storage is not the United Delhi database.
+After the Terms/Privacy consent screen, the client may request foreground location permission to support map centering and nearby DTC stop discovery. When location is allowed, mobile and web nearby-stop requests send coordinates rounded to four decimal places so the API can calculate nearby stops. The web client stores its map viewport rounded to three decimal places in browser local storage to restore the view; it does not save an exact device location. The app keeps device location in memory only while needed for the requested features.
 
 Core route and stop search does not require location permission.
 
@@ -32,11 +32,10 @@ United Delhi does not currently use advertising SDKs, analytics SDKs, crash-repo
 ## 2. Third-party services
 
 United Delhi currently uses or may rely on:
-- **Delhi Open Transit Data (OTD):** transit route, stop and realtime vehicle data.
+- **Delhi Open Transit Data (OTD) and Transport Stack:** transit route, stop and realtime vehicle data.
 - **OpenStreetMap:** map data and standard map tiles.
-- **Render:** hosting for the United Delhi API.
-- **Vercel:** hosting for the web client. The backend contacts Delhi OTD directly; there is no separate realtime relay.
-- **Neon:** PostgreSQL database hosting for transit data and realtime vehicle-position records.
+- **VPS hosting:** hosting for the United Delhi API and PostgreSQL database.
+- **Vercel:** hosting for the web client.
 - **GitHub:** source-code hosting and project infrastructure.
 
 Third-party services are governed by their own terms and privacy policies. United Delhi does not control their independent processing.

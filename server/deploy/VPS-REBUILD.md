@@ -40,7 +40,7 @@ runuser -u uddeploy -- env HOME=/home/uddeploy USER=uddeploy LOGNAME=uddeploy gi
 - Only start the backend service after confirming the current schema/data are compatible.
 - Verify `http://127.0.0.1:10000/health` and `http://127.0.0.1:10000/api/status`; the status must report database OK.
 - Verify the public API hostname through the existing Cloudflare Tunnel.
-- Do not switch the app/web API origin away from Render until these checks and user tests pass.
+- The current app/web API origin is `https://ud-api.mangotyping.fun`. After a rebuild, verify that this hostname and its health/database checks work before changing the production target.
 
 ## Security / resource limits
 
@@ -53,8 +53,8 @@ runuser -u uddeploy -- env HOME=/home/uddeploy USER=uddeploy LOGNAME=uddeploy gi
 
 ## Post-migration drift checks
 
-The default frontend/API targets must be kept in sync with the verified public VPS hostname, `https://ud-api.mangotyping.fun`. Check `web/vercel.json`, `app/eas.json`, and `app/src/config.ts` when rebuilding; do not silently fall back to Render in a fresh production build.
+The default frontend/API targets must stay in sync with the public VPS hostname, `https://ud-api.mangotyping.fun`. Check `web/vercel.json`, `app/eas.json`, `app/src/config.ts`, and the local Android build script when rebuilding; do not silently fall back to Render in a fresh production build.
 
 The read-only Git deploy key means the VPS can fetch but cannot push hotfixes. Any runtime source fix must be committed through an authorized developer workflow; keep the live deployment healthy until the fixed commit is fetched and tested.
 
-Run `npm audit --omit=dev` in `server`, and `npm audit` in `web` and `app`. The web package currently has no lockfile in GitHub, so create and review a lockfile before treating web dependency installation as reproducible or audit results as lockfile-based. Do not use `npm audit fix --force` blindly.
+Run `npm audit --omit=dev` in `server`, and `npm audit` in `web` and `app`. All three workspaces have committed lockfiles; use `npm ci` to verify the locked dependency trees. Do not use `npm audit fix --force` blindly.

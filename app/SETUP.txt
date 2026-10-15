@@ -20,8 +20,10 @@ Requirements: Node 22, JDK 17, Android SDK/platform-tools and PowerShell.
 
 Website
   cd web
-  npm install
+  npm ci
   npm run dev
+
+The current API base URL is https://ud-api.mangotyping.fun. Vite proxies local /api requests to this host; production uses the existing Vercel rewrites.
 
 Vercel settings:
 - Root Directory: web
@@ -39,20 +41,16 @@ Backend development
   npm test
   npm start
 
-Production architecture target
-- Website: Vercel
-- Database: Neon PostgreSQL
-- Backend: Ubuntu/Debian VPS running Node.js 22 with systemd
-- Automatic backend deployment: GitHub Actions, path-filtered to server/**, with a 20-second quiet-period debounce
-- Legacy Render service: remains running as a fallback while the VPS is provisioned; its repository blueprint now sets autoDeploy to false to avoid duplicate Render builds.
+Production architecture
+- Website: Vercel with its existing native Git integration.
+- API and PostgreSQL: Ubuntu/Debian VPS; the public API hostname is https://ud-api.mangotyping.fun.
+- Backend auto-deploy timer: disabled by default. Keep it disabled unless separately reviewed and intentionally enabled.
+- Android builds: local/manual only. Do not use EAS, GitHub Actions, or paid build services.
 
-VPS deployment is intentionally disabled until the VPS has been provisioned, the server environment configured and HTTPS/API routing ready. See server/deploy/SETUP.txt. Do not set the VPS_DEPLOY_ENABLED repository variable until that setup is complete.
-
-Until the VPS has a public HTTPS API hostname and has been tested, the app and website continue using the existing Render API:
-  https://united-delhi-api.onrender.com
+The current app build and website configurations use the VPS API hostname above. See server/deploy/SETUP.txt for operational notes; do not enable its VPS auto-deploy timer as part of routine source changes.
 
 VPS environment variables
-- DATABASE_URL (Neon connection string)
+- DATABASE_URL (PostgreSQL connection string for the VPS database)
 - TRANSPORT_STACK_API_KEY
 - APP_ORIGINS (include https://united-delhi.vercel.app)
 - PORT=10000
