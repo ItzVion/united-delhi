@@ -11,7 +11,8 @@
     "check": "node --check src/index.js && node --check src/vehicle-color.js && node --check scripts/import-dtc-static.mjs && node --check scripts/inspect-realtime.mjs",
     "import:dtc": "node scripts/import-dtc-static.mjs",
     "inspect:realtime": "node scripts/inspect-realtime.mjs",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "sync:metro": "node scripts/sync-dmrc-static.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
