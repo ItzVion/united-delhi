@@ -5,37 +5,36 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 
-test('embedded escapeHtml function in HomeScreen.tsx has valid JavaScript syntax', () => {
+test('embedded escapeHtml function has valid JavaScript syntax and escapes HTML', () => {
   const homeScreenPath = join(import.meta.dirname, '../../screens/HomeScreen.tsx');
   const content = readFileSync(homeScreenPath, 'utf-8');
 
-  // Extract the buildMapHtml function body which contains the embedded JavaScript
   const buildMapHtmlMatch = content.match(/function buildMapHtml\(\)\{[\s\S]*?return `([\s\S]*?)`;/);
-  assert.ok(buildMapHtmlMatch, 'Could not find buildMapHtml function');
+  assert.ok(buildMapHtmlMatch, 'Could not find buildMapHtml HTML template');
 
   const htmlContent = buildMapHtmlMatch[1];
+  const escapeHtmlLine = htmlContent
+    .split('\n')
+    .map(line => line.trim())
+    .find(line => line.includes('function escapeHtml(x)'));
+  assert.ok(escapeHtmlLine, 'Could not find escapeHtml function in embedded script');
 
-  // Find the line containing the escapeHtml function definition
-  const lines = htmlContent.split('\n');
-  let escapeHtmlLine: string | null = null;
-  for (const line of lines) {
-    if (line.includes('function escapeHtml(x)')) {
-      escapeHtmlLine = line.trim();
-      break;
-    }
-  }
-  assert.ok(escapeHtmlLine, 'Could not find escapeHtml function definition in embedded script');
-
-  // Validate JavaScript syntax by writing to a temp file and checking it
-  const tempFile = join(tmpdir(), `escapeHtml-test-${Date.now()}.js`);
-  // Add a test call to verify the function works - use a simpler test string to avoid escaping issues
-  const testCode = `${escapeHtmlLine}\nconst result = escapeHtml('<test>&"\\'');\nif (result !== '<test>&"\\'') {\n  throw new Error('escapeHtml function produced incorrect output: ' + result);\n}\n`;
+  const tempFile = join(tmpdir(), `escapeHtml-test-${process.pid}-${Date.now()}.js`);
+  const testCode = [
+    escapeHtmlLine,
+    'const input = String.fromCharCode(60) + "script" + String.fromCharCode(62) + "&\\"\'" + String.fromCharCode(60) + "/script" + String.fromCharCode(62);',
+    'const expected = "&lt;script&gt;&amp;&quot;&#39;&lt;/script&gt;";',
+    'if (escapeHtml(input) !== expected) { throw new Error("escapeHtml output mismatch: " + escapeHtml(input)); }',
+  ].join('\n') + '\n';
   writeFileSync(tempFile, testCode);
 
-  const result = spawnSync('node', ['--check', tempFile], { encoding: 'utf-8' });
+  try {
+    const syntax = spawnSync('node', ['--check', tempFile], { encoding: 'utf-8' });
+    assert.equal(syntax.status, 0, `Embedded JavaScript syntax error: ${syntax.stderr || syntax.stdout}`);
 
-  // Clean up
-  try { unlinkSync(tempFile); } catch {}
-
-  assert.equal(result.status, 0, `Embedded JavaScript syntax error: ${result.stderr || result.stdout}`);
+    const executed = spawnSync('node', [tempFile], { encoding: 'utf-8' });
+    assert.equal(executed.status, 0, `escapeHtml behavior test failed: ${executed.stderr || executed.stdout}`);
+  } finally {
+    try { unlinkSync(tempFile); } catch {}
+  }
 });
