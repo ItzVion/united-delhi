@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import { SERVER_ROOT, STATIC_IMPORTER_PATH, resolveServerPath } from './runtime-paths.js';
 import {syncMetroStatic} from './metro-sync.js';
-import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,estimateFleetLiveryColor,classifyFleetTypeFromRegistration,getRouteLiveryProfile,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
+import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,classifyFleetTypeFromRegistration,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
 const COLOR_FIELD=parseColorFieldSpec(process.env.TRANSPORT_STACK_COLOR_FIELD);
 
 const {Pool}=pg,app=express();
@@ -91,12 +91,9 @@ const applyFleetRegistry=v=>{
  const upstreamColor=(!priorSource||priorSource==='upstream-api')?apiVehicleColorOnly(v?.serviceColor):null;
  const verified=vehicleIdentityKeys(v).map(key=>verifiedLiveryByKey.get(key)).find(Boolean)||null;
  const vehicle={...v,...(row?{busType:row.busType,serviceType:row.serviceType}:{})};
- const exactColor=resolveEvidenceBackedColor(upstreamColor,verified?.colorHex);
- const routeProfile=getRouteLiveryProfile(vehicle.routeShortName,vehicle.routeId);
- const estimatedColor=exactColor?null:routeProfile?.color||estimateFleetLiveryColor({busType:vehicle.busType,serviceType:vehicle.serviceType,routeAgency:vehicle.operator});
- const serviceColor=exactColor||estimatedColor;
- const fleetColorSource=upstreamColor?'upstream-api':verified?'verified-livery-record':routeProfile?'estimated-route-profile':estimatedColor?'estimated-fleet-type':'not-provided-by-realtime-feed';
- return {...vehicle,...(routeProfile?{busType:routeProfile.busType}:{}),serviceColor,fleetColorSource,
+ const serviceColor=resolveEvidenceBackedColor(upstreamColor,verified?.colorHex);
+ const fleetColorSource=upstreamColor?'upstream-api':verified?'verified-livery-record':'not-provided-by-realtime-feed';
+ return {...vehicle,serviceColor,fleetColorSource,
   ...(verified?{liveryVerification:{status:'verified',colorName:verified.colorName||null,source:verified.sourceLabel||null,evidenceUrl:verified.evidenceUrl||null,verifiedAt:verified.verifiedAt}}:{})};
 };
 
@@ -106,10 +103,7 @@ const busLiveryForRoute=routeId=>{
  const id=String(routeId||'').trim();
  if(!id)return {};
  const active=cache.vehicles.filter(v=>String(v.routeId||'')===id);
- const summary=summarizeRouteLivery(active);
- if(summary)return summary;
- const meta=routeMeta.get(id),profile=getRouteLiveryProfile(meta?.short_name,id);
- return profile?{busLiveryColor:profile.color,busLiverySource:'estimated-route-profile',busType:profile.busType,trackedBuses:0,matchingVehicles:0}:{};
+ return summarizeRouteLivery(active)||{};
 };
 const decoratePlannerOptions=options=>(Array.isArray(options)?options:[]).map(option=>({...option,legs:(Array.isArray(option.legs)?option.legs:[]).map(leg=>!leg.mode||leg.mode==='bus'?{...leg,...busLiveryForRoute(leg.routeId)}:leg)}));
 const DTC_STATIC_SOURCE_KEY=String(process.env.DTC_STATIC_SOURCE_KEY||'uploaded-dtc-static-local-v1-20261013').trim();
