@@ -54,8 +54,8 @@ export function inspectGtfsServiceCoverage({
     type: String(row?.exception_type ?? '').trim(),
   })).filter(row => row.serviceId && row.date && (row.type === '1' || row.type === '2'));
 
-  const starts = [...baseRows.map(row => row.start), ...exceptions.map(row => row.date)].sort();
-  const ends = [...baseRows.map(row => row.end), ...exceptions.map(row => row.date)].sort();
+  const starts = (baseRows.length ? baseRows.map(row => row.start) : exceptions.map(row => row.date)).sort();
+  const ends = (baseRows.length ? baseRows.map(row => row.end) : exceptions.map(row => row.date)).sort();
   const calendarStartDate = starts[0] || null;
   const calendarEndDate = ends.at(-1) || null;
 
@@ -81,8 +81,8 @@ export function inspectGtfsServiceCoverage({
   const hasServiceToday = activeServices.size > 0;
   let status = 'unknown';
   if (baseRows.length || exceptions.length) {
-    if (calendarEndDate && normalizedToday > calendarEndDate) status = 'expired';
-    else if (hasServiceToday) status = 'active-today';
+    if (hasServiceToday) status = 'active-today';
+    else if (calendarEndDate && normalizedToday > calendarEndDate) status = 'expired';
     else status = 'no-service-today';
   }
 
