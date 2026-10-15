@@ -290,7 +290,7 @@ export function Planner({go}:{go:Go}){
   const color=mode==='metro'?plannerColor(l.routeColor,fallback):plannerColor(l.busLiveryColor,fallback);
   const target=mode==='metro'?'/metro/routes/':'/routes/';
   const colourTitle=mode!=='bus'?'Metro line colour':l.busLiveryColor
-   ?'Bus colour '+(l.busLiverySource==='upstream-api'?'from live data':l.busLiverySource==='verified-livery-record'?'from a reviewed vehicle record':'estimated from currently tracked buses')+'; colours can vary by vehicle'
+   ?'Evidence-backed bus colour '+(l.busLiverySource==='upstream-api'?'from live data':'from a reviewed vehicle record')+'; colours can vary by vehicle'
    :'Bus route; individual vehicle livery is not available for this route';
   return <button type="button" title={colourTitle} className={'leg leg-'+mode} key={mode+':'+String(l.routeId)+':'+j} onClick={()=>go(target+encodeURIComponent(l.routeId||''))}>
    <RouteBadge name={routeLabel} color={color}/>
