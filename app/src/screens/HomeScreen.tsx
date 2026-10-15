@@ -56,6 +56,7 @@ export default function HomeScreen(){
   const vehiclesLoadingRef=useRef(false);
   const vehiclesRefreshPendingRef=useRef(false);
   const loadVehiclesRef=useRef<()=>void>(()=>{});
+const legendRows = BUS_COLOUR_LEGEND.map(l => ({ key: l.key, label: l.label, color: l.colors[0] }));
 
   const requestLocation=useCallback(async()=>{
     try{
@@ -402,7 +403,7 @@ function openBus(id){
 }
 function validColor(x){return /^#[0-9a-f]{6}$/i.test(String(x));}
 function textColorFor(apiColor){if(!validColor(apiColor))return '#14211B';const h=String(apiColor).slice(1),rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255),lin=rgb.map(c=>c<=.03928?c/12.92:Math.pow((c+.055)/1.055,2.4));return .2126*lin[0]+.7152*lin[1]+.0722*lin[2]>.179?'#14211B':'#FFFFFF';}
-function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);}
+function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 </script></body></html>`;
 }
 const styles=StyleSheet.create({
@@ -423,7 +424,7 @@ const styles=StyleSheet.create({
  legendHeaderText:{width:160,fontSize:13,fontWeight:'500',color:colors.textMuted},
  legendRow:{flexDirection:'row',alignItems:'center',justifyContent:'flex-start',minHeight:32,borderBottomWidth:0},
  legendIcons:{flexDirection:'row',gap:8,width:160,flexGrow:0,flexShrink:0},
- legendBus:{width:36,height:26,borderRadius:0,alignItems:'center',justifyContent:'center},
+ legendBus:{width:36,height:26,borderRadius:0,alignItems:'center',justifyContent:'center'},
  legendBusWindow:{position:'absolute',left:4,right:4,top:3,height:3,backgroundColor:'rgba(255,255,255,.22)'},
  legendBusWindshield:{position:'absolute',left:5,right:5,top:8,height:3,backgroundColor:'rgba(255,255,255,.9)'},
  legendBusLightRow:{position:'absolute',left:4,right:4,bottom:2,flexDirection:'row',justifyContent:'space-between'},
