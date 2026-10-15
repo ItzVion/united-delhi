@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
+import { sha256Hex, sourceWithSha256, sourceHasSha256, inspectGtfsServiceCoverage } from './gtfs-feed-utils.js';
 
 const execFileAsync=promisify(execFile);
 const URL=String(process.env.METRO_STATIC_URL||'').trim();
@@ -33,10 +34,10 @@ async function unzipFeed(buf,dir){
   const files=await fs.readdir(dir,{recursive:true});
   const pick=n=>files.find(x=>path.basename(String(x)).toLowerCase()===n);
   const read=async n=>{const f=pick(n);if(!f)return [];return csv(await fs.readFile(path.join(dir,String(f)),'utf8'))};
-  return {agency:await read('agency.txt'),routes:await read('routes.txt'),stops:await read('stops.txt'),trips:await read('trips.txt'),stopTimes:await read('stop_times.txt'),calendar:await read('calendar.txt')};
+  return {agency:await read('agency.txt'),routes:await read('routes.txt'),stops:await read('stops.txt'),trips:await read('trips.txt'),stopTimes:await read('stop_times.txt'),calendar:await read('calendar.txt'),calendarDates:await read('calendar_dates.txt')};
 }
 
-export async function syncMetroStatic(pool){
+export async function syncMetroStatic(pool,{allowReplacement=false}={}){
   if(!pool)return {ok:false,reason:'Database is not configured'};
   if(syncRunning)return {ok:false,reason:'A Metro static sync is already running'};
   syncRunning=true;
@@ -45,10 +46,6 @@ export async function syncMetroStatic(pool){
     // Allocate inside the protected try/finally so a temp-directory failure
     // never leaves the module-level mutex stuck in the running state.
     dir=await fs.mkdtemp(path.join(os.tmpdir(),'united-delhi-dmrc-'));
-    const meta=(await pool.query('SELECT source_key,route_count,stop_count FROM metro_feed_meta WHERE id=1').catch(()=>({rows:[]}))).rows[0];
-    if(meta?.source_key===SOURCE_KEY&&Number(meta.route_count)>=18&&Number(meta.stop_count)>=260){
-      return {ok:true,unchanged:true,routes:Number(meta.route_count),stops:Number(meta.stop_count)};
-    }
     let body,sourceUrl=URL;
     if(STATIC_FILE){
       try{
@@ -69,8 +66,40 @@ export async function syncMetroStatic(pool){
       }finally{clearTimeout(timer)}
     }
     if(!Buffer.isBuffer(body)||!body.slice(0,2).equals(Buffer.from([0x50,0x4b])))throw new Error('DMRC static source is not a ZIP archive');
+    const archiveHash=sha256Hex(body);
+    sourceUrl=sourceWithSha256(sourceUrl,archiveHash);
     const feed=await unzipFeed(body,dir);
     if(!feed.routes.length||!feed.stops.length||!feed.trips.length||!feed.stopTimes.length)throw new Error('DMRC feed is missing required GTFS files');
+
+    const coverage=inspectGtfsServiceCoverage({calendarRows:feed.calendar,calendarDateRows:feed.calendarDates});
+    console.log('DMRC GTFS service calendar ('+coverage.today+' Asia/Kolkata): '+(coverage.calendarStartDate||'unknown')+' through '+(coverage.calendarEndDate||'unknown')+'; status='+coverage.status+'; service today='+coverage.hasServiceToday+'; invalid calendar rows='+(coverage.invalidBaseRows+coverage.invalidExceptionRows)+'.');
+    if(coverage.status==='expired'||!coverage.hasServiceToday||coverage.invalidBaseRows||coverage.invalidExceptionRows){
+      console.warn('DMRC static feed calendar is expired, inactive today, or invalid. Route topology can still be useful, but this feed must not be presented as a verified current timetable.');
+    }
+
+    const tableNames=['metro_routes','metro_stops','metro_route_stops'];
+    const tables=new Set((await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name=ANY($1::text[])",[tableNames])).rows.map(row=>row.table_name));
+    const actual={routes:0,stops:0,routeStops:0};
+    for(const [table,key] of [['metro_routes','routes'],['metro_stops','stops'],['metro_route_stops','routeStops']]){
+      if(tables.has(table)){
+        actual[key]=Number((await pool.query('SELECT COUNT(*)::int AS count FROM '+table)).rows[0]?.count)||0;
+      }
+    }
+    const meta=(await pool.query('SELECT source_key,source_url,route_count,stop_count,route_stop_count FROM metro_feed_meta WHERE id=1').catch(()=>({rows:[]}))).rows[0]||null;
+    const countsMatch=meta
+      &&actual.routes===Number(meta.route_count)
+      &&actual.stops===Number(meta.stop_count)
+      &&actual.routeStops===Number(meta.route_stop_count);
+    if(meta?.source_key===SOURCE_KEY&&sourceHasSha256(meta.source_url,archiveHash)&&countsMatch&&actual.routes>=18&&actual.stops>=260){
+      console.log('DMRC archive SHA-256 and static counts match the database; no import is needed.');
+      return {ok:true,unchanged:true,routes:actual.routes,stops:actual.stops,routeStops:actual.routeStops};
+    }
+    const populated=actual.routes>0||actual.stops>0||actual.routeStops>0;
+    if(populated&&!allowReplacement){
+      const reason='Automatic DMRC replacement suppressed: the populated database has no matching archive SHA-256 fingerprint, or its actual counts differ from metadata. Existing metro data is preserved. Review the feed and backups, then run the explicit reviewed metro sync command if replacement is approved.';
+      console.warn(reason);
+      return {ok:true,unchanged:true,requiresApproval:true,reason,routes:actual.routes,stops:actual.stops,routeStops:actual.routeStops};
+    }
 
     // The supplied feed stores opposite directions as separate GTFS routes
     // whose route_short_name values pair as CODE and CODE_R. Group those two
