@@ -189,23 +189,20 @@ export function scanEntities(bytes) {
   return result;
 }
 
-// Map<vehicleKey, '#RRGGBB'>. With no explicit field setting, inspect vehicle-scoped
-// extensions attached to the vehicle entity, position, or descriptor. Never infer colour from other data.
+// Map<vehicleKey, '#RRGGBB'> for one explicitly configured provider extension.
+// GTFS-Realtime has no standard physical-paint field; arbitrary hex-looking extensions are untrusted.
 export function extractColorsByVehicle(bytes, spec) {
   const config = typeof spec === 'string' ? parseColorFieldSpec(spec) : spec;
   const colors = new Map();
+  if (!config
+    || !['VehicleDescriptor', 'VehiclePosition', 'FeedEntity'].includes(config.message)
+    || !Number.isInteger(config.field)
+    || !isGtfsExtensionField(config.field)) return colors;
 
   for (const record of scanEntities(bytes)) {
-    const candidates = record.unknown.filter(field => {
-      if (field.wireType !== 2) return false;
-      if (config) return field.message === config.message && field.field === config.field;
-      if (!isGtfsExtensionField(field.field)) return false;
-      return field.message === 'VehicleDescriptor' || field.message === 'VehiclePosition' || field.message === 'FeedEntity';
-    });
-
-    const priority = { VehicleDescriptor: 0, VehiclePosition: 1, FeedEntity: 2 };
-    candidates.sort((a, b) => priority[a.message] - priority[b.message]);
-
+    const candidates = record.unknown.filter(field =>
+      field.wireType === 2 && field.message === config.message && field.field === config.field
+    );
     for (const candidate of candidates) {
       const color = validHexColor(candidate.value);
       if (!color) continue;
