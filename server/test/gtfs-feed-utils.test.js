@@ -42,16 +42,17 @@ test('expired calendars are reported, not silently interpreted as current schedu
   assert.equal(result.calendarEndDate,'20251231');
 });
 
-test('invalid and inverted calendar rows are reported and excluded', () => {
+test('invalid dates, inverted ranges, and invalid weekday flags are rejected', () => {
   const result = inspectGtfsServiceCoverage({
     calendarRows:[
       {service_id:'bad-date', start_date:'20260230', end_date:'20261231', monday:'1'},
-      {service_id:'inverted', start_date:'20261231', end_date:'20260101', monday:'1'}
+      {service_id:'inverted', start_date:'20261231', end_date:'20260101', monday:'1'},
+      {service_id:'bad-flag', start_date:'20260101', end_date:'20261231', monday:'2'}
     ],
     calendarDateRows:[{service_id:'bad-exception',date:'20261399',exception_type:'1'}],
     today:'20261016'
   });
   assert.equal(result.status,'unknown');
-  assert.equal(result.invalidBaseRows,2);
+  assert.equal(result.invalidBaseRows,3);
   assert.equal(result.invalidExceptionRows,1);
 });
