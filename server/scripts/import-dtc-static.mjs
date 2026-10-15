@@ -3,6 +3,7 @@ import { createInflateRaw } from 'node:zlib';
 import { Readable } from 'node:stream';
 import fs from 'node:fs/promises';
 import { resolveServerPath } from '../src/runtime-paths.js';
+import { sha256Hex, sourceWithSha256, sourceHasSha256, inspectGtfsServiceCoverage } from '../src/gtfs-feed-utils.js';
 
 const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
 const STATIC_URL_OVERRIDE = String(process.env.DTC_STATIC_URL || '').trim();
@@ -329,9 +330,54 @@ async function main() {
         }
       }
 
+      const calendarRows = [];
+      const calendarDateRows = [];
+      if (zip.find('calendar.txt')) {
+        for await (const row of rows(zip, 'calendar.txt')) calendarRows.push(row);
+      }
+      if (zip.find('calendar_dates.txt')) {
+        for await (const row of rows(zip, 'calendar_dates.txt')) calendarDateRows.push(row);
+      }
+      const coverage = inspectGtfsServiceCoverage({ calendarRows, calendarDateRows });
+      console.log('GTFS service calendar (' + coverage.today + ' Asia/Kolkata): ' +
+        (coverage.calendarStartDate || 'unknown') + ' through ' + (coverage.calendarEndDate || 'unknown') +
+        '; status=' + coverage.status + '; service today=' + coverage.hasServiceToday +
+        '; invalid calendar rows=' + (coverage.invalidBaseRows + coverage.invalidExceptionRows) + '.');
+      if (coverage.status === 'expired' || !coverage.hasServiceToday || coverage.invalidBaseRows || coverage.invalidExceptionRows) {
+        console.warn('GTFS schedule coverage is limited or unverified. Existing route topology may be usable, but timetable freshness must not be inferred from feed_info dates alone.');
+      }
+
       const sourceKey = sourceUrl.includes('ethanc8.github.io/delhi-gtfs')
         ? 'ethanc8-delhi-gtfs-bus'
         : SOURCE_KEY;
+      const archiveHash = sha256Hex(downloaded.data);
+      const persistedSourceUrl = sourceWithSha256(sourceUrl, archiveHash);
+      const existingCounts = (await client.query(`SELECT
+        (SELECT COUNT(*)::int FROM routes) AS routes,
+        (SELECT COUNT(*)::int FROM stops) AS stops,
+        (SELECT COUNT(*)::int FROM route_stops) AS route_stops`)).rows[0] || {};
+      const existingMeta = (await client.query(
+        'SELECT source_key,source_url,imported_route_count,imported_stop_count,imported_route_stop_count FROM static_feed_meta WHERE id=1'
+      )).rows[0] || {};
+      const currentRoutes = Number(existingCounts.routes) || 0;
+      const currentStops = Number(existingCounts.stops) || 0;
+      const currentLinks = Number(existingCounts.route_stops) || 0;
+      const populated = currentRoutes > 0 || currentStops > 0 || currentLinks > 0;
+      const archiveAlreadyImported = existingMeta.source_key === sourceKey
+        && sourceHasSha256(existingMeta.source_url, archiveHash)
+        && currentRoutes === routes.length
+        && currentStops === stops.length
+        && currentLinks === validLinks.length
+        && Number(existingMeta.imported_route_count) === routes.length
+        && Number(existingMeta.imported_stop_count) === stops.length
+        && Number(existingMeta.imported_route_stop_count) === validLinks.length;
+      if (archiveAlreadyImported) {
+        console.log('DTC archive SHA-256 and all static counts match the database; no import is needed.');
+        return;
+      }
+      if (populated && String(process.env.DTC_STATIC_ALLOW_REPLACEMENT || '').toLowerCase() !== 'true') {
+        throw new Error('SAFE REFUSAL: the database already contains static transit data, but its saved archive SHA-256 does not match this ZIP (or is not recorded). No rows were changed. Review a backup and the feed, then explicitly set DTC_STATIC_ALLOW_REPLACEMENT=true for an approved replacement.');
+      }
       try {
         await client.query('BEGIN');
         await client.query("SET LOCAL statement_timeout='120000'");
@@ -379,7 +425,7 @@ async function main() {
 
         await client.query(
           'INSERT INTO static_feed_meta(id,source_key,source_url,feed_version,feed_start_date,feed_end_date,imported_at,updated_at,imported_route_count,imported_stop_count,imported_route_stop_count) VALUES(1,$1,$2,$3,$4,$5,NOW(),NOW(),$6,$7,$8) ON CONFLICT(id) DO UPDATE SET source_key=EXCLUDED.source_key,source_url=EXCLUDED.source_url,feed_version=EXCLUDED.feed_version,feed_start_date=EXCLUDED.feed_start_date,feed_end_date=EXCLUDED.feed_end_date,imported_at=NOW(),updated_at=NOW(),imported_route_count=EXCLUDED.imported_route_count,imported_stop_count=EXCLUDED.imported_stop_count,imported_route_stop_count=EXCLUDED.imported_route_stop_count',
-          [sourceKey, sourceUrl, feedVersion, feedStart, feedEnd, routes.length, stops.length, validLinks.length]
+          [sourceKey, persistedSourceUrl, feedVersion, feedStart, feedEnd, routes.length, stops.length, validLinks.length]
         );
 
         await client.query('ANALYZE routes');
