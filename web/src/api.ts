@@ -1,13 +1,13 @@
 import {roundCoordinate} from './lib';
 
 export const API=String(import.meta.env.VITE_API_BASE_URL || '/api').trim().replace(/\/+$/,'');
-const LIVE_CACHE_KEY='ud-live-vehicles-v9';
+const LIVE_CACHE_KEY='ud-live-vehicles-v10';
 export const SERVICE_WAKING_MESSAGE='The live service is waking up or reconnecting. It can take up to a minute after inactivity; we will retry automatically.';
 type LiveryVerification={status:'verified';colorName?:string|null;source?:string|null;evidenceUrl?:string|null;verifiedAt?:string|null};
 export type Vehicle={
   id:string;routeId:string|null;routeShortName:string|null;routeColor?:string|null;routeTextColor?:string|null;
   routeLongName?:string|null;fromStop?:string|null;toStop?:string|null;serviceType?:'dtc'|'electric'|'unknown';
-  busType?:string|null;serviceColor?:string|null;fleetColorSource?:'upstream-api'|'verified-livery-record'|'estimated-fleet-type'|'estimated-route-profile'|'not-provided-by-realtime-feed';
+  busType?:string|null;serviceColor?:string|null;fleetColorSource?:'upstream-api'|'verified-livery-record'|'not-provided-by-realtime-feed';
   liveryVerification?:LiveryVerification;vehicleLabel?:string|null;licensePlate?:string|null;latitude:number;longitude:number;
   observedAt?:string;tripHeadsign?:string|null;directionId?:number|null
 };
