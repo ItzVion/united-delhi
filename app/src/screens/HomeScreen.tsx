@@ -11,19 +11,13 @@ import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
-import { hasEvidenceBackedVehicleColor, hasEstimatedVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
+import { fleetLegendRows, hasEvidenceBackedVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
 import { confirmLocationUse } from '../lib/locationConsent';
 import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type MapBounds = { south:number; west:number; north:number; east:number };
 const DELHI={latitude:28.6139,longitude:77.209};
-const BUS_COLOUR_LEGEND=[
-  {key:'ev-ac-12',label:'EV AC (12 mtr)',colors:['#52C2D6']},
-  {key:'ev-devi-ac-9',label:'EV DEVI AC (9 mtr)',colors:['#52C2D6','#229552']},
-  {key:'cng-ac-12',label:'CNG AC (12 mtr)',colors:['#3081EB','#ED4A4D']},
-  {key:'cng-nonac-12',label:'CNG NonAC (12 mtr)',colors:['#F1A96E','#61E29A']}
-];
 const UNKNOWN_BUS_MARKER_COLOR='#64748B';
 export default function HomeScreen(){
   const navigation=useNavigation<Nav>();
@@ -56,7 +50,7 @@ export default function HomeScreen(){
   const vehiclesLoadingRef=useRef(false);
   const vehiclesRefreshPendingRef=useRef(false);
   const loadVehiclesRef=useRef<()=>void>(()=>{});
-const legendRows = BUS_COLOUR_LEGEND.map(l => ({ key: l.key, label: l.label, color: l.colors[0] }));
+const legendRows = [...fleetLegendRows(vehicles), { key:'unknown', label:'Unknown / no verified colour', color:UNKNOWN_BUS_MARKER_COLOR }];
 
   const requestLocation=useCallback(async()=>{
     try{
@@ -168,7 +162,7 @@ const legendRows = BUS_COLOUR_LEGEND.map(l => ({ key: l.key, label: l.label, col
       buses:visible.map(v=>{
         const route=displayRouteName(v.routeShortName) || displayRouteName(v.routeId) || 'BUS';
         const c=resolveVehicleColor(v);
-        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,colourKnown:hasEvidenceBackedVehicleColor(v),colourEstimated:hasEstimatedVehicleColor(v),lat:v.latitude,lon:v.longitude}];
+        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,colourKnown:hasEvidenceBackedVehicleColor(v),colourEstimated:false,lat:v.latitude,lon:v.longitude}];
       }).flat(),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
     };
@@ -257,7 +251,7 @@ const legendRows = BUS_COLOUR_LEGEND.map(l => ({ key: l.key, label: l.label, col
               <View style={styles.busPreviewCopy}>
                 <Text style={styles.busPreviewEyebrow}>LIVE BUS</Text>
                 <Text style={styles.busPreviewTitle} numberOfLines={1}>To {selectedBus.toStop || 'Destination'}</Text>
-                <Text style={styles.busPreviewMeta} numberOfLines={2}>{selectedBus.vehicleLabel || selectedBus.licensePlate || selectedBus.id} · {freshness} · View route{selectedBus.fleetColorSource==='estimated-fleet-type'?' · colour estimated':''}</Text>
+                <Text style={styles.busPreviewMeta} numberOfLines={2}>{selectedBus.vehicleLabel || selectedBus.licensePlate || selectedBus.id} · {freshness} · View route{hasEvidenceBackedVehicleColor(selectedBus)?'':' · colour unavailable'}</Text>
               </View>
               <Text style={styles.busPreviewArrow}>›</Text>
             </Pressable>
@@ -269,7 +263,7 @@ const legendRows = BUS_COLOUR_LEGEND.map(l => ({ key: l.key, label: l.label, col
             <Pressable style={styles.legendDialog} onPress={event=>event.stopPropagation()}>
               <Text style={styles.legendTitle}>Bus Color Legend</Text>
               <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Type</Text></View>
-              {BUS_COLOUR_LEGEND.map(row=><View key={row.key} style={styles.legendRow}><View style={styles.legendIcons}>{row.colors.map(color=><View key={color} style={[styles.legendBus,{backgroundColor:color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View>)}</View><Text style={styles.legendType}>{row.label}</Text></View>)}
+              {legendRows.map(row=><View key={row.key} style={styles.legendRow}><View style={styles.legendIcons}><View style={[styles.legendBus,{backgroundColor:row.color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View></View><Text style={styles.legendType}>{row.label}</Text></View>)}
               <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Understood!</Text></Pressable>
             </Pressable>
           </Pressable>
