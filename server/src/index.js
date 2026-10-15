@@ -682,6 +682,7 @@ function scheduleMetroStaticRetry(){
 function runMetroStaticSync(){
  if(!pool||String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()==='false')return;
  void syncMetroStatic(pool).then(result=>{
+  if(result?.requiresApproval){console.warn(result.reason||'DMRC refresh requires explicit approval; existing data preserved.');return;}
   if(!result?.ok)throw new Error(result?.reason||'Metro static sync did not complete');
  }).catch(error=>{
   console.error('Uploaded DMRC static sync failed:',error?.message||error);
