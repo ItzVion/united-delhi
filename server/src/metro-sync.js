@@ -21,7 +21,7 @@ function csv(text){
     else if(ch!=='\r')cell+=ch;
   }
   if(cell.length||row.length){row.push(cell);out.push(row)}
-  const head=out.shift()||[];
+  const head=(out.shift()||[]).map(h=>String(h??'').replace(/^\uFEFF/,'').trim());
   return out.filter(r=>r.length).map(r=>Object.fromEntries(head.map((h,i)=>[h,r[i]??''])));
 }
 const esc=v=>String(v??'').trim();
@@ -37,7 +37,7 @@ async function unzipFeed(buf,dir){
   return {agency:await read('agency.txt'),routes:await read('routes.txt'),stops:await read('stops.txt'),trips:await read('trips.txt'),stopTimes:await read('stop_times.txt'),calendar:await read('calendar.txt'),calendarDates:await read('calendar_dates.txt')};
 }
 
-export async function syncMetroStatic(pool,{allowReplacement=false}={}){
+export async function syncMetroStatic(pool,{allowReplacement=false,allowExpiredCalendar=false}={}){
   if(!pool)return {ok:false,reason:'Database is not configured'};
   if(syncRunning)return {ok:false,reason:'A Metro static sync is already running'};
   syncRunning=true;
@@ -93,6 +93,11 @@ export async function syncMetroStatic(pool,{allowReplacement=false}={}){
     if(meta?.source_key===SOURCE_KEY&&sourceHasSha256(meta.source_url,archiveHash)&&countsMatch&&actual.routes>=18&&actual.stops>=260){
       console.log('DMRC archive SHA-256 and static counts match the database; no import is needed.');
       return {ok:true,unchanged:true,routes:actual.routes,stops:actual.stops,routeStops:actual.routeStops};
+    }
+    if(coverage.status==='expired'&&!allowExpiredCalendar){
+      const reason='SAFE REFUSAL: this DMRC calendar has expired. Existing metro data is preserved. Review the source; only permit a topology-only import with METRO_ALLOW_EXPIRED_CALENDAR=true after confirming that the expired timetable metadata is acceptable.';
+      console.warn(reason);
+      return {ok:false,requiresApproval:true,reason,routes:actual.routes,stops:actual.stops,routeStops:actual.routeStops};
     }
     const populated=actual.routes>0||actual.stops>0||actual.routeStops>0;
     if(populated&&!allowReplacement){
