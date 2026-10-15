@@ -135,14 +135,14 @@ test('route livery summaries ignore estimates and only count evidenced vehicle c
   ]), null);
 });
 
-test('route livery colour follows the dominant currently tracked bus colour', () => {
+test('route livery summary counts only API/reviewed colours and ignores estimates', () => {
   assert.deepEqual(summarizeRouteLivery([
-    {serviceColor:'#2563EB',fleetColorSource:'estimated-fleet-type',busType:'CNG AC'},
+    {serviceColor:'#2563EB',fleetColorSource:'upstream-api',busType:'CNG AC'},
     {serviceColor:'#2563EB',fleetColorSource:'upstream-api',busType:'CNG AC'},
     {serviceColor:'#F97316',fleetColorSource:'estimated-fleet-type',busType:'CNG NonAC'}
   ]), {
     busLiveryColor:'#2563EB',busLiverySource:'upstream-api',busType:'CNG AC',
-    trackedBuses:3,matchingVehicles:2
+    trackedBuses:2,matchingVehicles:2
   });
   assert.equal(summarizeRouteLivery([{serviceColor:null,fleetColorSource:'not-provided-by-realtime-feed'}]), null);
 });
