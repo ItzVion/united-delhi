@@ -257,7 +257,7 @@ async function main() {
       const present = new Set(schemaRows.map((x) => x.table_name));
       const missing = required.filter((x) => !present.has(x));
       if (missing.length) {
-        throw new Error('Database schema is missing: ' + missing.join(', ') + '. Run server/sql/001_reset_and_schema.sql first.');
+        throw new Error('Database schema is missing: ' + missing.join(', ') + '. No data was changed. Review the schema and apply a reviewed non-destructive migration; do not run the reset SQL against a populated database.');
       }
       const downloaded = await downloadZip();
       const sourceUrl = downloaded.sourceUrl;
