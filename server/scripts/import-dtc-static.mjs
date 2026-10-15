@@ -376,6 +376,10 @@ async function main() {
         console.log('DTC archive SHA-256 and all static counts match the database; no import is needed.');
         return;
       }
+      if ((coverage.invalidBaseRows || coverage.invalidExceptionRows)
+        && String(process.env.DTC_ALLOW_INVALID_CALENDAR || '').toLowerCase() !== 'true') {
+        throw new Error('SAFE REFUSAL: the DTC service calendar contains invalid date/rule rows. No data was changed. Review the source before any replacement.');
+      }
       if (coverage.status === 'expired' && String(process.env.DTC_ALLOW_EXPIRED_CALENDAR || '').toLowerCase() !== 'true') {
         throw new Error('SAFE REFUSAL: the DTC service calendar has expired. No data was changed. A topology-only replacement using this feed requires a separate review and DTC_ALLOW_EXPIRED_CALENDAR=true.');
       }
