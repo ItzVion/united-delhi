@@ -16,9 +16,8 @@ export function resolveEvidenceBackedColor(upstreamColor, verifiedLiveryColor) {
   return validHexColor(upstreamColor) || validHexColor(verifiedLiveryColor);
 }
 
-// Best-effort visual estimates when the API and reviewed vehicle records have no colour.
-// Route colours and route IDs are never used as physical-livery evidence.
-// Classify only the known fleet-registration families; registration alone does not prove paint colour.
+// Classify known registration families for vehicle category only.
+// Registration alone never proves a vehicle's physical paint colour.
 export function classifyFleetTypeFromRegistration(...values) {
   const candidates=values.map(value=>String(value||'').toUpperCase().replace(/[-_\\s]/g,'')).filter(Boolean);
   const electricNine=['DL1GD','DL2GD','DL5GD','DL7GD','DL11GD','DL12GD','DL13GD'];
