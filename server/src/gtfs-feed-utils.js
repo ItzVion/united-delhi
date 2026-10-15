@@ -45,8 +45,11 @@ export function inspectGtfsServiceCoverage({
     serviceId: String(row?.service_id ?? '').trim(),
     start: validDate(row?.start_date),
     end: validDate(row?.end_date),
-    weekdays: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].map(day => String(row?.[day] ?? '') === '1'),
-  })).filter(row => row.serviceId && row.start && row.end && row.start <= row.end);
+    rawWeekdays: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].map(day => String(row?.[day] ?? '').trim()),
+  })).filter(row => row.serviceId && row.start && row.end && row.start <= row.end
+    && row.rawWeekdays.every(value => value === '0' || value === '1')
+    && row.rawWeekdays.includes('1'))
+    .map(row => ({ ...row, weekdays: row.rawWeekdays.map(value => value === '1') }));
 
   const exceptions = (Array.isArray(calendarDateRows) ? calendarDateRows : []).map(row => ({
     serviceId: String(row?.service_id ?? '').trim(),
@@ -54,8 +57,9 @@ export function inspectGtfsServiceCoverage({
     type: String(row?.exception_type ?? '').trim(),
   })).filter(row => row.serviceId && row.date && (row.type === '1' || row.type === '2'));
 
-  const starts = (baseRows.length ? baseRows.map(row => row.start) : exceptions.map(row => row.date)).sort();
-  const ends = (baseRows.length ? baseRows.map(row => row.end) : exceptions.map(row => row.date)).sort();
+  // calendar_dates can add service outside calendar.txt's regular range.
+  const starts = [...baseRows.map(row => row.start), ...exceptions.map(row => row.date)].sort();
+  const ends = [...baseRows.map(row => row.end), ...exceptions.map(row => row.date)].sort();
   const calendarStartDate = starts[0] || null;
   const calendarEndDate = ends.at(-1) || null;
 
