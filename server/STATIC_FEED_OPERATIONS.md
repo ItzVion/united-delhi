@@ -15,7 +15,7 @@ cd /opt/united-delhi/repo/server
 DTC_STATIC_ALLOW_REPLACEMENT=true node scripts/import-dtc-static.mjs
 ```
 
-If the feed calendar has expired, the import refuses by default. `DTC_ALLOW_EXPIRED_CALENDAR=true` is a separate override for an intentionally approved topology-only use; it must not be used to imply current timetable accuracy.
+If the feed calendar has expired or contains invalid service-date rows, the import refuses by default. `DTC_ALLOW_EXPIRED_CALENDAR=true` and `DTC_ALLOW_INVALID_CALENDAR=true` are separate overrides for intentionally approved topology-only use; they must not be used to imply current timetable accuracy.
 
 ## Explicit Metro replacement
 
@@ -26,7 +26,7 @@ cd /opt/united-delhi/repo/server
 METRO_STATIC_ALLOW_REPLACEMENT=true npm run sync:metro
 ```
 
-An expired metro calendar is refused by default. `METRO_ALLOW_EXPIRED_CALENDAR=true` separately allows a reviewed topology-only import, not a claim that current train schedules are represented. Keep these override variables absent/false in service startup environments.
+An expired or invalid metro calendar is refused by default. `METRO_ALLOW_EXPIRED_CALENDAR=true` and `METRO_ALLOW_INVALID_CALENDAR=true` separately allow a reviewed topology-only import, not a claim that current train schedules are represented. Keep these override variables absent/false in service startup environments.
 
 ## Vehicle colours
 
