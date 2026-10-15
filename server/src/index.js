@@ -164,7 +164,8 @@ function autoImportDtcStaticIfEmpty(){
     finally{clearTimeout(timer)}
    }
    if(!sourceAvailable){
-    console.warn('DTC GTFS source is unavailable ('+sourceDescription+'); empty database left unchanged.');
+    console.warn('DTC GTFS source is unavailable ('+sourceDescription+'); empty database left unchanged; retrying in five minutes.');
+    scheduleDtcStaticRetry();
     return;
    }
    if(dtcAutoImportRunning)return;
@@ -184,6 +185,7 @@ function autoImportDtcStaticIfEmpty(){
    child.on('error',error=>{
     dtcAutoImportRunning=false;
     console.error('Could not start DTC static importer:',error?.message||error);
+    scheduleDtcStaticRetry();
    });
    child.on('close',code=>{
     dtcAutoImportRunning=false;
