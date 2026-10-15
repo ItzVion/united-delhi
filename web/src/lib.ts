@@ -17,9 +17,12 @@ export const METRO_LINE_COLORS={RED:'#D83B3B',YELLOW:'#E5B12C',BLUE:'#2F63B7',GR
 export const metroColor=(value)=>{const t=String(value||'').toUpperCase();for(const k of Object.keys(METRO_LINE_COLORS))if(t.includes(k))return METRO_LINE_COLORS[k];return '#1F3D36';};
 
 export const isHex=(v:unknown):v is string=>/^#[0-9a-f]{6}$/i.test(String(v||''));
-// Use the exact verified API colour. Slate is only a neutral marker when the API supplies none.
+// Only exact upstream per-vehicle colours and reviewed livery evidence may colour a bus.
+// Fleet type, route colour and registration-based guesses are not paint evidence.
 export const UNKNOWN_BUS_MARKER_COLOR='#64748B';
-export const busColor=(v:{serviceColor?:string|null;busType?:string|null})=>{
+export const busColor=(v:{serviceColor?:string|null;busType?:string|null;fleetColorSource?:string|null})=>{
+  const source=String(v?.fleetColorSource||'');
+  if(source!=='upstream-api'&&source!=='verified-livery-record')return UNKNOWN_BUS_MARKER_COLOR;
   const color=String(v?.serviceColor??'').trim();
   return isHex(color)?color:UNKNOWN_BUS_MARKER_COLOR;
 };
