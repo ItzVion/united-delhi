@@ -3,14 +3,20 @@ import {Icon} from './ui';
 import type {Vehicle} from '../api';
 
 type Props={open:boolean;onClose:()=>void;vehicles:Vehicle[]};
-const LEGEND_ROWS=[
-  {key:'ev-ac-12',label:'EV AC (12 mtr)',colors:['#52C2D6']},
-  {key:'ev-devi-ac-9',label:'EV DEVI AC (9 mtr)',colors:['#52C2D6','#229552']},
-  {key:'cng-ac-12',label:'CNG AC (12 mtr)',colors:['#3081EB','#ED4A4D']},
-  {key:'cng-nonac-12',label:'CNG NonAC (12 mtr)',colors:['#F1A96E','#61E29A']}
-];
 
-export default function Legend({open,onClose}:Props){
+export default function Legend({open,onClose,vehicles}:Props){
+  const counts=new Map<string,{source:'upstream-api'|'verified-livery-record';color:string;count:number}>();
+  for(const vehicle of vehicles){
+    const source=vehicle.fleetColorSource;
+    const color=String(vehicle.serviceColor||'').trim();
+    if((source!=='upstream-api'&&source!=='verified-livery-record')||!/^#[0-9a-f]{6}$/i.test(color))continue;
+    const normalized=color.toUpperCase(),key=source+':'+normalized,prior=counts.get(key);
+    if(prior)prior.count++;
+    else counts.set(key,{source,color:normalized,count:1});
+  }
+  const rows=[...counts.values()].sort((a,b)=>a.source.localeCompare(b.source)||b.count-a.count||a.color.localeCompare(b.color))
+    .map(row=>({key:row.source+':'+row.color,label:(row.source==='upstream-api'?'Live API':'Reviewed')+' · '+row.color+' ('+row.count+')',color:row.color}));
+  rows.push({key:'unknown',label:'Unknown / no verified physical colour',color:'#64748B'});
   useEffect(()=>{
     if(!open)return;
     const keydown=(event:KeyboardEvent)=>{if(event.key==='Escape')onClose()};
@@ -22,9 +28,10 @@ export default function Legend({open,onClose}:Props){
   return <div className="modal legend-modal" role="dialog" aria-modal="true" aria-label="Bus Color Legend" onClick={onClose}>
     <div className="modal-card legend-exact" onClick={event=>event.stopPropagation()}>
       <h2>Bus Color Legend</h2>
-      <div className="legend-head-exact"><span>Bus Icon</span><span>Type</span></div>
-      {LEGEND_ROWS.map(row=><div className="legend-exact-row" key={row.key}>
-        <div className="legend-exact-icons">{row.colors.map(color=><span key={color} className="legend-exact-bus" style={{backgroundColor:color}}><Icon n="bus" size={22}/></span>)}</div>
+      <p className="legend-colour-note">Only exact live API colours and reviewed vehicle evidence are shown as physical colours. Unknown vehicles are neutral grey.</p>
+      <div className="legend-head-exact"><span>Bus Icon</span><span>Colour source</span></div>
+      {rows.map(row=><div className="legend-exact-row" key={row.key}>
+        <div className="legend-exact-icons"><span className="legend-exact-bus" style={{backgroundColor:row.color}}><Icon n="bus" size={22}/></span></div>
         <span className="legend-exact-type">{row.label}</span>
       </div>)}
       <button className="legend-understood" onClick={onClose}>Understood!</button>
