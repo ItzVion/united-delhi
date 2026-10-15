@@ -375,6 +375,9 @@ async function main() {
         console.log('DTC archive SHA-256 and all static counts match the database; no import is needed.');
         return;
       }
+      if (coverage.status === 'expired' && String(process.env.DTC_ALLOW_EXPIRED_CALENDAR || '').toLowerCase() !== 'true') {
+        throw new Error('SAFE REFUSAL: the DTC service calendar has expired. No data was changed. A topology-only replacement using this feed requires a separate review and DTC_ALLOW_EXPIRED_CALENDAR=true.');
+      }
       if (populated && String(process.env.DTC_STATIC_ALLOW_REPLACEMENT || '').toLowerCase() !== 'true') {
         throw new Error('SAFE REFUSAL: the database already contains static transit data, but its saved archive SHA-256 does not match this ZIP (or is not recorded). No rows were changed. Review a backup and the feed, then explicitly set DTC_STATIC_ALLOW_REPLACEMENT=true for an approved replacement.');
       }
