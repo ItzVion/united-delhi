@@ -22,7 +22,8 @@ if (String(process.env.METRO_STATIC_ALLOW_REPLACEMENT || '').toLowerCase() !== '
   try {
     const result = await syncMetroStatic(pool, {
       allowReplacement: true,
-      allowExpiredCalendar: String(process.env.METRO_ALLOW_EXPIRED_CALENDAR || '').toLowerCase() === 'true'
+      allowExpiredCalendar: String(process.env.METRO_ALLOW_EXPIRED_CALENDAR || '').toLowerCase() === 'true',
+      allowInvalidCalendar: String(process.env.METRO_ALLOW_INVALID_CALENDAR || '').toLowerCase() === 'true'
     });
     if (!result?.ok || result?.requiresApproval) {
       console.error(result?.reason || 'Metro sync did not complete; no success is claimed.');
