@@ -413,7 +413,6 @@ async function main() {
           );
         }
 
-        const validLinks = [...links.values()];
         for (const batch of batches(validLinks, 1000)) {
           const values = [];
           const sql = batch.map((x, index) => {
