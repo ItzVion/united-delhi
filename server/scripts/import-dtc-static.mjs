@@ -317,6 +317,7 @@ async function main() {
       if (links.size < 5000) {
         throw new Error('DTC static feed has unexpectedly few route-stop links; refusing to replace the live static database');
       }
+      const validLinks = [...links.values()];
 
       let feedVersion = null;
       let feedStart = null;
