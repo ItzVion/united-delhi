@@ -26,6 +26,38 @@ export const busColor=(v:{serviceColor?:string|null;busType?:string|null;fleetCo
   const color=String(v?.serviceColor??'').trim();
   return isHex(color)?color:UNKNOWN_BUS_MARKER_COLOR;
 };
+
+// These colours are for visual route distinction only, never evidence of physical bus paint.
+export const ROUTE_MARKER_PALETTE=[
+  '#2563EB','#0F766E','#C2410C','#7E22CE','#BE123C','#047857',
+  '#A16207','#0369A1','#6D28D9','#B91C1C','#0E7490','#4D7C0F'
+] as const;
+type BusMarkerInput={
+  id?:string|null;routeId?:string|null;routeShortName?:string|null;routeColor?:string|null;
+  serviceColor?:string|null;fleetColorSource?:string|null;
+};
+const verifiedVehicleColour=(v:BusMarkerInput)=>{
+  const source=String(v?.fleetColorSource||'');
+  const colour=String(v?.serviceColor??'').trim();
+  return (source==='upstream-api'||source==='verified-livery-record')&&isHex(colour)?colour:null;
+};
+export type BusMarkerKind='physical'|'route'|'distinctive';
+export const busMarkerKind=(v:BusMarkerInput):BusMarkerKind=>{
+  if(verifiedVehicleColour(v))return 'physical';
+  if(isHex(v?.routeColor))return 'route';
+  return 'distinctive';
+};
+export const busMarkerColor=(v:BusMarkerInput)=>{
+  const physical=verifiedVehicleColour(v);
+  if(physical)return physical;
+  const route=String(v?.routeColor??'').trim();
+  if(isHex(route))return route;
+  // Stable FNV-1a hash means the same route keeps its marker colour across refreshes.
+  const key=String(v?.routeId||v?.routeShortName||v?.id||'unassigned').trim().toUpperCase();
+  let hash=2166136261;
+  for(let i=0;i<key.length;i++){hash^=key.charCodeAt(i);hash=Math.imul(hash,16777619);}
+  return ROUTE_MARKER_PALETTE[(hash>>>0)%ROUTE_MARKER_PALETTE.length];
+};
 export const textOn=(bg:string)=>{if(!isHex(bg))return '#14211B';const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.179?'#14211B':'#FFFFFF'};
 
 export const routeName=(value:unknown)=>{
