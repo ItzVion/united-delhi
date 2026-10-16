@@ -11,9 +11,9 @@ export const BUS_CATEGORY_MARKER_COLORS={
 } as const;
 export function defaultBusCategoryColor(busType:string|null|undefined):string|null{
   const type=String(busType||'').trim().toUpperCase().replace(/[_-]+/g,' ').replace(/\\s+/g,' ');
-  if(/\\bEV\\b/.test(type)&&/\\bDEVI\\b/.test(type)&&/\\bAC\\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_AC;
-  if(/\\bCNG\\b/.test(type)&&/\\bNON\\s*AC\\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC;
-  if(/\\bCNG\\b/.test(type)&&/\\bAC\\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.CNG_AC;
+  if(/\bEV\b/.test(type)&&/\bDEVI\b/.test(type)&&/\bAC\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_AC;
+  if(/\bCNG\b/.test(type)&&/\bNON\s*AC\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC;
+  if(/\bCNG\b/.test(type)&&/\bAC\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.CNG_AC;
   return null;
 }
 
