@@ -2,10 +2,10 @@ import {useEffect,useRef} from 'react';
 import L from 'leaflet';
 import type {Vehicle} from '../api';
 import {busColor,esc,textOn,routeName} from '../lib';
-import {TILE,busIcon,busPopup} from './MapView';
+import {TILE,busIcon,busPopup,BUS_FRONT_SVG} from './MapView';
 export default function RouteMap({stops,buses,onStop}:{stops:any[];buses:Vehicle[];onStop:(id:string)=>void}){
  const el=useRef<HTMLDivElement>(null),mapRef=useRef<L.Map|null>(null),busLayer=useRef<L.LayerGroup|null>(null),stopRef=useRef(onStop);stopRef.current=onStop;
- const vehicleIdIcon=(b:Vehicle)=>{const label=routeName(b.routeShortName)||routeName(b.routeId)||'BUS',color=busColor(b),foreground='#FFFFFF';return L.divIcon({className:'vehicle-id-icon',iconSize:[Math.max(34,label.length*7),18],iconAnchor:[Math.max(17,label.length*3.5),9],html:'<span class="vehicle-id-marker" title="Route '+esc(label)+'; click to view vehicle details" style="background:'+esc(color)+';color:'+esc(foreground)+'">'+esc(label)+'</span>'})};
+ const vehicleIdIcon=(b:Vehicle)=>{const label=routeName(b.routeShortName)||routeName(b.routeId)||'BUS',color=busColor(b),width=Math.max(48,label.length*7+24);return L.divIcon({className:'vehicle-id-icon',iconSize:[width,22],iconAnchor:[width/2,11],html:'<span class="vehicle-id-marker" title="Route '+esc(label)+'; click to view vehicle details" style="background:'+esc(color)+';color:#FFFFFF"><span class="vehicle-id-glyph">'+BUS_FRONT_SVG+'</span><span>'+esc(label)+'</span></span>'})};
  const valid=stops.filter(s=>Number.isFinite(Number(s.latitude))&&Number.isFinite(Number(s.longitude)));
  const stopsKey=valid.map(s=>String(s.stop_id)).join(',');
  const stopsRef=useRef(valid);stopsRef.current=valid;
