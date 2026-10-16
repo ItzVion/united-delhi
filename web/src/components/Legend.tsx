@@ -1,13 +1,13 @@
 import {useEffect} from 'react';
 import {Icon} from './ui';
 import type {Vehicle} from '../api';
-import {ROUTE_MARKER_PALETTE,busMarkerKind} from '../lib';
+import {BUS_CATEGORY_MARKER_COLORS,ROUTE_MARKER_PALETTE,busMarkerKind} from '../lib';
 
 type Props={open:boolean;onClose:()=>void;vehicles:Vehicle[]};
 
 export default function Legend({open,onClose,vehicles}:Props){
   const counts=new Map<string,{source:'upstream-api'|'verified-livery-record';color:string;count:number}>();
-  let routeColourCount=0,displayPaletteCount=0;
+  let routeColourCount=0,categoryDefaultCount=0,displayPaletteCount=0;
   for(const vehicle of vehicles){
     const source=vehicle.fleetColorSource;
     const color=String(vehicle.serviceColor||'').trim();
@@ -17,7 +17,8 @@ export default function Legend({open,onClose,vehicles}:Props){
       else counts.set(key,{source,color:normalized,count:1});
     }else{
       const kind=busMarkerKind(vehicle);
-      if(kind==='route')routeColourCount++;
+      if(kind==='category-default')categoryDefaultCount++;
+      else if(kind==='route')routeColourCount++;
       else displayPaletteCount++;
     }
   }
@@ -34,13 +35,20 @@ export default function Legend({open,onClose,vehicles}:Props){
   return <div className="modal legend-modal" role="dialog" aria-modal="true" aria-label="Map Marker Colour Legend" onClick={onClose}>
     <div className="modal-card legend-exact" onClick={event=>event.stopPropagation()}>
       <h2>Map Marker Colours</h2>
-      <p className="legend-colour-note">A marker's colour distinguishes a route; it is not necessarily the physical paint on that bus. We show a real vehicle colour only when the live API supplies it or reviewed vehicle evidence verifies it.</p>
+      <p className="legend-colour-note">Category defaults and route colours improve map readability; they are not claims about physical paint. A real vehicle colour is shown only when the live API supplies it or reviewed vehicle evidence verifies it. We show a real vehicle colour only when the live API supplies it or reviewed vehicle evidence verifies it.</p>
       <div className="legend-section-title">Verified physical bus colours</div>
       {rows.length?rows.map(row=><div className="legend-exact-row" key={row.key}>
         <div className="legend-exact-icons"><span className="legend-exact-bus" style={{backgroundColor:row.color}}><Icon n="bus" size={22}/></span></div>
         <span className="legend-exact-type">{row.label}</span>
       </div>):<p className="legend-empty">No verified physical bus colours are currently supplied for the visible live fleet.</p>}
-      <div className="legend-section-title">Route distinction colours</div>
+      <div className="legend-section-title">Default colours by bus category</div>
+      <div className="legend-route-counts">
+        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC}}/>CNG non-AC · light orange</span>
+        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.CNG_AC}}/>CNG AC · Blue Whale blue</span>
+        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.EV_DEVI_AC}}/>EV AC (Devi) · light green</span>
+        <span>Visible buses using a category default <b>{categoryDefaultCount}</b></span>
+      </div>
+      <div className="legend-section-title">Other route distinction colours</div>
       <div className="legend-route-counts">
         <span><i className="legend-route-swatch" style={{backgroundColor:"#2563EB"}}/>Static GTFS route colour <b>{routeColourCount}</b></span>
         <span><i className="legend-route-swatch" style={{backgroundColor:ROUTE_MARKER_PALETTE[1]}}/>Display-only palette colour <b>{displayPaletteCount}</b></span>
