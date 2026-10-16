@@ -37,6 +37,7 @@ test('fallback marker palette is stable and never claimed to be physical paint',
   };
   assert.equal(busMarkerKind(vehicle), 'distinctive');
   assert.equal(busMarkerColor(vehicle), busMarkerColor(vehicle));
+  assert.equal(busMarkerColor({ ...vehicle, id: 'different-bus-on-same-route' }), busMarkerColor(vehicle));
   assert.ok(ROUTE_MARKER_PALETTE.includes(busMarkerColor(vehicle)));
 });
 
