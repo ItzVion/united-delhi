@@ -11,7 +11,7 @@ const hasEvidenceBackedBusColour=(v:Partial<Vehicle>)=>/^#[0-9a-f]{6}$/i.test(St
 export const busIcon=(v:Vehicle,small=false)=>{const bg=busMarkerColor(v),kind=busMarkerKind(v),known=kind==='physical',label=vehicleRoute(v),w=Math.max(small?34:38,label.length*6.5+(small?10:14)+(known?0:9)),h=small?16:18,badge=known?'':'<span class="bus-colour-unknown" title="Physical paint is unverified; marker colour is not a paint claim" aria-label="Physical bus colour unknown">?</span>',title=known&&v.fleetColorSource==='verified-livery-record'?'Physical colour verified from a reviewed vehicle record':known?'Physical colour supplied by the live API':kind==='route'?'Static GTFS route colour; not verified physical bus paint':'Display-only colour to distinguish this route; physical bus paint is unknown';return L.divIcon({className:'bus-icon',iconSize:[w,h],iconAnchor:[w/2,h/2],html:'<div class="bus-pill'+(known?'':' unknown-colour')+'" title="'+esc(title)+'" style="background:'+esc(bg)+';color:'+esc(textOn(bg))+'">'+(small?'':BUS_SVG)+badge+'<span>'+esc(label)+'</span></div>'})};
 const mapDotStyle=(v:Vehicle)=>{
  const color=busMarkerColor(v);
- // Keep a white halo so both official colours and neutral unknown markers stand out on map tiles.
+ // Keep a white halo so official route colours and display-only markers stand out on map tiles.
  return{radius:5,weight:1.5,color:'#FFFFFF',fillColor:color,fillOpacity:1};
 };
 export const busPopup=(v:Vehicle,withLink=true)=>{
