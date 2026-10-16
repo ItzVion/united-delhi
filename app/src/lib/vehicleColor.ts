@@ -3,6 +3,19 @@ import type { Vehicle, Arrival } from '../api/client';
 export type VehicleColor={background:string;text:string};
 type ApiVehicleColor={serviceColor?:string|null;busType?:string|null;fleetColorSource?:string|null};
 const UNKNOWN_BUS_MARKER_COLOR='#64748B';
+// Display defaults by service category; these are not claims about verified physical paint.
+export const BUS_CATEGORY_MARKER_COLORS={
+  CNG_NON_AC:'#FDBA74', // light orange
+  CNG_AC:'#0077B6', // Blue Whale blue
+  EV_DEVI_AC:'#90EE90' // light green
+} as const;
+export function defaultBusCategoryColor(busType:string|null|undefined):string|null{
+  const type=String(busType||'').trim().toUpperCase().replace(/[_-]+/g,' ').replace(/\\s+/g,' ');
+  if(/\\bEV\\b/.test(type)&&/\\bDEVI\\b/.test(type)&&/\\bAC\\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_AC;
+  if(/\\bCNG\\b/.test(type)&&/\\bNON\\s*AC\\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC;
+  if(/\\bCNG\\b/.test(type)&&/\\bAC\\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.CNG_AC;
+  return null;
+}
 
 function validApiColor(value:string|null|undefined):string|null{
   const color=String(value??'').trim();
@@ -43,6 +56,7 @@ export function hasEvidenceBackedVehicleColor(v:Partial<Vehicle>|Partial<Arrival
 }
 export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{
   const color=evidencedColor(v as ApiVehicleColor);
-  const background=color||UNKNOWN_BUS_MARKER_COLOR;
+  const categoryColor=defaultBusCategoryColor(v.busType);
+  const background=color||categoryColor||UNKNOWN_BUS_MARKER_COLOR;
   return {background,text:textFor(background)};
 }
