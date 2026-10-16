@@ -34,22 +34,37 @@ export const ROUTE_MARKER_PALETTE=[
 ] as const;
 type BusMarkerInput={
   id?:string|null;routeId?:string|null;routeShortName?:string|null;routeColor?:string|null;
-  serviceColor?:string|null;fleetColorSource?:string|null;
+  serviceColor?:string|null;fleetColorSource?:string|null;busType?:string|null;
 };
 const verifiedVehicleColour=(v:BusMarkerInput)=>{
   const source=String(v?.fleetColorSource||'');
   const colour=String(v?.serviceColor??'').trim();
   return (source==='upstream-api'||source==='verified-livery-record')&&isHex(colour)?colour:null;
 };
-export type BusMarkerKind='physical'|'route'|'distinctive';
+export const BUS_CATEGORY_MARKER_COLORS={
+  CNG_NON_AC:'#FDBA74', // light orange
+  CNG_AC:'#0077B6', // Blue Whale blue
+  EV_DEVI_AC:'#90EE90' // light green
+} as const;
+export function defaultBusCategoryColor(busType?:string|null):string|null{
+  const type=String(busType||'').trim().toUpperCase().replace(/[_-]+/g,' ').replace(/\\s+/g,' ');
+  if(/\\bEV\\b/.test(type)&&/\\bDEVI\\b/.test(type)&&/\\bAC\\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_AC;
+  if(/\\bCNG\\b/.test(type)&&/\\bNON\\s*AC\\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC;
+  if(/\\bCNG\\b/.test(type)&&/\\bAC\\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.CNG_AC;
+  return null;
+}
+export type BusMarkerKind='physical'|'category-default'|'route'|'distinctive';
 export const busMarkerKind=(v:BusMarkerInput):BusMarkerKind=>{
   if(verifiedVehicleColour(v))return 'physical';
+  if(defaultBusCategoryColor(v.busType))return 'category-default';
   if(isHex(v?.routeColor))return 'route';
   return 'distinctive';
 };
 export const busMarkerColor=(v:BusMarkerInput)=>{
   const physical=verifiedVehicleColour(v);
   if(physical)return physical;
+  const category=defaultBusCategoryColor(v.busType);
+  if(category)return category;
   const route=String(v?.routeColor??'').trim();
   if(isHex(route))return route;
   // Stable FNV-1a hash means the same route keeps its marker colour across refreshes.
