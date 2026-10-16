@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { busMarkerColor, busMarkerKind, ROUTE_MARKER_PALETTE } from '../src/lib.ts';
+import { busMarkerColor, busMarkerKind, ROUTE_MARKER_PALETTE, defaultBusCategoryColor, BUS_CATEGORY_MARKER_COLORS } from '../src/lib.ts';
 
 test('verified physical vehicle colour takes precedence over route colour', () => {
   const vehicle = {
@@ -51,4 +51,15 @@ test('unverified service colours and arbitrary identifiers cannot override marke
   };
   assert.equal(busMarkerKind(vehicle), 'distinctive');
   assert.ok(ROUTE_MARKER_PALETTE.includes(busMarkerColor(vehicle)));
+});
+
+test('requested category defaults are stable and do not override verified physical colour', () => {
+  assert.equal(defaultBusCategoryColor('CNG NonAC (12 mtr)'), BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
+  assert.equal(defaultBusCategoryColor('CNG AC (12 mtr)'), BUS_CATEGORY_MARKER_COLORS.CNG_AC);
+  assert.equal(defaultBusCategoryColor('EV DEVI AC (9 mtr)'), BUS_CATEGORY_MARKER_COLORS.EV_DEVI_AC);
+  assert.equal(busMarkerColor({ busType: 'CNG NonAC (12 mtr)', id: 'a' }), '#FDBA74');
+  assert.equal(busMarkerColor({ busType: 'CNG AC (12 mtr)', id: 'b' }), '#0077B6');
+  assert.equal(busMarkerColor({ busType: 'EV DEVI AC (9 mtr)', id: 'c' }), '#90EE90');
+  assert.equal(busMarkerColor({ busType: 'CNG AC (12 mtr)', serviceColor: '#FF0000', fleetColorSource: 'upstream-api' }), '#FF0000');
+  assert.equal(defaultBusCategoryColor('EV AC (12 mtr)'), null);
 });
