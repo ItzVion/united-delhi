@@ -7,8 +7,9 @@ import { rateLimit } from 'express-rate-limit';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import { SERVER_ROOT, STATIC_IMPORTER_PATH, resolveServerPath } from './runtime-paths.js';
+import { sha256Hex, sourceHasSha256 } from './gtfs-feed-utils.js';
 import {syncMetroStatic} from './metro-sync.js';
-import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,estimateFleetLiveryColor,classifyFleetTypeFromRegistration,getRouteLiveryProfile,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
+import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,classifyFleetTypeFromRegistration,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
 const COLOR_FIELD=parseColorFieldSpec(process.env.TRANSPORT_STACK_COLOR_FIELD);
 
 const {Pool}=pg,app=express();
@@ -91,12 +92,9 @@ const applyFleetRegistry=v=>{
  const upstreamColor=(!priorSource||priorSource==='upstream-api')?apiVehicleColorOnly(v?.serviceColor):null;
  const verified=vehicleIdentityKeys(v).map(key=>verifiedLiveryByKey.get(key)).find(Boolean)||null;
  const vehicle={...v,...(row?{busType:row.busType,serviceType:row.serviceType}:{})};
- const exactColor=resolveEvidenceBackedColor(upstreamColor,verified?.colorHex);
- const routeProfile=getRouteLiveryProfile(vehicle.routeShortName,vehicle.routeId);
- const estimatedColor=exactColor?null:routeProfile?.color||estimateFleetLiveryColor({busType:vehicle.busType,serviceType:vehicle.serviceType,routeAgency:vehicle.operator});
- const serviceColor=exactColor||estimatedColor;
- const fleetColorSource=upstreamColor?'upstream-api':verified?'verified-livery-record':routeProfile?'estimated-route-profile':estimatedColor?'estimated-fleet-type':'not-provided-by-realtime-feed';
- return {...vehicle,...(routeProfile?{busType:routeProfile.busType}:{}),serviceColor,fleetColorSource,
+ const serviceColor=resolveEvidenceBackedColor(upstreamColor,verified?.colorHex);
+ const fleetColorSource=upstreamColor?'upstream-api':verified?'verified-livery-record':'not-provided-by-realtime-feed';
+ return {...vehicle,serviceColor,fleetColorSource,
   ...(verified?{liveryVerification:{status:'verified',colorName:verified.colorName||null,source:verified.sourceLabel||null,evidenceUrl:verified.evidenceUrl||null,verifiedAt:verified.verifiedAt}}:{})};
 };
 
@@ -106,10 +104,7 @@ const busLiveryForRoute=routeId=>{
  const id=String(routeId||'').trim();
  if(!id)return {};
  const active=cache.vehicles.filter(v=>String(v.routeId||'')===id);
- const summary=summarizeRouteLivery(active);
- if(summary)return summary;
- const meta=routeMeta.get(id),profile=getRouteLiveryProfile(meta?.short_name,id);
- return profile?{busLiveryColor:profile.color,busLiverySource:'estimated-route-profile',busType:profile.busType,trackedBuses:0,matchingVehicles:0}:{};
+ return summarizeRouteLivery(active)||{};
 };
 const decoratePlannerOptions=options=>(Array.isArray(options)?options:[]).map(option=>({...option,legs:(Array.isArray(option.legs)?option.legs:[]).map(leg=>!leg.mode||leg.mode==='bus'?{...leg,...busLiveryForRoute(leg.routeId)}:leg)}));
 const DTC_STATIC_SOURCE_KEY=String(process.env.DTC_STATIC_SOURCE_KEY||'uploaded-dtc-static-local-v1-20261013').trim();
@@ -125,48 +120,66 @@ function autoImportDtcStaticIfEmpty(){
  void (async()=>{
   try{
    const [countResult,metaResult]=await Promise.all([
-    pool.query('SELECT COUNT(*)::int AS count FROM routes'),
-    pool.query('SELECT source_key,imported_route_count,imported_stop_count FROM static_feed_meta WHERE id=1').catch(()=>({rows:[]}))
+    pool.query(`SELECT
+      (SELECT COUNT(*)::int FROM routes) AS routes,
+      (SELECT COUNT(*)::int FROM stops) AS stops,
+      (SELECT COUNT(*)::int FROM route_stops) AS route_stops`),
+    pool.query('SELECT source_key,source_url,imported_route_count,imported_stop_count,imported_route_stop_count FROM static_feed_meta WHERE id=1').catch(()=>({rows:[]}))
    ]);
-   const routeCount=Number(countResult.rows[0]?.count)||0;
+   const counts=countResult.rows[0]||{};
+   const routeCount=Number(counts.routes)||0,stopCount=Number(counts.stops)||0,linkCount=Number(counts.route_stops)||0;
    const meta=metaResult.rows[0]||{};
-   if(meta.source_key===DTC_STATIC_SOURCE_KEY&&routeCount>=2500&&Number(meta.imported_stop_count)>=6000)return;
-   // Keep current rows until the configured local archive or explicitly configured URL is available.
+   const populated=routeCount>0||stopCount>0||linkCount>0;
+   if(populated){
+    let digest=null;
+    if(DTC_STATIC_FILE){
+     try{
+      const stat=await fs.stat(DTC_STATIC_FILE);
+      if(stat.isFile()&&stat.size>0)digest=sha256Hex(await fs.readFile(DTC_STATIC_FILE));
+     }catch(error){console.warn('Cannot fingerprint local DTC GTFS archive:',error?.message||error)}
+    }
+    const metadataMatches=meta.source_key===DTC_STATIC_SOURCE_KEY
+      &&Number(meta.imported_route_count)===routeCount
+      &&Number(meta.imported_stop_count)===stopCount
+      &&Number(meta.imported_route_stop_count)===linkCount;
+    if(digest&&sourceHasSha256(meta.source_url,digest)&&metadataMatches)return;
+    console.warn('Automatic DTC replacement suppressed: the populated database has no matching archive SHA-256 fingerprint, or its counts differ. Existing transit data is preserved. Review the feed and backups, then use the explicit import command with DTC_STATIC_ALLOW_REPLACEMENT=true if replacement is approved.');
+    return;
+   }
+   // Automatic import is permitted only for a genuinely empty static network.
    let sourceAvailable=false;
    const sourceDescription=DTC_STATIC_FILE||DTC_STATIC_BUNDLE_URL||'(not configured)';
    if(DTC_STATIC_FILE){
     try{
      const fileStat=await fs.stat(DTC_STATIC_FILE);
      sourceAvailable=fileStat.isFile()&&fileStat.size>0;
-    }catch(error){
-     console.warn('Local DTC GTFS archive is unavailable:',error?.message||error);
-    }
+    }catch(error){console.warn('Local DTC GTFS archive is unavailable:',error?.message||error)}
    }else if(DTC_STATIC_BUNDLE_URL){
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
     try{
      const response=await fetch(DTC_STATIC_BUNDLE_URL,{method:'HEAD',signal:controller.signal});
      sourceAvailable=response.ok;
      if(!response.ok)console.warn('DTC GTFS URL returned HTTP '+response.status+'.');
-    }catch(error){
-     console.warn('DTC GTFS source check failed:',error?.message||error);
-    }finally{clearTimeout(timer)}
+    }catch(error){console.warn('DTC GTFS source check failed:',error?.message||error)}
+    finally{clearTimeout(timer)}
    }
    if(!sourceAvailable){
-    console.warn('DTC GTFS source is unavailable ('+sourceDescription+'); retaining existing static data and retrying shortly.');
+    console.warn('DTC GTFS source is unavailable ('+sourceDescription+'); empty database left unchanged; retrying in five minutes.');
     scheduleDtcStaticRetry();
     return;
    }
    if(dtcAutoImportRunning)return;
    dtcAutoImportRunning=true;
-   console.log('DTC GTFS source is available; importing static data from '+sourceDescription+'.');
+   console.log('DTC GTFS source is available; initializing the empty static database from '+sourceDescription+'.');
    const importEnv={...process.env,DTC_STATIC_SOURCE_KEY};
+   delete importEnv.DTC_STATIC_ALLOW_REPLACEMENT;
    if(DTC_STATIC_FILE){
     importEnv.DTC_STATIC_FILE=DTC_STATIC_FILE;
     delete importEnv.DTC_STATIC_URL;
    }else{
     importEnv.DTC_STATIC_URL=DTC_STATIC_BUNDLE_URL;
    }
-    const child=spawn(process.execPath,[STATIC_IMPORTER_PATH],{cwd:SERVER_ROOT,env:importEnv,stdio:['ignore','pipe','pipe']});
+   const child=spawn(process.execPath,[STATIC_IMPORTER_PATH],{cwd:SERVER_ROOT,env:importEnv,stdio:['ignore','pipe','pipe']});
    child.stdout.on('data',chunk=>console.log('[DTC static importer] '+String(chunk).trimEnd()));
    child.stderr.on('data',chunk=>console.warn('[DTC static importer] '+String(chunk).trimEnd()));
    child.on('error',error=>{
@@ -181,21 +194,18 @@ function autoImportDtcStaticIfEmpty(){
      void (async()=>{
       await loadRouteMeta();
       cache.vehicles=cache.vehicles.map(applyRouteMeta);
-      console.log('Supplied DTC static feed imported; route metadata and cached vehicles refreshed.');
+      console.log('Supplied DTC static feed initialized; route metadata and cached vehicles refreshed.');
      })().catch(error=>console.error('Post-import metadata refresh failed:',error?.message||error));
     }else{
-     console.error('Supplied DTC static importer exited with code '+code+'. Retrying in five minutes.');
-     scheduleDtcStaticRetry();
+     console.error('Automatic DTC initial import exited with code '+code+'. Existing database was empty at launch.');
     }
    });
   }catch(error){
    dtcAutoImportRunning=false;
-   console.error('DTC static sync check failed:',error?.message||error);
-   scheduleDtcStaticRetry();
+   console.error('DTC static source check failed:',error?.message||error);
   }
  })();
 }
-
 async function loadDatabaseVehicleCache(){
  if(!pool)return;
  try{
@@ -674,6 +684,7 @@ function scheduleMetroStaticRetry(){
 function runMetroStaticSync(){
  if(!pool||String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()==='false')return;
  void syncMetroStatic(pool).then(result=>{
+  if(result?.requiresApproval){console.warn(result.reason||'DMRC refresh requires explicit approval; existing data preserved.');return;}
   if(!result?.ok)throw new Error(result?.reason||'Metro static sync did not complete');
  }).catch(error=>{
   console.error('Uploaded DMRC static sync failed:',error?.message||error);

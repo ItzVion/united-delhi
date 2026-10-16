@@ -1,16 +1,29 @@
 import {useEffect} from 'react';
 import {Icon} from './ui';
 import type {Vehicle} from '../api';
+import {BUS_CATEGORY_MARKER_COLORS,ROUTE_MARKER_PALETTE,busMarkerKind} from '../lib';
 
 type Props={open:boolean;onClose:()=>void;vehicles:Vehicle[]};
-const LEGEND_ROWS=[
-  {key:'ev-ac-12',label:'EV AC (12 mtr)',colors:['#52C2D6']},
-  {key:'ev-devi-ac-9',label:'EV DEVI AC (9 mtr)',colors:['#52C2D6','#229552']},
-  {key:'cng-ac-12',label:'CNG AC (12 mtr)',colors:['#3081EB','#ED4A4D']},
-  {key:'cng-nonac-12',label:'CNG NonAC (12 mtr)',colors:['#F1A96E','#61E29A']}
-];
 
-export default function Legend({open,onClose}:Props){
+export default function Legend({open,onClose,vehicles}:Props){
+  const counts=new Map<string,{source:'upstream-api'|'verified-livery-record';color:string;count:number}>();
+  let routeColourCount=0,categoryDefaultCount=0,displayPaletteCount=0;
+  for(const vehicle of vehicles){
+    const source=vehicle.fleetColorSource;
+    const color=String(vehicle.serviceColor||'').trim();
+    if((source==='upstream-api'||source==='verified-livery-record')&&/^#[0-9a-f]{6}$/i.test(color)){
+      const normalized=color.toUpperCase(),key=source+':'+normalized,prior=counts.get(key);
+      if(prior)prior.count++;
+      else counts.set(key,{source,color:normalized,count:1});
+    }else{
+      const kind=busMarkerKind(vehicle);
+      if(kind==='category-default')categoryDefaultCount++;
+      else if(kind==='route')routeColourCount++;
+      else displayPaletteCount++;
+    }
+  }
+  const rows=[...counts.values()].sort((a,b)=>a.source.localeCompare(b.source)||b.count-a.count||a.color.localeCompare(b.color))
+    .map(row=>({key:row.source+':'+row.color,label:(row.source==='upstream-api'?'Live API · physical colour':'Reviewed physical colour')+' · '+row.color+' ('+row.count+')',color:row.color}));
   useEffect(()=>{
     if(!open)return;
     const keydown=(event:KeyboardEvent)=>{if(event.key==='Escape')onClose()};
@@ -19,15 +32,32 @@ export default function Legend({open,onClose}:Props){
   },[open,onClose]);
   if(!open)return null;
 
-  return <div className="modal legend-modal" role="dialog" aria-modal="true" aria-label="Bus Color Legend" onClick={onClose}>
+  return <div className="modal legend-modal" role="dialog" aria-modal="true" aria-label="Map Marker Colour Legend" onClick={onClose}>
     <div className="modal-card legend-exact" onClick={event=>event.stopPropagation()}>
-      <h2>Bus Color Legend</h2>
-      <div className="legend-head-exact"><span>Bus Icon</span><span>Type</span></div>
-      {LEGEND_ROWS.map(row=><div className="legend-exact-row" key={row.key}>
-        <div className="legend-exact-icons">{row.colors.map(color=><span key={color} className="legend-exact-bus" style={{backgroundColor:color}}><Icon n="bus" size={22}/></span>)}</div>
+      <h2>Map Marker Colours</h2>
+      <p className="legend-colour-note">Category defaults and route colours improve map readability; they are not claims about physical paint. A real vehicle colour is shown only when the live API supplies it or reviewed vehicle evidence verifies it. We show a real vehicle colour only when the live API supplies it or reviewed vehicle evidence verifies it.</p>
+      <div className="legend-section-title">Verified physical bus colours</div>
+      {rows.length?rows.map(row=><div className="legend-exact-row" key={row.key}>
+        <div className="legend-exact-icons"><span className="legend-exact-bus" style={{backgroundColor:row.color}}><Icon n="bus" size={22}/></span></div>
         <span className="legend-exact-type">{row.label}</span>
-      </div>)}
-      <button className="legend-understood" onClick={onClose}>Understood!</button>
+      </div>):<p className="legend-empty">No verified physical bus colours are currently supplied for the visible live fleet.</p>}
+      <div className="legend-section-title">Default colours by bus category</div>
+      <div className="legend-route-counts">
+        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC}}/>CNG non-AC · light orange</span>
+        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.CNG_AC}}/>CNG AC · Blue Whale blue</span>
+        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.EV_DEVI_AC}}/>EV AC (Devi) · light green</span>
+        <span>Visible buses using a category default <b>{categoryDefaultCount}</b></span>
+      </div>
+      <div className="legend-section-title">Other route distinction colours</div>
+      <div className="legend-route-counts">
+        <span><i className="legend-route-swatch" style={{backgroundColor:"#2563EB"}}/>Static GTFS route colour <b>{routeColourCount}</b></span>
+        <span><i className="legend-route-swatch" style={{backgroundColor:ROUTE_MARKER_PALETTE[1]}}/>Display-only palette colour <b>{displayPaletteCount}</b></span>
+      </div>
+      <div className="legend-palette" aria-label="Display-only marker palette">
+        {ROUTE_MARKER_PALETTE.map((color,index)=><span key={color} title={'Display-only marker palette colour '+(index+1)} style={{backgroundColor:color}}/>)}
+      </div>
+      <p className="legend-empty">A ? on a marker means that bus's physical paint is not verified. Palette colours are stable for the same route between refreshes.</p>
+      <button className="legend-understood" onClick={onClose}>Got it</button>
     </div>
   </div>;
 }

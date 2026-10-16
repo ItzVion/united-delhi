@@ -16,9 +16,8 @@ export function resolveEvidenceBackedColor(upstreamColor, verifiedLiveryColor) {
   return validHexColor(upstreamColor) || validHexColor(verifiedLiveryColor);
 }
 
-// Best-effort visual estimates when the API and reviewed vehicle records have no colour.
-// Route colours and route IDs are never used as physical-livery evidence.
-// Classify only the known fleet-registration families; registration alone does not prove paint colour.
+// Classify known registration families for vehicle category only.
+// Registration alone never proves a vehicle's physical paint colour.
 export function classifyFleetTypeFromRegistration(...values) {
   const candidates=values.map(value=>String(value||'').toUpperCase().replace(/[-_\\s]/g,'')).filter(Boolean);
   const electricNine=['DL1GD','DL2GD','DL5GD','DL7GD','DL11GD','DL12GD','DL13GD'];
@@ -34,21 +33,14 @@ export function classifyFleetTypeFromRegistration(...values) {
   return {serviceType:'unknown',busType:'Unknown'};
 }
 
-// User-confirmed route-specific profile. Route 772 is reported to use blue AC buses;
-// this is a route rule, not evidence that GTFS-RT supplies physical livery per vehicle.
-export function getRouteLiveryProfile(routeShortName, routeId) {
-  const normalise = value => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const labels = [routeShortName, routeId].map(normalise);
-  if (labels.some(value => /^772(?:UP|DOWN|DWN)?$/.test(value))) {
-    return { routeNumber: '772', busType: 'CNG AC (12 mtr)', color: '#2563EB' };
-  }
-  return null;
-}
-
+// Physical-livery summaries include only exact per-vehicle upstream colours or reviewed records.
+// Route colours, registration families and fleet/service categories are not vehicle-paint evidence.
 export function summarizeRouteLivery(vehicles = []) {
   const byColor = new Map();
   let trackedBuses = 0;
   for (const vehicle of Array.isArray(vehicles) ? vehicles : []) {
+    const source = String(vehicle?.fleetColorSource || '');
+    if (source !== 'upstream-api' && source !== 'verified-livery-record') continue;
     const color = validHexColor(vehicle?.serviceColor);
     if (!color) continue;
     trackedBuses++;
@@ -59,43 +51,17 @@ export function summarizeRouteLivery(vehicles = []) {
       byColor.set(key, row);
     }
     row.count++;
-    const source = String(vehicle?.fleetColorSource || 'estimated-fleet-type');
     row.sources.set(source, (row.sources.get(source) || 0) + 1);
     const type = String(vehicle?.busType || 'Unknown');
     row.types.set(type, (row.types.get(type) || 0) + 1);
   }
   if (!trackedBuses) return null;
-  const sourceWeight = source => source === 'upstream-api' ? 4 : source === 'verified-livery-record' ? 3 : source === 'estimated-route-profile' ? 2 : 1;
+  const sourceWeight = source => source === 'upstream-api' ? 4 : 3;
   const ranked = [...byColor.values()].sort((a, b) => b.count - a.count || b.color.localeCompare(a.color));
   const winner = ranked[0];
-  const source = [...winner.sources.entries()].sort((a, b) => b[1] - a[1] || sourceWeight(b[0]) - sourceWeight(a[0]))[0]?.[0] || 'estimated-fleet-type';
+  const source = [...winner.sources.entries()].sort((a, b) => b[1] - a[1] || sourceWeight(b[0]) - sourceWeight(a[0]))[0]?.[0] || 'upstream-api';
   const busType = [...winner.types.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || 'Unknown';
   return { busLiveryColor: winner.color, busLiverySource: source, busType, trackedBuses, matchingVehicles: winner.count };
-}
-
-export function estimateFleetLiveryColor({ busType, serviceType, routeAgency, operator } = {}) {
-  const type = String(busType || '').toLowerCase().replace(/[_-]+/g, ' ');
-  // This field is the GTFS route agency, not verified vehicle ownership. Treat it as a clue only.
-  const agency = String(routeAgency || operator || '').trim().toUpperCase();
-  const dotRoute = agency === 'DOT' || /DIMTS|CLUSTER/.test(agency);
-  const nonAc = /non\s*ac|non\s*air\s*conditioned/.test(type);
-  const ac = !nonAc && (/\bac\b|air\s*conditioned/.test(type));
-  const cluster = /DIMTS|CLUSTER/.test(agency);
-  const mohalla = /mohalla/.test(type + ' ' + agency);
-  const devi = /\bdevi\b/.test(type);
-  const cng = /cng/.test(type);
-  const electric = serviceType === 'electric' || /\bev\b|electric/.test(type);
-  if (mohalla) return null;
-  if (devi && ac) return '#229552';
-  if (electric && /9\\s*mtr/.test(type) && ac) return '#229552';
-  if (electric && ac) return '#52C2D6';
-  if (cng && nonAc) return dotRoute ? '#F97316' : '#238B45';
-  // DTC's old red AC low-floor fleet has been retired; currently visible AC CNG
-  // services are generally blue cluster/contracted buses. Exact API/reviewed colours win.
-  if (cng && ac) return '#2563EB';
-  if (cluster && nonAc) return '#F97316';
-  if (cluster && ac) return '#2563EB';
-  return null;
 }
 
 const KNOWN = {
@@ -223,23 +189,20 @@ export function scanEntities(bytes) {
   return result;
 }
 
-// Map<vehicleKey, '#RRGGBB'>. With no explicit field setting, inspect vehicle-scoped
-// extensions attached to the vehicle entity, position, or descriptor. Never infer colour from other data.
+// Map<vehicleKey, '#RRGGBB'> for one explicitly configured provider extension.
+// GTFS-Realtime has no standard physical-paint field; arbitrary hex-looking extensions are untrusted.
 export function extractColorsByVehicle(bytes, spec) {
   const config = typeof spec === 'string' ? parseColorFieldSpec(spec) : spec;
   const colors = new Map();
+  if (!config
+    || !['VehicleDescriptor', 'VehiclePosition', 'FeedEntity'].includes(config.message)
+    || !Number.isInteger(config.field)
+    || !isGtfsExtensionField(config.field)) return colors;
 
   for (const record of scanEntities(bytes)) {
-    const candidates = record.unknown.filter(field => {
-      if (field.wireType !== 2) return false;
-      if (config) return field.message === config.message && field.field === config.field;
-      if (!isGtfsExtensionField(field.field)) return false;
-      return field.message === 'VehicleDescriptor' || field.message === 'VehiclePosition' || field.message === 'FeedEntity';
-    });
-
-    const priority = { VehicleDescriptor: 0, VehiclePosition: 1, FeedEntity: 2 };
-    candidates.sort((a, b) => priority[a.message] - priority[b.message]);
-
+    const candidates = record.unknown.filter(field =>
+      field.wireType === 2 && field.message === config.message && field.field === config.field
+    );
     for (const candidate of candidates) {
       const color = validHexColor(candidate.value);
       if (!color) continue;

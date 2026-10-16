@@ -5,10 +5,8 @@ import {
   validHexColor,
   apiVehicleColorOnly,
   resolveEvidenceBackedColor,
-  estimateFleetLiveryColor,
   summarizeRouteLivery,
   classifyFleetTypeFromRegistration,
-  getRouteLiveryProfile,
   scanEntities,
   extractColorsByVehicle,
   parseColorFieldSpec
@@ -82,16 +80,11 @@ test('VehiclePosition.position field 2 is never mistaken for VehicleDescriptor',
   assert.equal(entity.vehicleId, 'DL1PD4669');
 });
 
-test('auto-detects exact colour in VehicleDescriptor extensions', () => {
-  assert.equal(extractColorsByVehicle(feed()).get('DL1PD4669'), '#F97316');
-});
-
-test('auto-detects exact colour in VehiclePosition extensions', () => {
-  assert.equal(extractColorsByVehicle(feed({ where: 'position' })).get('DL1PD4669'), '#F97316');
-});
-
-test('auto-detects exact colour in FeedEntity extensions', () => {
-  assert.equal(extractColorsByVehicle(feed({ where: 'entity' })).get('DL1PD4669'), '#F97316');
+test('unconfigured hex-looking GTFS-Realtime extensions are never treated as physical colours', () => {
+  assert.equal(extractColorsByVehicle(feed()).size, 0);
+  assert.equal(extractColorsByVehicle(feed({ where: 'position' })).size, 0);
+  assert.equal(extractColorsByVehicle(feed({ where: 'entity' })).size, 0);
+  assert.equal(extractColorsByVehicle(feed(), null).size, 0);
 });
 
 test('explicit extension configuration is respected exactly', () => {
@@ -105,8 +98,9 @@ test('explicit extension configuration is respected exactly', () => {
   assert.equal(parseColorFieldSpec('invalid:1001'), null);
 });
 
-test('auto-detection ignores field numbers outside GTFS extension ranges', () => {
+test('unconfigured fields are ignored regardless of whether their number looks like an extension', () => {
   assert.equal(extractColorsByVehicle(feed({ extNum: 99 })).size, 0);
+  assert.equal(extractColorsByVehicle(feed({ extNum: 1001 })).size, 0);
 });
 
 test('invalid API colour values are ignored by the raw feed decoder', () => {
@@ -123,34 +117,32 @@ test('fleet registration classification includes the current Delhi EV prefix fam
   assert.deepEqual(classifyFleetTypeFromRegistration('random-id'), {serviceType:'unknown',busType:'Unknown'});
 });
 
-test('route 772 profile stays blue AC for both directional route labels', () => {
-  assert.deepEqual(getRouteLiveryProfile('772DOWN', '778'), {routeNumber:'772',busType:'CNG AC (12 mtr)',color:'#2563EB'});
-  assert.deepEqual(getRouteLiveryProfile('772UP', '779'), {routeNumber:'772',busType:'CNG AC (12 mtr)',color:'#2563EB'});
-  assert.equal(getRouteLiveryProfile('7721DOWN', '7721'), null);
-  assert.equal(getRouteLiveryProfile('778', '778'), null);
-});
-
-test('fleet-colour estimates distinguish common vehicle and cluster categories', () => {
-  assert.equal(estimateFleetLiveryColor({busType:'CNG NonAC (12 mtr)',serviceType:'dtc',routeAgency:'DTC'}), '#238B45');
-  assert.equal(estimateFleetLiveryColor({busType:'CNG NonAC (12 mtr)',serviceType:'dtc',routeAgency:'DOT'}), '#F97316');
-  assert.equal(estimateFleetLiveryColor({busType:'CNG AC (12 mtr)',serviceType:'dtc',routeAgency:'DTC'}), '#2563EB');
-  assert.equal(estimateFleetLiveryColor({busType:'CNG AC (12 mtr)',serviceType:'dtc',routeAgency:'DOT'}), '#2563EB');
-  assert.equal(estimateFleetLiveryColor({busType:'EV AC (12 mtr)',serviceType:'electric',routeAgency:'DTC'}), '#52C2D6');
-  assert.equal(estimateFleetLiveryColor({busType:'EV DEVI AC (9 mtr)',serviceType:'electric',routeAgency:'DTC'}), '#229552');
-  assert.equal(estimateFleetLiveryColor({busType:'Non-AC',serviceType:'unknown',routeAgency:'DIMTS Cluster'}), '#F97316');
-  assert.equal(estimateFleetLiveryColor({busType:'AC',serviceType:'unknown',routeAgency:'DIMTS'}), '#2563EB');
-  assert.equal(estimateFleetLiveryColor({busType:'Unknown',serviceType:'unknown',routeAgency:'OTD'}), null);
-  assert.equal(estimateFleetLiveryColor({busType:'Mohalla EV AC',serviceType:'electric'}), null);
-});
-
-test('route livery colour follows the dominant currently tracked bus colour', () => {
+test('route livery summaries ignore estimates and only count evidenced vehicle colours', () => {
   assert.deepEqual(summarizeRouteLivery([
     {serviceColor:'#2563EB',fleetColorSource:'estimated-fleet-type',busType:'CNG AC'},
+    {serviceColor:'#2563EB',fleetColorSource:'upstream-api',busType:'CNG AC'},
+    {serviceColor:'#2563EB',fleetColorSource:'upstream-api',busType:'CNG AC'},
+    {serviceColor:'#F97316',fleetColorSource:'verified-livery-record',busType:'CNG NonAC'},
+    {serviceColor:'#F97316',fleetColorSource:'estimated-route-profile',busType:'CNG NonAC'}
+  ]), {
+    busLiveryColor:'#2563EB',busLiverySource:'upstream-api',busType:'CNG AC',
+    trackedBuses:3,matchingVehicles:2
+  });
+  assert.equal(summarizeRouteLivery([
+    {serviceColor:'#2563EB',fleetColorSource:'estimated-fleet-type'},
+    {serviceColor:'#F97316',fleetColorSource:'estimated-route-profile'},
+    {serviceColor:'#64748B',fleetColorSource:'not-provided-by-realtime-feed'}
+  ]), null);
+});
+
+test('route livery summary counts only API/reviewed colours and ignores estimates', () => {
+  assert.deepEqual(summarizeRouteLivery([
+    {serviceColor:'#2563EB',fleetColorSource:'upstream-api',busType:'CNG AC'},
     {serviceColor:'#2563EB',fleetColorSource:'upstream-api',busType:'CNG AC'},
     {serviceColor:'#F97316',fleetColorSource:'estimated-fleet-type',busType:'CNG NonAC'}
   ]), {
     busLiveryColor:'#2563EB',busLiverySource:'upstream-api',busType:'CNG AC',
-    trackedBuses:3,matchingVehicles:2
+    trackedBuses:2,matchingVehicles:2
   });
   assert.equal(summarizeRouteLivery([{serviceColor:null,fleetColorSource:'not-provided-by-realtime-feed'}]), null);
 });
