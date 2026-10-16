@@ -7,7 +7,7 @@ type Props={open:boolean;onClose:()=>void;vehicles:Vehicle[]};
 
 export default function Legend({open,onClose,vehicles}:Props){
   const counts=new Map<string,{source:'upstream-api'|'verified-livery-record';color:string;count:number}>();
-  let routeColourCount=0,displayPaletteCount=0,physicalCount=0;
+  let routeColourCount=0,displayPaletteCount=0;
   for(const vehicle of vehicles){
     const source=vehicle.fleetColorSource;
     const color=String(vehicle.serviceColor||'').trim();
@@ -15,7 +15,6 @@ export default function Legend({open,onClose,vehicles}:Props){
       const normalized=color.toUpperCase(),key=source+':'+normalized,prior=counts.get(key);
       if(prior)prior.count++;
       else counts.set(key,{source,color:normalized,count:1});
-      physicalCount++;
     }else{
       const kind=busMarkerKind(vehicle);
       if(kind==='route')routeColourCount++;
