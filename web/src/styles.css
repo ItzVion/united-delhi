@@ -327,3 +327,16 @@ body,#root{background:var(--bg)}
  .nav button::before{transition:none!important}
  .planner-page .trip{transition:none!important}
 }
+
+/* Map colour legend: distinguish real vehicle-livery evidence from display-only route colours. */
+.legend-modal .legend-card,.legend-modal .modal-card{max-height:min(82dvh,720px);overflow:auto;gap:12px}
+.legend-colour-note{font-size:13px;line-height:1.5;color:#53616b;background:#F3F6F8;border:1px solid #DDE4E8;border-radius:12px;padding:10px 12px}
+.legend-section-title{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#697783;margin-top:4px}
+.legend-empty{font-size:12px;line-height:1.45;color:#6B7280}
+.legend-route-counts{display:flex;flex-direction:column;gap:8px}
+.legend-route-counts>span{display:flex;align-items:center;gap:8px;font-size:13px;color:#334155}
+.legend-route-counts b{margin-left:auto;font-variant-numeric:tabular-nums}
+.legend-route-swatch{width:12px;height:12px;border-radius:4px;border:1px solid #0001;display:inline-block;flex:none}
+.legend-palette{display:flex;flex-wrap:wrap;gap:7px;padding:3px 0}
+.legend-palette>span{width:26px;height:16px;border-radius:5px;box-shadow:0 1px 3px #0003;border:1px solid #fff8}
+.legend-understood{width:100%;height:44px;border-radius:12px;background:var(--g);color:#fff;text-align:center;font-size:14px;font-weight:750;display:grid;place-items:center;margin-top:4px}
