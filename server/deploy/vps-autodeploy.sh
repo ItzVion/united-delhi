@@ -52,6 +52,7 @@ print(json.dumps({"content": message, "allowed_mentions": {"parse": []}}))
 PY
 )"
     if curl --fail --silent --show-error --max-time 45 --retry 2 --retry-all-errors \
+      --user-agent "DiscordBot (https://github.com/ItzVion/united-delhi, 1.0)" \
       -F "payload_json=$payload" \
       -F "files[0]=@$archive;type=application/gzip;filename=$(basename "$archive")" \
       "${DISCORD_WEBHOOK_URL}?wait=true" \
