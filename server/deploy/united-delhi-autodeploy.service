@@ -15,5 +15,5 @@ Environment=ANDROID_HOME=/opt/android-sdk
 Environment=ANDROID_SDK_ROOT=/opt/android-sdk
 Environment=GRADLE_USER_HOME=/home/uddeploy/.gradle
 Environment=PATH=/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/usr/local/bin:/usr/bin:/bin
-ExecStart=/opt/united-delhi/repo/server/deploy/vps-autodeploy.sh
+ExecStart=/usr/bin/bash /opt/united-delhi/repo/server/deploy/vps-autodeploy.sh
 TimeoutStartSec=3600
