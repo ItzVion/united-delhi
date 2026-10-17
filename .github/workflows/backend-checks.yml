@@ -130,8 +130,8 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${DISCORD_WEBHOOK_URL:-}" ]]; then
-            echo "::error::DISCORD_WEBHOOK_URL is not configured. Add it under repository Settings > Secrets and variables > Actions."
-            exit 1
+            echo "::warning::DISCORD_WEBHOOK_URL is not configured. Add it under repository Settings > Secrets and variables > Actions to enable Discord failure alerts."
+            exit 0
           fi
 
           python3 - <<'PY' > "$RUNNER_TEMP/discord-payload.json"
