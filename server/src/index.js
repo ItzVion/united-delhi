@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import { SERVER_ROOT, STATIC_IMPORTER_PATH, resolveServerPath } from './runtime-paths.js';
 import { sha256Hex, sourceHasSha256 } from './gtfs-feed-utils.js';
 import {syncMetroStatic} from './metro-sync.js';
+import {createRealtimeRequest} from './realtime-provider.js';
 import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,classifyFleetTypeFromRegistration,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
 const COLOR_FIELD=parseColorFieldSpec(process.env.OTD_COLOR_FIELD||process.env.TRANSPORT_STACK_COLOR_FIELD);
 
@@ -290,26 +291,22 @@ function parseVehicle(e,feedTs,colors){
  return{id,routeId:str(v?.trip?.routeId),tripId:str(v?.trip?.tripId),stopId:str(v?.stopId),vehicleLabel:str(v?.vehicle?.label),licensePlate:str(v?.vehicle?.licensePlate),serviceColor,latitude:lat,longitude:lon,bearing:num(p.bearing),observedAt:new Date(ts*1000).toISOString()};
 }
 async function fetchLive(){
- const useOtd=Boolean(OTD_API_KEY);
- if(!useOtd&&!TRANSPORT_STACK_KEY)throw new Error('OTD_API_KEY is not configured (preferred); TRANSPORT_STACK_API_KEY fallback is also absent');
- const u=new URL(useOtd?OTD_REALTIME_FEED:TRANSPORT_STACK_FEED);
- // OTD authenticates realtime requests with ?key=...; keep it server-side and never log the URL.
- if(useOtd)u.searchParams.set('key',OTD_API_KEY);
+ const request=createRealtimeRequest({
+  otdApiKey:OTD_API_KEY,otdUrl:OTD_REALTIME_FEED,
+  transportStackApiKey:TRANSPORT_STACK_KEY,transportStackUrl:TRANSPORT_STACK_FEED
+ });
+ // The request builder keeps the OTD key server-side and rejects redirects that could forward it.
  const ac=new AbortController(),t=setTimeout(()=>ac.abort(),12000);
- const headers=useOtd
-  ?{accept:'*/*','user-agent':'United-Delhi/2.0'}
-  :{'x-api-key':TRANSPORT_STACK_KEY,accept:'*/*','user-agent':'United-Delhi/2.0'};
  try{
-  const r=await fetch(u,{signal:ac.signal,headers});
-  const provider=useOtd?'OTD':'Transport Stack';
-  if(!r.ok)throw new Error(provider+' realtime HTTP '+r.status);
+  const r=await fetch(request.url,{signal:ac.signal,headers:request.headers,redirect:request.redirect});
+  if(!r.ok)throw new Error(request.provider+' realtime HTTP '+r.status);
   const b=new Uint8Array(await r.arrayBuffer());
   if(b.length>10*1024*1024)throw new Error('Realtime feed exceeds safety limit');
   const f=GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(b),m=new Map(),colors=extractColorsByVehicle(b,COLOR_FIELD);
   for(const e of f.entity||[]){const v=parseVehicle(e,Number(f.header?.timestamp||0),colors);if(v)m.set(v.id,v)}
-  return{vehicles:[...m.values()],source:useOtd?'otd-live':'transport-stack-live',provider};
+  return{vehicles:[...m.values()],source:request.source,provider:request.provider};
  }catch(e){
-  if(e?.name==='AbortError')throw new Error((useOtd?'OTD':'Transport Stack')+' realtime request timed out');
+  if(e?.name==='AbortError')throw new Error(request.provider+' realtime request timed out');
   throw e;
  }finally{clearTimeout(t)}
 }
