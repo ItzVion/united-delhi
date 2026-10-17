@@ -51,8 +51,8 @@ export function generateRouteColor(shortName, routeId) {
   // Hash bits choose hue, saturation, and lightness. Keeping saturation high
   // and lightness within 40–50% avoids grey/muddy, nearly-black, and near-white fills.
   const hue = digest.readUInt16BE(0) / 65535 * 360;
-  const saturation = 0.68 + (digest[2] / 255) * 0.17;
-  const lightness = 0.40 + (digest[3] / 255) * 0.10;
+  const saturation = 0.68 + (digest[2] / 255) * 0.14;
+  const lightness = 0.45 + (digest[3] / 255) * 0.07;
   return rgbHex(hslToRgb(hue, saturation, lightness));
 }
 
