@@ -10,6 +10,12 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
+      - key: OTD_API_KEY
+        sync: false
+      - key: OTD_REALTIME_URL
+        value: "https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb"
+      - key: OTD_COLOR_FIELD
+        sync: false
       - key: TRANSPORT_STACK_API_KEY
         sync: false
       - key: TRANSPORT_STACK_REALTIME_URL
