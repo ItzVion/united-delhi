@@ -23,7 +23,7 @@ getent group united-delhi >/dev/null || groupadd --system united-delhi
 id united-delhi >/dev/null 2>&1 || useradd --system --gid united-delhi --home-dir /nonexistent --no-create-home --shell /usr/sbin/nologin united-delhi
 id uddeploy >/dev/null 2>&1 || useradd --create-home --home-dir /home/uddeploy --shell /bin/bash uddeploy
 install -d -o root -g united-delhi -m 0750 /etc/united-delhi /opt/united-delhi/data
-install -d -o uddeploy -g uddeploy -m 0755 /opt/united-delhi /opt/united-delhi/releases /opt/united-delhi/artifacts /opt/united-delhi/state
+install -d -o uddeploy -g uddeploy -m 0755 /opt/united-delhi /opt/united-delhi/releases /opt/united-delhi/artifacts /opt/united-delhi/state /opt/united-delhi/logs
 install -d -o uddeploy -g uddeploy -m 0700 /home/uddeploy/.ssh
 
 if [[ ! -e /etc/united-delhi/server.env ]]; then
