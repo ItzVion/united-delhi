@@ -10,7 +10,7 @@ ARTIFACTS="$ROOT/artifacts"
 API_BASE="${UD_API_BASE_URL:-https://ud-api.mangotyping.fun}"
 MAIN_REF=refs/remotes/origin/main
 LOG_DIR="$ROOT/logs"
-RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$"
+RUN_ID="$(date -u +%Y%m%dT%H%M%S%N)"
 RUN_LOG="$LOG_DIR/backend-deploy-$RUN_ID.log"
 
 mkdir -p "$LOG_DIR" "$STATE"
