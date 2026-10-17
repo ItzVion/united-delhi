@@ -21,8 +21,11 @@ The VPS bootstrap installs `united-delhi-autodeploy.service` and `united-delhi-a
    DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN
    ```
    Preserve any other values already in the file. The OTD API key belongs separately in `/etc/united-delhi/server.env`.
-3. Check ownership and permissions, then enable the timer:
+3. Ensure the deploy user owns the updater's writable directories, then configure the environment and enable the timer:
    ```bash
+   sudo chown uddeploy:uddeploy /opt/united-delhi
+   sudo install -d -o uddeploy -g uddeploy -m 0700 /opt/united-delhi/logs /opt/united-delhi/state
+   sudo install -d -o uddeploy -g uddeploy -m 0755 /opt/united-delhi/releases /opt/united-delhi/artifacts
    sudo chown root:uddeploy /etc/united-delhi/deploy.env
    sudo chmod 0640 /etc/united-delhi/deploy.env
    sudo systemctl daemon-reload
