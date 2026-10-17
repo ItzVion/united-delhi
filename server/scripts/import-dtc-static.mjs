@@ -4,6 +4,7 @@ import { Readable } from 'node:stream';
 import fs from 'node:fs/promises';
 import { resolveServerPath } from '../src/runtime-paths.js';
 import { sha256Hex, sourceWithSha256, sourceHasSha256, inspectGtfsServiceCoverage } from '../src/gtfs-feed-utils.js';
+import { resolveGtfsRouteColors } from '../src/route-colors.js';
 
 const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
 const STATIC_URL_OVERRIDE = String(process.env.DTC_STATIC_URL || '').trim();
@@ -270,13 +271,20 @@ async function main() {
       for await (const row of rows(zip, 'routes.txt')) {
         const routeId = clean(row.route_id, 160);
         if (!routeId) continue;
+        const shortName = clean(row.route_short_name, 160);
+        const colors = resolveGtfsRouteColors({
+          routeId,
+          shortName,
+          routeColor: row.route_color,
+          routeTextColor: row.route_text_color
+        });
         routes.push({
           route_id: routeId,
           agency_id: clean(row.agency_id, 160),
-          short_name: clean(row.route_short_name, 160),
+          short_name: shortName,
           long_name: clean(row.route_desc || row.route_long_name, 500),
-          route_color: clean(row.route_color, 20),
-          route_text_color: clean(row.route_text_color, 20)
+          route_color: colors.route_color,
+          route_text_color: colors.route_text_color
         });
       }
 
