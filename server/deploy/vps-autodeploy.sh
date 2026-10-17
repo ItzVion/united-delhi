@@ -9,9 +9,64 @@ RELEASES="$ROOT/releases"
 ARTIFACTS="$ROOT/artifacts"
 API_BASE="${UD_API_BASE_URL:-https://ud-api.mangotyping.fun}"
 MAIN_REF=refs/remotes/origin/main
+LOG_DIR="$ROOT/logs"
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$"
+RUN_LOG="$LOG_DIR/backend-deploy-$RUN_ID.log"
+
+mkdir -p "$LOG_DIR" "$STATE"
+chmod 0700 "$LOG_DIR" "$STATE"
+: > "$RUN_LOG"
+chmod 0600 "$RUN_LOG"
+exec > >(tee -a "$RUN_LOG") 2>&1
 
 log() { printf '[%s] %s\n' "$(date --iso-8601=seconds)" "$*"; }
 fail() { log "ERROR: $*" >&2; return 1; }
+
+notify_failure_on_exit() {
+  local exit_code=$?
+  trap - EXIT
+  if (( exit_code == 0 )); then exit 0; fi
+  set +e
+  log "Deployment run failed with exit code $exit_code."
+  local failed_commit="${target:-unknown}"
+  local sent_marker="$STATE/discord-failure-$failed_commit.sent"
+  if [[ -z "${DISCORD_WEBHOOK_URL:-}" ]]; then
+    log "WARNING: DISCORD_WEBHOOK_URL is empty in /etc/united-delhi/deploy.env; complete log kept at $RUN_LOG."
+  elif [[ -f "$sent_marker" ]]; then
+    log "Discord failure alert already sent for commit $failed_commit; suppressing duplicate timer notification."
+    log "Latest log kept at $RUN_LOG."
+  else
+    local archive="$RUN_LOG.gz"
+    gzip -c "$RUN_LOG" > "$archive"
+    local payload
+    payload="$(python3 - "$failed_commit" "$RUN_ID" "$exit_code" "$(basename "$archive")" <<'PY'
+import json, sys
+commit, run_id, status, filename = sys.argv[1:]
+message = (
+    "🚨 **United Delhi backend deploy failed**\n"
+    f"Commit: `{commit[:12]}`\n"
+    f"Run ID: `{run_id}` (exit code {status})\n"
+    f"Full compressed log is attached: `{filename}`"
+)
+print(json.dumps({"content": message, "allowed_mentions": {"parse": []}}))
+PY
+)"
+    if curl --fail --silent --show-error --max-time 45 --retry 2 --retry-all-errors \
+      -F "payload_json=$payload" \
+      -F "files[0]=@$archive;type=application/gzip;filename=$(basename "$archive")" \
+      "${DISCORD_WEBHOOK_URL}?wait=true" \
+      --output /dev/null --write-out "Discord upload HTTP %{http_code}\n"; then
+      printf '%s\n' "$(date --iso-8601=seconds)" > "$sent_marker"
+      log "Failure log attached to Discord for commit $failed_commit."
+    else
+      log "WARNING: failed to upload the failure log to Discord. Local copies: $RUN_LOG and $archive"
+    fi
+  fi
+  # Keep recent logs on disk for manual inspection, but avoid unbounded storage use.
+  find "$LOG_DIR" -maxdepth 1 -type f -mtime +14 -delete
+  exit "$exit_code"
+}
+trap notify_failure_on_exit EXIT
 
 if [[ "${AUTODEPLOY_ENABLED:-0}" != 1 ]]; then
   log 'Automatic updates are disabled. Set AUTODEPLOY_ENABLED=1 in /etc/united-delhi/deploy.env after setup.'
