@@ -87,6 +87,21 @@ export const busMarkerColor=(v:BusMarkerInput)=>{
   for(let i=0;i<key.length;i++){hash^=key.charCodeAt(i);hash=Math.imul(hash,16777619);}
   return ROUTE_MARKER_PALETTE[(hash>>>0)%ROUTE_MARKER_PALETTE.length];
 };
+
+/** Route-specific default category used on route detail pages.
+ * Reviewed per-vehicle livery can override it; generic/unreviewed feed colours
+ * must not turn 741/772 orange when their intended route default is CNG AC blue.
+ */
+export function routePageBusMarkerColor(v:BusMarkerInput):string{
+  if(String(v?.fleetColorSource||'')==='verified-livery-record')return busMarkerColor(v);
+  return routeCategoryColor(v.routeId,v.routeShortName)||busMarkerColor(v);
+}
+export function routeDefaultCategory(routeId?:string|null,routeShortName?:string|null):{label:string;color:string}|null{
+  const color=routeCategoryColor(routeId,routeShortName);
+  if(color===BUS_CATEGORY_MARKER_COLORS.CNG_AC)return {label:'CNG AC (route default)',color};
+  if(color===BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC)return {label:'CNG NonAC (route default)',color};
+  return null;
+}
 export const textOn=(bg:string)=>{if(!isHex(bg))return '#14211B';const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.179?'#14211B':'#FFFFFF'};
 
 export const routeName=(value:unknown)=>{

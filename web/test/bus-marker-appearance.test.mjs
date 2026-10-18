@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const webMap = readFileSync(new URL('../src/components/MapView.tsx', import.meta.url), 'utf8');
 const webRouteMap = readFileSync(new URL('../src/components/RouteMap.tsx', import.meta.url), 'utf8');
 const webPages = readFileSync(new URL('../src/components/pages.tsx', import.meta.url), 'utf8');
+const webHome = readFileSync(new URL('../src/components/Home.tsx', import.meta.url), 'utf8');
 const webStyles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
 const appHome = readFileSync(new URL('../../app/src/screens/HomeScreen.tsx', import.meta.url), 'utf8');
 const appRoute = readFileSync(new URL('../../app/src/screens/RouteDetailsScreen.tsx', import.meta.url), 'utf8');
@@ -26,9 +27,9 @@ test('route map bus markers use the same front glyph and white route labels', ()
 
 
 test('route pages use the same route/category-aware colors as the main map', () => {
-  assert.match(webRouteMap, /color=busMarkerColor\(b\)/);
-  assert.match(webRouteMap, /background:busMarkerColor\(buses\[0\]\)/);
-  assert.match(webPages, /background:fleetSummary\(buses\)\.vehicle\?busMarkerColor\(fleetSummary\(buses\)\.vehicle\)/);
+  assert.match(webRouteMap, /color=routePageBusMarkerColor\(b\)/);
+  assert.match(webRouteMap, /background:routePageBusMarkerColor\(buses\[0\]\)/);
+  assert.match(webPages, /routeDefault\?\.color\|\|\(fleet\.vehicle\?busMarkerColor\(fleet\.vehicle\):'#6B7280'\)/);
 });
 
 test('native home map replaces the question badge with a front bus glyph and white labels', () => {
@@ -43,4 +44,9 @@ test('native route map uses a front bus glyph and white labels without a questio
   assert.match(appRoute, /M5 19V7\.5A3\.5 3\.5 0 0 1/);
   assert.match(appRoute, /color:#FFFFFF/);
   assert.doesNotMatch(appRoute, /No usable physical-colour information" aria-label="Colour unknown">\?<\/span>/);
+});
+
+test('new search queries clear old suggestions before loading the new results', () => {
+  assert.match(webHome, /setSBusy\(true\);setResults\(\[\]\);setSErr\(''\)/);
+  assert.match(webHome, /sBusy\?<div className="state"><span className="spinner"\/><span>Searching…<\/span><\/div>/);
 });
