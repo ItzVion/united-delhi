@@ -99,6 +99,42 @@ export const routeName=(value:unknown)=>{
   const num=t.match(/^(?:D[-\s]?)?(\d{1,5}[A-Z]?)(?=$|[\s\-_\/])/i);if(num)return num[1].toUpperCase();
   return t.length<=14?t:null;
 };
+
+const normaliseSearchText=(value:unknown)=>String(value??'').normalize('NFD')
+  .replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+
+/**
+ * Rank route and stop suggestions by how closely they match the typed query.
+ * Exact route-number matches always win over partial route names, independent
+ * of the order returned by the API. Original order is retained for ties.
+ */
+export function rankSearchResults<T extends {
+  id?:unknown;label?:unknown;type?:unknown;long_name?:unknown;longName?:unknown;
+  fromStop?:unknown;toStop?:unknown;
+}>(results:T[],query:string):T[]{
+  const term=normaliseSearchText(query);
+  if(!term)return [...results];
+  const score=(item:T):number=>{
+    const label=normaliseSearchText(item.label);
+    const id=normaliseSearchText(item.id);
+    const isRoute=item.type==='route';
+    const routeLabel=normaliseSearchText(routeName(item.label)||'');
+    const routeId=normaliseSearchText(routeName(item.id)||'');
+    if(label===term||(!isRoute&&id===term))return 0;
+    if(isRoute&&(routeLabel===term||routeId===term))return 0;
+    if(label.startsWith(term)||(isRoute&&(routeLabel.startsWith(term)||routeId.startsWith(term))))return 1;
+    if(id.startsWith(term)||label.includes(term)||(isRoute&&(routeLabel.includes(term)||routeId.includes(term))))return 2;
+    const context=[item.long_name,item.longName,item.fromStop,item.toStop].map(normaliseSearchText);
+    if(context.some(value=>value===term))return 3;
+    if(context.some(value=>value.startsWith(term)))return 4;
+    if(context.some(value=>value.includes(term)))return 5;
+    return 6;
+  };
+  return results.map((item,index)=>({item,index,rank:score(item)}))
+    .sort((a,b)=>a.rank-b.rank||a.index-b.index)
+    .map(entry=>entry.item);
+}
+
 export const fullRouteName=(value:unknown)=>{
   let t=String(value??'').trim().replace(/\s+/g,' ').replace(/^route\s*[:#-]?\s*/i,'');
   t=t.replace(/(?:\s*[-_\/|:]?\s*)(?:UP|DOWN|DWN)$/i,'').replace(/\b(?:UP|DOWN|DWN)\b/gi,'').replace(/\s*[-–—|:]+\s*$/,'').replace(/\s+/g,' ').trim();

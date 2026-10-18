@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const webMap = readFileSync(new URL('../src/components/MapView.tsx', import.meta.url), 'utf8');
 const webRouteMap = readFileSync(new URL('../src/components/RouteMap.tsx', import.meta.url), 'utf8');
+const webPages = readFileSync(new URL('../src/components/pages.tsx', import.meta.url), 'utf8');
 const webStyles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
 const appHome = readFileSync(new URL('../../app/src/screens/HomeScreen.tsx', import.meta.url), 'utf8');
 const appRoute = readFileSync(new URL('../../app/src/screens/RouteDetailsScreen.tsx', import.meta.url), 'utf8');
@@ -21,6 +22,13 @@ test('route map bus markers use the same front glyph and white route labels', ()
   assert.match(webRouteMap, /BUS_FRONT_SVG/);
   assert.match(webRouteMap, /color:#FFFFFF/);
   assert.match(webStyles, /\.vehicle-id-marker\{[^}]*color:#fff/);
+});
+
+
+test('route pages use the same route/category-aware colors as the main map', () => {
+  assert.match(webRouteMap, /color=busMarkerColor\\(b\\)/);
+  assert.match(webRouteMap, /background:busMarkerColor\\(buses\\[0\\]\\)/);
+  assert.match(webPages, /background:fleetSummary\\(buses\\)\\.vehicle\\?busMarkerColor\\(fleetSummary\\(buses\\)\\.vehicle\\)/);
 });
 
 test('native home map replaces the question badge with a front bus glyph and white labels', () => {

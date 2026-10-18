@@ -2,7 +2,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import type {PointerEvent as RPE} from 'react';
 import {api} from '../api';
 import type {Vehicle} from '../api';
-import {dist,routeName} from '../lib';
+import {dist,rankSearchResults,routeName} from '../lib';
 import type {Go,LiveStatus,Point} from '../lib';
 import MapView from './MapView';
 import {Icon,RouteBadge} from './ui';
@@ -20,7 +20,7 @@ export default function Home({vehicles,live,liveNote,onRetry,location,locState,o
     const t=window.setTimeout(async()=>{
       try{
         const r=await api.search(term,{signal:controller.signal});
-        if(on&&id===requestId.current)setResults((r.results||[]).slice(0,20));
+        if(on&&id===requestId.current)setResults(rankSearchResults(r.results||[],term).slice(0,20));
       }catch(e){
         if(on&&id===requestId.current&&(e as Error)?.name!=='AbortError'){
           setResults([]);setSErr((e as Error).message||'Search is temporarily unavailable. Please try again.');
