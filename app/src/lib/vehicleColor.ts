@@ -1,7 +1,7 @@
 import type { Vehicle, Arrival } from '../api/client';
 
 export type VehicleColor={background:string;text:string};
-type ApiVehicleColor={serviceColor?:string|null;busType?:string|null;fleetColorSource?:string|null};
+type ApiVehicleColor={serviceColor?:string|null;busType?:string|null;fleetColorSource?:string|null;routeId?:string|null;routeShortName?:string|null};
 const UNKNOWN_BUS_MARKER_COLOR='#64748B';
 // Display defaults by service category; these are not claims about verified physical paint.
 export const BUS_CATEGORY_MARKER_COLORS={
@@ -54,9 +54,19 @@ export function hasApiVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):boolean{
 export function hasEvidenceBackedVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):boolean{
   return evidencedColor(v as ApiVehicleColor)!==null;
 }
+// Routes 772 and 741 are known CNG AC-only services. Use the category blue
+// when a per-vehicle colour is not explicitly supplied by the API/reviewed record.
+export function routeCategoryColor(routeId?:string|null,routeShortName?:string|null):string|null{
+  const candidates=[routeShortName,routeId].map(value=>String(value??'').trim().toUpperCase()).filter(Boolean);
+  const isKnownRoute=candidates.some(value=>
+    /^(?:ROUTE\\s*[:#-]?\\s*)?(?:D[-\\s]?)?0*(?:772|741)(?=$|[\\s\\-_/|:])/i.test(value)
+  );
+  return isKnownRoute?BUS_CATEGORY_MARKER_COLORS.CNG_AC:null;
+}
 export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{
   const color=evidencedColor(v as ApiVehicleColor);
+  const routeColor=routeCategoryColor((v as any).routeId,(v as any).routeShortName);
   const categoryColor=defaultBusCategoryColor(v.busType);
-  const background=color||categoryColor||UNKNOWN_BUS_MARKER_COLOR;
+  const background=color||routeColor||categoryColor||UNKNOWN_BUS_MARKER_COLOR;
   return {background,text:textFor(background)};
 }
