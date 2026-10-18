@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {busColor} from '../../../../web/src/lib.ts';
+import {busColor,busMarkerColor,busMarkerKind,BUS_CATEGORY_MARKER_COLORS,routeCategoryColor} from '../../../../web/src/lib.ts';
 
 test('web marker preserves exact upstream or reviewed colours regardless of bus type',()=>{
   assert.equal(busColor({id:'DL1PD4669',busType:'CNG AC (12 mtr)',serviceColor:'#F97316',fleetColorSource:'upstream-api'}),'#F97316');
@@ -15,4 +15,16 @@ test('web uses neutral grey when colour source is absent, estimated, or invalid'
 });
 test('web preserves a valid grey API colour as supplied',()=>{
   assert.equal(busColor({busType:'CNG AC (12 mtr)',serviceColor:'#777777',fleetColorSource:'upstream-api'}),'#777777');
+});
+
+test('web map uses CNG AC blue as the fallback for routes 772 and 741',()=>{
+  assert.equal(routeCategoryColor('772',null),BUS_CATEGORY_MARKER_COLORS.CNG_AC);
+  assert.equal(routeCategoryColor(null,'741 UP'),BUS_CATEGORY_MARKER_COLORS.CNG_AC);
+  assert.equal(busMarkerColor({routeId:'772',routeShortName:'772'}),BUS_CATEGORY_MARKER_COLORS.CNG_AC);
+  assert.equal(busMarkerColor({routeId:'route-741',routeShortName:'741',busType:'CNG NonAC'}),BUS_CATEGORY_MARKER_COLORS.CNG_AC);
+  assert.equal(busMarkerKind({routeShortName:'772'}),'category-default');
+  assert.equal(routeCategoryColor('773',null),null);
+  assert.notEqual(busMarkerColor({routeShortName:'773'}),BUS_CATEGORY_MARKER_COLORS.CNG_AC);
+  // A vehicle-specific API/reviewed colour remains stronger evidence than route category.
+  assert.equal(busMarkerColor({routeShortName:'772',serviceColor:'#FDBA74',fleetColorSource:'upstream-api'}),'#FDBA74');
 });
