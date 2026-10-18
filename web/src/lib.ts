@@ -56,10 +56,14 @@ export function defaultBusCategoryColor(busType?:string|null):string|null{
 export type BusMarkerKind='physical'|'category-default'|'route'|'distinctive';
 export function routeCategoryColor(routeId?:string|null,routeShortName?:string|null):string|null{
   const candidates=[routeShortName,routeId].map(value=>String(value??'').trim().toUpperCase()).filter(Boolean);
-  const isKnownRoute=candidates.some(value=>
+  const isCngNonAcRoute=candidates.some(value=>
+    /^(?:ROUTE\s*[:#-]?\s*)?(?:D[-\s]?)?0*(?:801STL|801)(?=$|[\s\-_/|:])/i.test(value)
+  );
+  if(isCngNonAcRoute)return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC;
+  const isCngAcRoute=candidates.some(value=>
     /^(?:ROUTE\s*[:#-]?\s*)?(?:D[-\s]?)?0*(?:772|741)(?=$|[\s\-_/|:])/i.test(value)
   );
-  return isKnownRoute?BUS_CATEGORY_MARKER_COLORS.CNG_AC:null;
+  return isCngAcRoute?BUS_CATEGORY_MARKER_COLORS.CNG_AC:null;
 }
 export const busMarkerKind=(v:BusMarkerInput):BusMarkerKind=>{
   if(verifiedVehicleColour(v))return 'physical';
