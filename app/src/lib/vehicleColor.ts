@@ -54,14 +54,19 @@ export function hasApiVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):boolean{
 export function hasEvidenceBackedVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):boolean{
   return evidencedColor(v as ApiVehicleColor)!==null;
 }
-// Routes 772 and 741 are known CNG AC-only services. Use the category blue
-// when a per-vehicle colour is not explicitly supplied by the API/reviewed record.
+// Route-level display defaults are fallbacks only; explicit per-vehicle API/reviewed
+// colour evidence takes priority. 801 and 801STL default to CNG Non-AC orange;
+// 772 and 741 default to CNG AC blue.
 export function routeCategoryColor(routeId?:string|null,routeShortName?:string|null):string|null{
   const candidates=[routeShortName,routeId].map(value=>String(value??'').trim().toUpperCase()).filter(Boolean);
-  const isKnownRoute=candidates.some(value=>
+  const isCngNonAcRoute=candidates.some(value=>
+    /^(?:ROUTE\s*[:#-]?\s*)?(?:D[-\s]?)?0*(?:801STL|801)(?=$|[\s\-_/|:])/i.test(value)
+  );
+  if(isCngNonAcRoute)return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC;
+  const isCngAcRoute=candidates.some(value=>
     /^(?:ROUTE\s*[:#-]?\s*)?(?:D[-\s]?)?0*(?:772|741)(?=$|[\s\-_/|:])/i.test(value)
   );
-  return isKnownRoute?BUS_CATEGORY_MARKER_COLORS.CNG_AC:null;
+  return isCngAcRoute?BUS_CATEGORY_MARKER_COLORS.CNG_AC:null;
 }
 export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{
   const color=evidencedColor(v as ApiVehicleColor);
