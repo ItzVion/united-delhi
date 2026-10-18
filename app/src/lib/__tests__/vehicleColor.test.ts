@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {resolveVehicleColor,fleetLegendRows,hasApiVehicleColor,hasEvidenceBackedVehicleColor,defaultBusCategoryColor,BUS_CATEGORY_MARKER_COLORS} from '../vehicleColor.ts';
+import {resolveVehicleColor,fleetLegendRows,hasApiVehicleColor,hasEvidenceBackedVehicleColor,defaultBusCategoryColor,BUS_CATEGORY_MARKER_COLORS,routeCategoryColor} from '../vehicleColor.ts';
 
 test('native marker preserves exact upstream and reviewed colours',()=>{
   assert.equal(resolveVehicleColor({serviceColor:'#F97316',fleetColorSource:'upstream-api'} as any).background,'#F97316');
@@ -47,4 +47,14 @@ test('default marker colours match the requested CNG and Devi EV categories',()=
   assert.equal(resolveVehicleColor({busType:'EV DEVI AC (9 mtr)'} as any).background,'#90EE90');
   assert.equal(resolveVehicleColor({busType:'CNG AC (12 mtr)',serviceColor:'#FF0000',fleetColorSource:'upstream-api'} as any).background,'#FF0000');
   assert.equal(defaultBusCategoryColor('EV AC (12 mtr)'),null);
+});
+
+test('routes 772 and 741 use the CNG AC blue display fallback when per-vehicle colour is unavailable',()=>{
+  assert.equal(routeCategoryColor('772',null),BUS_CATEGORY_MARKER_COLORS.CNG_AC);
+  assert.equal(routeCategoryColor(null,'741 UP'),BUS_CATEGORY_MARKER_COLORS.CNG_AC);
+  assert.equal(resolveVehicleColor({routeId:'772',routeShortName:'772',busType:'Unknown'} as any).background,BUS_CATEGORY_MARKER_COLORS.CNG_AC);
+  assert.equal(resolveVehicleColor({routeId:'route-741',routeShortName:'741',busType:'CNG NonAC (12 mtr)'} as any).background,BUS_CATEGORY_MARKER_COLORS.CNG_AC);
+  assert.equal(routeCategoryColor('773',null),null);
+  // Explicit per-vehicle API colours continue to take priority over inferred route category.
+  assert.equal(resolveVehicleColor({routeShortName:'772',serviceColor:'#FDBA74',fleetColorSource:'upstream-api'} as any).background,'#FDBA74');
 });
