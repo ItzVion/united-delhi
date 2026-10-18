@@ -26,8 +26,8 @@ test('search ranking preserves API order among equal-relevance matches', () => {
 
 test('search ranking is case-insensitive and accent-insensitive for text', () => {
   const results = [
-    { id: 'x', label: 'Inderlok Metro', type: 'route', fromStop: 'IGI Airport' },
-    { id: 'y', label: 'IND' , type: 'stop' }
+    { id: 'other', label: 'Metro Inderlok', type: 'stop' },
+    { id: 'x', label: 'Inderlók Metro', type: 'route', fromStop: 'IGI Airport' }
   ];
-  assert.equal(rankSearchResults(results, 'ind').at(-1).id, 'x');
+  assert.equal(rankSearchResults(results, 'INDERLOK METRO')[0].id, 'x');
 });

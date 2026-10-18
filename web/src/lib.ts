@@ -101,7 +101,7 @@ export const routeName=(value:unknown)=>{
 };
 
 const normaliseSearchText=(value:unknown)=>String(value??'').normalize('NFD')
-  .replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  .replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 
 /**
  * Rank route and stop suggestions by how closely they match the typed query.

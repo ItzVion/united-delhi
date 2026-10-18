@@ -26,9 +26,9 @@ test('route map bus markers use the same front glyph and white route labels', ()
 
 
 test('route pages use the same route/category-aware colors as the main map', () => {
-  assert.match(webRouteMap, /color=busMarkerColor\\(b\\)/);
-  assert.match(webRouteMap, /background:busMarkerColor\\(buses\\[0\\]\\)/);
-  assert.match(webPages, /background:fleetSummary\\(buses\\)\\.vehicle\\?busMarkerColor\\(fleetSummary\\(buses\\)\\.vehicle\\)/);
+  assert.match(webRouteMap, /color=busMarkerColor\(b\)/);
+  assert.match(webRouteMap, /background:busMarkerColor\(buses\[0\]\)/);
+  assert.match(webPages, /background:fleetSummary\(buses\)\.vehicle\?busMarkerColor\(fleetSummary\(buses\)\.vehicle\)/);
 });
 
 test('native home map replaces the question badge with a front bus glyph and white labels', () => {
