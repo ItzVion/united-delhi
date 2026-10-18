@@ -58,3 +58,16 @@ test('routes 772 and 741 use the CNG AC blue display fallback when per-vehicle c
   // Explicit per-vehicle API colours continue to take priority over inferred route category.
   assert.equal(resolveVehicleColor({routeShortName:'772',serviceColor:'#FDBA74',fleetColorSource:'upstream-api'} as any).background,'#FDBA74');
 });
+
+test('routes 801 and 801STL default to CNG Non-AC orange, even if fleet metadata says CNG AC',()=>{
+  assert.equal(routeCategoryColor('801',null),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
+  assert.equal(routeCategoryColor(null,'801 - Inderlok - IGI Airport'),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
+  assert.equal(routeCategoryColor(null,'801STL'),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
+  assert.equal(routeCategoryColor('route-801STL-UP',null),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
+  assert.equal(resolveVehicleColor({routeId:'801',routeShortName:'801',busType:'CNG AC (12 mtr)'} as any).background,BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
+  assert.equal(resolveVehicleColor({routeId:'route-801STL',routeShortName:'801STL',busType:'CNG AC (12 mtr)'} as any).background,BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
+  assert.equal(routeCategoryColor('1801',null),null);
+  assert.equal(routeCategoryColor('8012',null),null);
+  // An explicitly provided per-vehicle colour remains authoritative.
+  assert.equal(resolveVehicleColor({routeShortName:'801',serviceColor:'#0077B6',fleetColorSource:'upstream-api'} as any).background,'#0077B6');
+});
