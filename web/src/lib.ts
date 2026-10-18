@@ -54,8 +54,16 @@ export function defaultBusCategoryColor(busType?:string|null):string|null{
   return null;
 }
 export type BusMarkerKind='physical'|'category-default'|'route'|'distinctive';
+export function routeCategoryColor(routeId?:string|null,routeShortName?:string|null):string|null{
+  const candidates=[routeShortName,routeId].map(value=>String(value??'').trim().toUpperCase()).filter(Boolean);
+  const isKnownRoute=candidates.some(value=>
+    /^(?:ROUTE\s*[:#-]?\s*)?(?:D[-\s]?)?0*(?:772|741)(?=$|[\s\-_/|:])/i.test(value)
+  );
+  return isKnownRoute?BUS_CATEGORY_MARKER_COLORS.CNG_AC:null;
+}
 export const busMarkerKind=(v:BusMarkerInput):BusMarkerKind=>{
   if(verifiedVehicleColour(v))return 'physical';
+  if(routeCategoryColor(v.routeId,v.routeShortName))return 'category-default';
   if(defaultBusCategoryColor(v.busType))return 'category-default';
   if(isHex(v?.routeColor))return 'route';
   return 'distinctive';
@@ -63,6 +71,8 @@ export const busMarkerKind=(v:BusMarkerInput):BusMarkerKind=>{
 export const busMarkerColor=(v:BusMarkerInput)=>{
   const physical=verifiedVehicleColour(v);
   if(physical)return physical;
+  const routeCategory=routeCategoryColor(v.routeId,v.routeShortName);
+  if(routeCategory)return routeCategory;
   const category=defaultBusCategoryColor(v.busType);
   if(category)return category;
   const route=String(v?.routeColor??'').trim();
