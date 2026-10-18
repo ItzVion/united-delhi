@@ -59,7 +59,7 @@ export function hasEvidenceBackedVehicleColor(v:Partial<Vehicle>|Partial<Arrival
 export function routeCategoryColor(routeId?:string|null,routeShortName?:string|null):string|null{
   const candidates=[routeShortName,routeId].map(value=>String(value??'').trim().toUpperCase()).filter(Boolean);
   const isKnownRoute=candidates.some(value=>
-    /^(?:ROUTE\\s*[:#-]?\\s*)?(?:D[-\\s]?)?0*(?:772|741)(?=$|[\\s\\-_/|:])/i.test(value)
+    /^(?:ROUTE\s*[:#-]?\s*)?(?:D[-\s]?)?0*(?:772|741)(?=$|[\s\-_/|:])/i.test(value)
   );
   return isKnownRoute?BUS_CATEGORY_MARKER_COLORS.CNG_AC:null;
 }
