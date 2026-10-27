@@ -440,7 +440,7 @@ app.get('/api/planner/stops',async(q,r)=>{
   return r.json({status:'OK',mode,stops:filtered.slice(0,limit),total:filtered.length,source:'transport-stack'});
  }catch(error){
   const detail=String(error?.message||error||'');
-  const authRejected=/\\bHTTP 401\\b|\\bHTTP 403\\b|unauthori[sz]ed|forbidden/i.test(detail);
+  const authRejected=/\bHTTP 401\b|\bHTTP 403\b|unauthori[sz]ed|forbidden/i.test(detail);
   console.error('Transport Stack planner stop lookup failed:',detail);
   const reason=authRejected
    ?'Transport Stack rejected the Journey Planner credential. Request a fresh Multimodal Journey Planner key and update TRANSPORT_STACK_PLANNER_API_KEY in Render.'
@@ -470,7 +470,7 @@ app.get('/api/planner/multimodal',async(q,r)=>{
   return r.json({status:'OK',options,reason:null,source:'transport-stack',providerMessage:payload?.message||null});
  }catch(error){
   const detail=String(error?.message||error||'');
-  const authRejected=/\\bHTTP 401\\b|\\bHTTP 403\\b|unauthori[sz]ed|forbidden/i.test(detail);
+  const authRejected=/\bHTTP 401\b|\bHTTP 403\b|unauthori[sz]ed|forbidden/i.test(detail);
   console.error('Transport Stack multimodal planning failed:',detail);
   const reason=authRejected
    ?'Transport Stack rejected the Journey Planner credential. Request a fresh Multimodal Journey Planner key and update TRANSPORT_STACK_PLANNER_API_KEY in Render.'
