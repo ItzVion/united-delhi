@@ -1,33 +1,24 @@
-export const DEFAULT_OTD_REALTIME_URL='https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb';
 export const DEFAULT_TRANSPORT_STACK_REALTIME_URL='https://dts-backend.transportstack.in/api/dataset/otd/get-file?agency=delhi-buses&category=realtime_gtfs&filename=VehiclePositions.pb';
 
-// OTD is preferred whenever its key is configured. Never pass its query-string key
-// as a header, and reject redirects so the private key cannot be forwarded elsewhere.
+/**
+ * United Delhi uses Transport Stack only for live bus positions.
+ * The credential is read from the backend environment and sent in x-api-key.
+ */
 export function createRealtimeRequest({
-  otdApiKey='',
-  otdUrl=DEFAULT_OTD_REALTIME_URL,
   transportStackApiKey='',
   transportStackUrl=DEFAULT_TRANSPORT_STACK_REALTIME_URL
 }={}){
-  const otdKey=String(otdApiKey??'').trim();
-  if(otdKey){
-    const url=new URL(String(otdUrl||DEFAULT_OTD_REALTIME_URL));
-    url.searchParams.set('key',otdKey);
-    return{
-      provider:'OTD',
-      source:'otd-live',
-      url,
-      headers:{accept:'*/*','user-agent':'United-Delhi/2.0'},
-      redirect:'error'
-    };
+  const key=String(transportStackApiKey??'').trim();
+  if(!key)throw new Error('TRANSPORT_STACK_API_KEY is not configured');
+  const url=new URL(String(transportStackUrl||DEFAULT_TRANSPORT_STACK_REALTIME_URL));
+  if(url.protocol!=='https:'||url.hostname!=='dts-backend.transportstack.in'){
+    throw new Error('Transport Stack realtime URL must use the approved HTTPS host');
   }
-  const legacyKey=String(transportStackApiKey??'').trim();
-  if(!legacyKey)throw new Error('OTD_API_KEY is not configured (preferred); TRANSPORT_STACK_API_KEY fallback is also absent');
-  return{
+  return {
     provider:'Transport Stack',
     source:'transport-stack-live',
-    url:new URL(String(transportStackUrl||DEFAULT_TRANSPORT_STACK_REALTIME_URL)),
-    headers:{'x-api-key':legacyKey,accept:'*/*','user-agent':'United-Delhi/2.0'},
-    redirect:'follow'
+    url,
+    headers:{'x-api-key':key,accept:'*/*','user-agent':'United-Delhi/2.1'},
+    redirect:'error'
   };
 }
