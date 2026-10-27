@@ -132,7 +132,29 @@ export async function syncMetroStatic(pool,{allowReplacement=false,allowExpiredC
       rawRouteToGroup.set(esc(baseRoute.route_id),{routeId,directionId:0});
       rawRouteToGroup.set(esc(reverse.route_id),{routeId,directionId:1});
     }
-    if(groupedRoutes.length<15)throw new Error('DMRC feed did not contain the expected paired directional routes');
+    // The raw DMRC feed publishes paired route_short_name values (CODE/CODE_R).
+    // Cleaned public feeds may already consolidate directions into one route per line;
+    // support those by retaining each route and deriving direction from trips.txt.
+    if(groupedRoutes.length<15){
+      groupedRoutes.length=0;
+      rawRouteToGroup.clear();
+      for(const route of feed.routes){
+        const rawId=esc(route.route_id);
+        if(!rawId)continue;
+        const routeId='Metro_'+rawId;
+        groupedRoutes.push({
+          route_id:routeId,
+          agency_id:esc(route.agency_id)||esc(feed.agency[0]?.agency_id)||'DMRC',
+          short_name:esc(route.route_long_name)||esc(route.route_short_name)||rawId,
+          long_name:esc(route.route_long_name)||esc(route.route_short_name)||rawId,
+          route_type:num(route.route_type)||1,
+          route_color:esc(route.route_color)||null,
+          route_text_color:esc(route.route_text_color)||'FFFFFF'
+        });
+        rawRouteToGroup.set(rawId,{routeId,directionId:null});
+      }
+    }
+    if(groupedRoutes.length<5)throw new Error('DMRC feed did not contain enough usable metro routes');
     const tripById=new Map(feed.trips.map(x=>[esc(x.trip_id),x]));
     const stopsByTrip=new Map();
     for(const x of feed.stopTimes){
@@ -140,7 +162,9 @@ export async function syncMetroStatic(pool,{allowReplacement=false,allowExpiredC
       const mapped=rawRouteToGroup.get(esc(rawRoute?.route_id)),stopId=esc(x.stop_id),seq=num(x.stop_sequence);
       if(!tripId||!mapped||!stopId||!Number.isFinite(seq))continue;
       const bucket=stopsByTrip.get(tripId)||[];
-      bucket.push({routeId:mapped.routeId,directionId:mapped.directionId,stopId,seq});
+      const tripDirection=num(trip?.direction_id);
+      const directionId=Number.isInteger(mapped.directionId)?mapped.directionId:(Number.isInteger(tripDirection)&&tripDirection>=0?tripDirection:0);
+      bucket.push({routeId:mapped.routeId,directionId,stopId,seq});
       stopsByTrip.set(tripId,bucket);
     }
     const candidatesByDirection=new Map(),seenPatterns=new Set();
