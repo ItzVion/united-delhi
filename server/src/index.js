@@ -17,6 +17,9 @@ const {Pool}=pg,app=express();
 const PORT=Number(process.env.PORT)||10000;
 const DB=String(process.env.DATABASE_URL||'').trim();
 const TRANSPORT_STACK_KEY=String(process.env.TRANSPORT_STACK_API_KEY||'').trim();
+const TRANSPORT_STACK_PLANNER_KEY=String(process.env.TRANSPORT_STACK_PLANNER_API_KEY||'').trim();
+const TRANSPORT_STACK_PLANNER_BASE='https://dts-backend.transportstack.in/api/serviceset/journey-planner';
+const plannerStopsCache=new Map();
 const TRANSPORT_STACK_FEED=String(process.env.TRANSPORT_STACK_REALTIME_URL||'https://dts-backend.transportstack.in/api/dataset/otd/get-file?agency=delhi-buses&category=realtime_gtfs&filename=VehiclePositions.pb').trim();
 const HAS_REALTIME_KEY=Boolean(TRANSPORT_STACK_KEY);
 const REALTIME_PERSIST_INTERVAL_MS=Math.max(15000,Number(process.env.REALTIME_PERSIST_INTERVAL_MS)||60000);
@@ -242,6 +245,121 @@ app.use(cors({origin:(o,cb)=>{if(!o||ALLOWED_ORIGINS.includes(o))return cb(null,
 app.use(express.json({limit:'32kb'}));
 app.use((_q,r,n)=>{r.setHeader('X-Content-Type-Options','nosniff');r.setHeader('Referrer-Policy','no-referrer');r.setHeader('X-Frame-Options','DENY');r.setHeader('Permissions-Policy','geolocation=(self)');if(_q.secure||String(_q.headers['x-forwarded-proto']||'').split(',')[0].trim()==='https')r.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');n()});
 app.use('/api',rateLimit({windowMs:60000,limit:180,standardHeaders:'draft-8',legacyHeaders:false}));
+// Transport Stack Journey Planner is a separate service/key from the live GTFS-RT feed.
+// All provider requests are made server-side; the key is never sent to either client.
+const plannerPayloadRows=payload=>Array.isArray(payload)?payload:(Array.isArray(payload?.data)?payload.data:Array.isArray(payload?.stops)?payload.stops:Array.isArray(payload?.results)?payload.results:[]);
+const plannerText=value=>{
+ if(value==null)return '';
+ if(typeof value==='string'||typeof value==='number')return String(value);
+ return String(value.name||value.stop_name||value.location_name||value.label||value.stopName||value.value||value.stop_id||'');
+};
+const plannerStopName=stop=>plannerText(stop?.stop_name||stop?.name||stop?.label||stop?.stopName);
+function normaliseTransportPlannerStop(stop,mode){
+ const id=String(stop?.stop_id??stop?.id??stop?.stopId??stop?.stop_code??stop?.stopCode??'').trim();
+ const name=plannerStopName(stop).trim();
+ if(!id||!name)return null;
+ const geometry=stop?.geometry;
+ let latitude=num(stop?.latitude??stop?.lat??stop?.stop_lat??geometry?.latitude);
+ let longitude=num(stop?.longitude??stop?.lon??stop?.lng??stop?.stop_lon??geometry?.longitude);
+ if((latitude===null||longitude===null)&&Array.isArray(geometry?.coordinates)&&geometry.coordinates.length>=2){
+  longitude=num(geometry.coordinates[0]);latitude=num(geometry.coordinates[1]);
+ }else if((latitude===null||longitude===null)&&Array.isArray(geometry)&&geometry.length>=2){
+  latitude=num(geometry[0]);longitude=num(geometry[1]);
+ }
+ return {stop_id:id,id,name,label:name,latitude,longitude,stop_code:stop?.stop_code??stop?.stopCode??null,mode,source_name:stop?.source_name??null};
+}
+async function transportPlannerRequest(endpoint,params){
+ if(!TRANSPORT_STACK_PLANNER_KEY)throw new Error('Transport Stack Journey Planner key is not configured.');
+ const url=new URL(TRANSPORT_STACK_PLANNER_BASE+'/'+endpoint);
+ for(const [key,value] of Object.entries(params||{}))if(value!==undefined&&value!==null&&String(value).trim()!=='')url.searchParams.set(key,String(value));
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),18000);
+ try{
+  const response=await fetch(url,{method:'GET',headers:{accept:'application/json','x-api-key':TRANSPORT_STACK_PLANNER_KEY},redirect:'error',signal:controller.signal});
+  const text=await response.text();let payload=null;
+  try{payload=text?JSON.parse(text):{}}catch{throw new Error('Transport Stack Journey Planner returned invalid JSON.');}
+  if(!response.ok)throw new Error('Transport Stack Journey Planner returned HTTP '+response.status+'.');
+  return payload;
+ }finally{clearTimeout(timer)}
+}
+const plannerModeOf=value=>{
+ const v=String(value??'').toLowerCase();
+ if(v.includes('walk'))return 'walk';
+ if(v.includes('metro')||v.includes('rail')||v==='train')return 'metro';
+ if(v.includes('bus')||v.includes('dtc')||v.includes('electric'))return 'bus';
+ return null;
+};
+const plannerTimeMinutes=value=>{
+ if(typeof value==='number'&&Number.isFinite(value)&&value>0)return value>720?Math.round(value/60):Math.round(value);
+ const raw=String(value??'').trim();
+ if(/^\\d+(?:\\.\\d+)?$/.test(raw)){const n=Number(raw);return n>0?(n>720?Math.round(n/60):Math.round(n)):null}
+ const match=raw.match(/^(\\d{1,3}):(\\d{2})(?::(\\d{2}))?$/);
+ if(match){const n=Number(match[1])*60+Number(match[2])+Number(match[3]||0)/60;return n>0?Math.ceil(n):null}
+ return null;
+};
+function normaliseTransportPlannerTrip(row,context,index){
+ const rawSegments=Array.isArray(row?.legs)?row.legs:Array.isArray(row?.routes)?row.routes:[];
+ const stopRows=Array.isArray(row?.stops)?row.stops:[];
+ const firstStop=plannerText(stopRows[0]?.stop_name||stopRows[0]?.name||stopRows[0]?.parent_info||stopRows[0]?.stop||stopRows[0]);
+ const lastStop=plannerText(stopRows[stopRows.length-1]?.stop_name||stopRows[stopRows.length-1]?.name||stopRows[stopRows.length-1]?.child_info||stopRows[stopRows.length-1]?.stop||stopRows[stopRows.length-1]);
+ const globalMode=plannerModeOf(row?.type)||plannerModeOf(row?.mode)||(context.fromType==='metro'&&context.toType==='metro'?'metro':'bus');
+ const legs=rawSegments.map((segment,segmentIndex)=>{
+  const entry=segment&&typeof segment==='object'?segment:{routeName:String(segment??'')};
+  const mode=plannerModeOf(entry.mode||entry.type||entry.edge_type||entry.stop_type||entry.vehicle_type)||globalMode;
+  const parent=entry.fromStop||entry.from_stop||entry.parent_info||entry.parent_node||entry.from||entry.source;
+  const child=entry.toStop||entry.to_stop||entry.child_info||entry.child_node||entry.to||entry.destination;
+  const routeId=entry.route_id??entry.routeId??entry.route??entry.id??row?.route??null;
+  const routeName=plannerText(entry.short_name||entry.route_name||entry.routeName||entry.long_name||entry.longName||entry.line_name||entry.name||routeId||row?.short_name||row?.long_name||row?.description||'Transit');
+  const colour=String(entry.route_color||entry.routeColor||entry.color||row?.color||'').trim();
+  const safeColour=/^#?[0-9a-f]{6}$/i.test(colour)?(colour.startsWith('#')?colour:'#'+colour):null;
+  return {
+   mode:mode||'bus',
+   routeId:routeId===null?null:String(routeId),
+   routeName,
+   routeLongName:plannerText(entry.long_name||entry.longName||row?.long_name)||null,
+   routeColor:safeColour,
+   routeTextColor:String(entry.route_text_color||entry.routeTextColor||'').trim()||null,
+   fromStop:plannerText(parent)|| (segmentIndex===0?(firstStop||context.fromName):'Transfer'),
+   toStop:plannerText(child)|| (segmentIndex===rawSegments.length-1?(lastStop||context.toName):'Transfer'),
+   fromStopId:String(entry.fromStopId||entry.from_stop_id||'')||null,
+   toStopId:String(entry.toStopId||entry.to_stop_id||'')||null
+  };
+ }).filter(x=>x.routeName||x.fromStop||x.toStop);
+ if(!legs.length){
+  const tripRoute=row?.route??row?.route_id??row?.short_name??row?.long_name??row?.description??'Transit journey';
+  legs.push({
+   mode:globalMode||'bus',routeId:tripRoute?String(tripRoute):null,
+   routeName:plannerText(row?.short_name||row?.long_name||row?.route||row?.description||'Transit journey'),
+   routeLongName:plannerText(row?.long_name)||null,
+   routeColor:/^#?[0-9a-f]{6}$/i.test(String(row?.color||''))?(String(row.color).startsWith('#')?String(row.color):'#'+String(row.color)):null,
+   routeTextColor:null,fromStop:context.fromName||firstStop||'Origin',toStop:context.toName||lastStop||'Destination',
+   fromStopId:context.fromStopId,toStopId:context.toStopId
+  });
+ }else{
+  if(!legs[0].fromStop||legs[0].fromStop==='Transfer')legs[0].fromStop=context.fromName||firstStop||'Origin';
+  if(!legs[legs.length-1].toStop||legs[legs.length-1].toStop==='Transfer')legs[legs.length-1].toStop=context.toName||lastStop||'Destination';
+  if(!legs[0].fromStopId)legs[0].fromStopId=context.fromStopId;
+  if(!legs[legs.length-1].toStopId)legs[legs.length-1].toStopId=context.toStopId;
+ }
+ const modes=new Set(legs.map(x=>x.mode));
+ const journeyMode=modes.has('bus')&&modes.has('metro')?'mixed':modes.has('metro')?'metro':'bus';
+ const durationMinutes=plannerTimeMinutes(row?.trip_time??row?.durationMinutes??row?.duration??row?.travel_time);
+ const walkingMinutes=legs.filter(x=>x.mode==='walk').reduce((sum,x)=>sum+(plannerTimeMinutes(x.walkingMinutes||x.travel_time)||1),0);
+ const sourceType=String(row?.type??'').toLowerCase();
+ const type=sourceType.includes('direct')?'direct':sourceType.includes('transfer')?'transfer':journeyMode==='metro'?'metro':legs.filter(x=>x.mode==='bus'||x.mode==='metro').length>1?'transfer':'direct';
+ return {
+  type,journeyMode,
+  durationMinutes:durationMinutes||Math.max(10,legs.length*12),
+  durationIsEstimate:!durationMinutes,
+  walkingMinutes:walkingMinutes||null,
+  legs,
+  transferStop:plannerText(row?.transfer_stop||row?.transferStop)||null,
+  fare:row?.fare??null,
+  description:plannerText(row?.description)||null,
+  provider:'transport-stack',
+  providerIndex:index
+ };
+}
+
 
 async function ensureRuntimeSchema(){if(!pool)return;const c=await pool.connect();try{
  await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS trip_id TEXT');
@@ -393,6 +511,54 @@ app.get('/api/realtime/vehicles',(_q,r)=>{
  r.json({status:hasData?(responseStale?'STALE':'OK'):cache.status,count:cache.vehicles.length,vehicles:cache.vehicles,fetchedAt:cache.fetchedAt,stale:responseStale,source:cache.source,cacheAgeSeconds:Number.isFinite(responseAge)?Math.max(0,Math.round(responseAge/1000)):null,reason:publicRealtimeReason(hasData,responseStale)});
 });
 
+app.get('/api/planner/stops',async(q,r)=>{
+ if(!TRANSPORT_STACK_PLANNER_KEY)return r.status(503).json({status:'UNAVAILABLE',stops:[],reason:'Transport Stack Journey Planner key is not configured on the backend.'});
+ const mode=String(q.query.mode||'bus').trim().toLowerCase();
+ if(!['bus','metro','multi'].includes(mode))return r.status(400).json({status:'ERROR',stops:[],reason:'Choose bus, metro, or multi mode.'});
+ const query=String(q.query.q||'').trim().toLocaleLowerCase();
+ try{
+  let rows=plannerStopsCache.get(mode);
+  if(!rows||Date.now()-rows.cachedAt>5*60*1000){
+   const payload=await transportPlannerRequest('get_stops',{mode});
+   const message=String(payload?.message||'').toLowerCase();
+   if(message&&!message.includes('success')&&message.includes('failure'))throw new Error(String(payload?.description||'Journey Planner could not load stops.'));
+   rows={cachedAt:Date.now(),stops:plannerPayloadRows(payload).map(stop=>normaliseTransportPlannerStop(stop,mode)).filter(Boolean)};
+   plannerStopsCache.set(mode,rows);
+  }
+  const filtered=query?rows.stops.filter(stop=>(stop.name+' '+String(stop.stop_code||'')).toLocaleLowerCase().includes(query)):rows.stops;
+  const limit=query?12:Math.min(filtered.length,30000);
+  return r.json({status:'OK',mode,stops:filtered.slice(0,limit),total:filtered.length,source:'transport-stack'});
+ }catch(error){
+  console.error('Transport Stack planner stop lookup failed:',error?.message||error);
+  return r.status(502).json({status:'ERROR',stops:[],reason:'Transport Stack Journey Planner could not load stops right now.'});
+ }
+});
+app.get('/api/planner/multimodal',async(q,r)=>{
+ if(!TRANSPORT_STACK_PLANNER_KEY)return r.status(503).json({status:'UNAVAILABLE',options:[],reason:'Transport Stack Journey Planner key is not configured on the backend.'});
+ const fromType=['bus','metro','place'].includes(String(q.query.fromType||''))?String(q.query.fromType):'';
+ const toType=['bus','metro','place'].includes(String(q.query.toType||''))?String(q.query.toType):'';
+ const fromStopId=str(q.query.fromStopId,256),toStopId=str(q.query.toStopId,256);
+ const fromName=str(q.query.fromName,160)||'Origin',toName=str(q.query.toName,160)||'Destination';
+ if(!fromType||!toType||!fromStopId||!toStopId)return r.status(400).json({status:'ERROR',options:[],reason:'Choose valid origin and destination stops.'});
+ if(fromStopId===toStopId&&fromType===toType)return r.status(400).json({status:'ERROR',options:[],reason:'Choose two different stops or stations.'});
+ const mode=String(q.query.mode||((fromType==='metro'&&toType==='metro')?'metro':'multi')).toLowerCase();
+ if(!['bus','metro','multi'].includes(mode))return r.status(400).json({status:'ERROR',options:[],reason:'Choose bus, metro, or multi journey mode.'});
+ const time=String(q.query.time||'').trim();
+ if(time&&!/^\\d{2}:\\d{2}:\\d{2}$/.test(time))return r.status(400).json({status:'ERROR',options:[],reason:'Departure time must use HH:MM:SS.'});
+ try{
+  const params={src:fromStopId,src_type:fromType,dst:toStopId,dst_type:toType,mode,src_name:fromName,dst_name:toName};
+  if(time)params.time=time;
+  const payload=await transportPlannerRequest('multi_modal',params);
+  const rows=plannerPayloadRows(payload);
+  const options=rows.map((row,index)=>normaliseTransportPlannerTrip(row,{fromType,toType,fromStopId,toStopId,fromName,toName},index)).slice(0,12);
+  const message=String(payload?.message||'').toLowerCase();
+  if(!options.length||message.includes('failure'))return r.json({status:'ERROR',options,reason:String(payload?.description||'No journey was found between those stops.')});
+  return r.json({status:'OK',options,reason:null,source:'transport-stack',providerMessage:payload?.message||null});
+ }catch(error){
+  console.error('Transport Stack multimodal planning failed:',error?.message||error);
+  return r.status(502).json({status:'ERROR',options:[],reason:'Transport Stack Journey Planner is temporarily unavailable. Please try again.'});
+ }
+});
 app.get('/api/metro',async(_q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',routes:[],stops:[],reason:'Database is not configured'});try{const meta=(await pool.query('SELECT * FROM metro_feed_meta WHERE id=1')).rows[0]||null;const routes=(await pool.query('SELECT route_id,agency_id,short_name,long_name,route_type,route_color,route_text_color FROM metro_routes ORDER BY short_name,route_id')).rows;const stops=(await pool.query('SELECT stop_id,name,latitude,longitude FROM metro_stops ORDER BY name,stop_id')).rows;r.json({status:'OK',routes,stops,meta})}catch(e){r.status(500).json({status:'ERROR',routes:[],stops:[],reason:'Metro data is temporarily unavailable'})}});
 app.get('/api/metro/routes/:id',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE'});try{const id=str(q.params.id),route=(await pool.query('SELECT route_id,agency_id,short_name,long_name,route_type,route_color,route_text_color FROM metro_routes WHERE route_id=$1',[id])).rows[0];if(!route)return r.status(404).json({status:'NOT_FOUND'});const rows=(await pool.query('SELECT s.stop_id,s.name,s.latitude,s.longitude,rs.stop_sequence,COALESCE(rs.direction_id,0) AS direction_id FROM metro_route_stops rs JOIN metro_stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=$1 ORDER BY rs.direction_id,rs.stop_sequence,s.stop_id',[id])).rows;const grouped=new Map();for(const stop of rows){const key=String(stop.direction_id);if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(stop)}const directions=[...grouped.entries()].map(([directionId,stops])=>({directionId,fromStop:stops[0]?.name||null,toStop:stops[stops.length-1]?.name||null,stops}));r.json({status:'OK',route,directions,stops:directions[0]?.stops||[]})}catch(e){console.error('Metro route query failed:',e?.message||e);r.status(500).json({status:'ERROR',reason:'Failed to load metro route'})}});
 app.get('/api/routes/:id',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',reason:'Database is not configured'});try{const id=str(q.params.id),route=(await pool.query(`SELECT r.route_id,r.agency_id,r.short_name,r.long_name,r.route_color,r.route_text_color,first_stop.name AS from_stop,last_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.stop_id ASC LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true WHERE r.route_id=$1`,[id])).rows[0];let routeFallback=false;if(!route){const live=cache.vehicles.find(v=>String(v.routeId||'')===id);if(live){routeFallback=true;route={route_id:id,agency_id:live.operator||null,short_name:live.routeShortName||id,long_name:live.routeLongName||null,route_color:live.routeColor||null,route_text_color:live.routeTextColor||null,from_stop:live.fromStop||null,to_stop:live.toStop||null}}else return r.status(404).json({status:'NOT_FOUND',reason:'Route not found'});}if(!route)return r.status(404).json({status:'NOT_FOUND',reason:'Route not found'});const stops=routeFallback?[]:(await pool.query('SELECT s.stop_id,s.name,s.latitude,s.longitude,rs.stop_sequence FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=$1 ORDER BY rs.stop_sequence,s.stop_id',[id])).rows;r.json({status:'OK',route,stops,vehicles:cache.vehicles.filter(v=>String(v.routeId||'')===id),staticDataAvailable:!routeFallback})}catch{r.status(500).json({status:'ERROR',reason:'Failed to load route'})}});
