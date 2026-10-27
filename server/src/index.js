@@ -291,8 +291,8 @@ const plannerModeOf=value=>{
 const plannerTimeMinutes=value=>{
  if(typeof value==='number'&&Number.isFinite(value)&&value>0)return value>720?Math.round(value/60):Math.round(value);
  const raw=String(value??'').trim();
- if(/^\\d+(?:\\.\\d+)?$/.test(raw)){const n=Number(raw);return n>0?(n>720?Math.round(n/60):Math.round(n)):null}
- const match=raw.match(/^(\\d{1,3}):(\\d{2})(?::(\\d{2}))?$/);
+ if(/^\d+(?:\.\d+)?$/.test(raw)){const n=Number(raw);return n>0?(n>720?Math.round(n/60):Math.round(n)):null}
+ const match=raw.match(/^(\d{1,3}):(\d{2})(?::(\d{2}))?$/);
  if(match){const n=Number(match[1])*60+Number(match[2])+Number(match[3]||0)/60;return n>0?Math.ceil(n):null}
  return null;
 };

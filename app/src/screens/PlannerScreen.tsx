@@ -29,20 +29,20 @@ export default function PlannerScreen() {
   const [fromFocus, setFromFocus] = useState(false);
   const [toFocus, setToFocus] = useState(false);
 
-  useEffect(() => { let active=true; void api.metro().then(result => { if(active) setMetroStops((result.stops||[]).filter((s:any)=>s.stop_id&&s.name).map((s:any)=>({id:String(s.stop_id),label:String(s.name),mode:'metro' as const}))); }).catch(() => { if(active) setMetroStops([]); }); return () => { active=false; }; }, []);
+  useEffect(() => { let active=true; void api.plannerStops('metro').then(result => { if(active) setMetroStops((result.stops||[]).filter((s:any)=>s.stop_id&&s.name).map((s:any)=>({id:String(s.stop_id),label:String(s.name),mode:'metro' as const}))); }).catch(() => { if(active) setMetroStops([]); }); return () => { active=false; }; }, []);
 
   useEffect(() => {
     const value=from.trim();
     if(value.length<2){setFromSuggestions([]);return;}
     let active=true;
-    const timer=setTimeout(async()=>{try{const r=await api.search(value);if(active){const bus=(r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label,mode:'bus' as const}));const metro=metroStops.filter(x=>x.label.toLowerCase().includes(value.toLowerCase())).map(x=>({...x,mode:'metro' as const}));setFromSuggestions([...bus,...metro].slice(0,8));}}catch{if(active)setFromSuggestions([]);}},180);
+    const timer=setTimeout(async()=>{try{const r=await api.plannerStops('bus',value);if(active){const bus=(r.stops||[]).slice(0,8).map(x=>({id:String(x.stop_id),label:String(x.name),mode:'bus' as const}));const metro=metroStops.filter(x=>x.label.toLowerCase().includes(value.toLowerCase())).slice(0,8).map(x=>({...x,mode:'metro' as const}));setFromSuggestions([...bus,...metro].slice(0,8));}}catch{if(active)setFromSuggestions([]);}},180);
     return()=>{active=false;clearTimeout(timer);};
   },[from,metroStops]);
   useEffect(() => {
     const value=to.trim();
     if(value.length<2){setToSuggestions([]);return;}
     let active=true;
-    const timer=setTimeout(async()=>{try{const r=await api.search(value);if(active){const bus=(r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label,mode:'bus' as const}));const metro=metroStops.filter(x=>x.label.toLowerCase().includes(value.toLowerCase())).map(x=>({...x,mode:'metro' as const}));setToSuggestions([...bus,...metro].slice(0,8));}}catch{if(active)setToSuggestions([]);}},180);
+    const timer=setTimeout(async()=>{try{const r=await api.plannerStops('bus',value);if(active){const bus=(r.stops||[]).slice(0,8).map(x=>({id:String(x.stop_id),label:String(x.name),mode:'bus' as const}));const metro=metroStops.filter(x=>x.label.toLowerCase().includes(value.toLowerCase())).slice(0,8).map(x=>({...x,mode:'metro' as const}));setToSuggestions([...bus,...metro].slice(0,8));}}catch{if(active)setToSuggestions([]);}},180);
     return()=>{active=false;clearTimeout(timer);};
   },[to,metroStops]);
   const swap = () => { const value = from; const valueId = fromStopId; const mode=fromMode; setFrom(to); setTo(value); setFromStopId(toStopId); setToStopId(valueId); setFromMode(toMode); setToMode(mode); };
@@ -54,16 +54,7 @@ export default function PlannerScreen() {
     }
     setLoading(true); setError(null); setOptions([]); setFromFocus(false); setToFocus(false);
     try {
-      let result:any;
-      if (fromMode==='bus'&&toMode==='bus') {
-        const replies=await Promise.allSettled([api.plan(from.trim(),to.trim(),fromStopId??undefined,toStopId??undefined),api.planMultimodal('bus','bus',fromStopId,toStopId)]);
-        const bus=replies[0].status==='fulfilled'?replies[0].value:null;
-        const multi=replies[1].status==='fulfilled'?replies[1].value:null;
-        const all=[...(bus?.options||[]),...(multi?.options||[])];
-        const unique=new Map<string,TripPlanOption>();
-        for(const option of all){const key=(option.legs||[]).map((leg:any)=>[leg.mode||'bus',leg.routeId||'',leg.fromStopId||'',leg.toStopId||''].join(':')).join('|');const previous=unique.get(key);if(!previous||(option.durationMinutes||999)<(previous.durationMinutes||999))unique.set(key,option)}
-        result={status:bus?.status==='OK'||multi?.status==='OK'?'OK':'ERROR',options:[...unique.values()].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999)),reason:bus?.reason||multi?.reason};
-      } else result=await api.planMultimodal(fromMode,toMode,fromStopId,toStopId);
+      const result=await api.planTransportStack(fromMode,toMode,fromStopId,toStopId,from.trim(),to.trim());
       if (result.status === 'OK') setOptions(result.options);
       else setError(result.reason || 'No journey could be planned.');
     } catch (e) {

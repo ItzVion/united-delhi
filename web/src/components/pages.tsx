@@ -76,7 +76,7 @@ function normalisePlannerPlace(value:unknown):string{
 }
 function getPlannerMetroStops():Promise<any[]>{
  if(plannerMetroStopsCache)return Promise.resolve(plannerMetroStopsCache);
- if(!plannerMetroStopsPromise)plannerMetroStopsPromise=api.metro().then(d=>{
+ if(!plannerMetroStopsPromise)plannerMetroStopsPromise=api.plannerStops('metro').then(d=>{
   plannerMetroStopsCache=Array.isArray(d?.stops)?d.stops.filter((s:any)=>s?.stop_id&&s?.name):[];
   return plannerMetroStopsCache;
  }).catch(()=>{plannerMetroStopsPromise=null;return[]});
@@ -102,11 +102,11 @@ function StopField({label,value,onChange,placeholder,active,setActive,onEdit}:{l
   setBusy(true);
   const t=window.setTimeout(async()=>{
    try{
-    const [busResult,metroStops]=await Promise.all([api.search(term,{signal:controller.signal}),getPlannerMetroStops()]);
+    const [busResult,metroStops]=await Promise.all([api.plannerStops('bus',term,{signal:controller.signal}),getPlannerMetroStops()]);
     if(!on)return;
-    const busRaw=(Array.isArray(busResult?.results)?busResult.results:[])
-     .filter((x:any)=>x.type==='stop'&&x.id&&x.label)
-     .map((x:any)=>({...x,mode:'bus',stopContext:x.stopContext||'Bus stop'}));
+    const busRaw=(Array.isArray(busResult?.stops)?busResult.stops:[])
+     .filter((x:any)=>x.stop_id&&x.name)
+     .map((x:any)=>({...x,id:String(x.stop_id),label:String(x.name),type:'stop',mode:'bus',stopContext:'Bus stop'}));
     const bus:any[]=[];
     for(const item of busRaw){
      const lat=Number(item.latitude),lon=Number(item.longitude);
@@ -178,70 +178,7 @@ export function Planner({go}:{go:Go}){
    }
    const fromMode=f.mode==='metro'?'metro':'bus';
    const toMode=t.mode==='metro'?'metro':'bus';
-   let result:any;
-   if(fromMode==='bus'&&toMode==='bus'){
-    const replies=await Promise.allSettled([
-     api.plan(f.label,t.label,f.id,t.id),
-     api.planMultimodal(fromMode,toMode,f.id,t.id)
-    ]);
-    const busReply=replies[0].status==='fulfilled'?replies[0].value:null;
-    const multiReply=replies[1].status==='fulfilled'?replies[1].value:null;
-    const originIds=new Set<string>([
-     String(f.id),...(Array.isArray(busReply?.originStopIds)?busReply.originStopIds:[]).map(String),
-     ...(Array.isArray(multiReply?.originStopIds)?multiReply.originStopIds:[]).map(String)
-    ]);
-    const destinationIds=new Set<string>([
-     String(t.id),...(Array.isArray(busReply?.destinationStopIds)?busReply.destinationStopIds:[]).map(String),
-     ...(Array.isArray(multiReply?.destinationStopIds)?multiReply.destinationStopIds:[]).map(String)
-    ]);
-    const merged=[
-     ...(Array.isArray(busReply?.options)?busReply.options:[]),
-     ...(Array.isArray(multiReply?.options)?multiReply.options:[])
-    ].filter((option:any)=>{
-     const legs=(Array.isArray(option?.legs)?option.legs:[]).filter((leg:any)=>leg&&leg.mode!=='walk');
-     if(!legs.length)return false;
-     const first=legs[0],last=legs[legs.length-1];
-     const fromId=String(first.fromStopId||''),toId=String(last.toStopId||'');
-     const fromMatches=!fromId||originIds.has(fromId)||normalisePlannerPlace(first.fromStop)===normalisePlannerPlace(f.label);
-     const toMatches=!toId||destinationIds.has(toId)||normalisePlannerPlace(last.toStop)===normalisePlannerPlace(t.label);
-     return fromMatches&&toMatches;
-    });
-    const unique=new Map<string,any>();
-    for(const option of merged){
-     const legs=Array.isArray(option.legs)?option.legs:[];
-     const key=legs.map((leg:any)=>[
-      String(leg.mode||'bus'),String(leg.routeId||'walk'),
-      normalisePlannerPlace(leg.fromStop),normalisePlannerPlace(leg.toStop)
-     ].join(':')).join('|');
-     const previous=unique.get(key);
-     if(!previous||(Number(option.durationMinutes)||999)<(Number(previous.durationMinutes)||999))unique.set(key,option);
-    }
-    const sortedByEta=[...unique.values()].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
-    const bestDirect=sortedByEta.filter(option=>option.type==='direct'&&(Array.isArray(option.legs)?option.legs.filter((leg:any)=>leg.mode!=='walk').length:0)===1)
-     .sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999))[0];
-    const bestOther=sortedByEta.find(option=>option!==bestDirect);
-    const preferDirect=!!bestDirect&&(!bestOther||(Number(bestDirect.durationMinutes)||999)<=(Number(bestOther.durationMinutes)||999)+15);
-    const ranked=preferDirect?[bestDirect,...sortedByEta.filter(option=>option!==bestDirect)]:sortedByEta;
-    // Keep at least one result from every available mode before filling the list by time.
-    // Otherwise eight quick bus-only routes can accidentally hide every Bus + Metro option.
-    const options:any[]=[];
-    for(const mode of ['bus','mixed','metro']){
-     const best=ranked.find(option=>optionMode(option)===mode);
-     if(best)options.push(best);
-    }
-    for(const option of ranked){
-     if(options.length>=8)break;
-     if(!options.includes(option))options.push(option);
-    }
-    options.sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
-    if(preferDirect&&bestDirect&&options.includes(bestDirect)){
-     options.splice(options.indexOf(bestDirect),1);
-     options.unshift(bestDirect);
-    }
-    result={status:busReply?.status==='OK'||multiReply?.status==='OK'?'OK':'ERROR',options,reason:busReply?.reason||multiReply?.reason};
-   }else{
-    result=await api.planMultimodal(fromMode,toMode,f.id,t.id);
-   }
+   const result=await api.planTransportStack(fromMode,toMode,f.id,t.id,f.label,t.label);
    if(result.status!=='OK'){
     setErr(result.reason||'No journey could be found. Try another stop or station.');
     return;
