@@ -29,6 +29,8 @@ export default function PlannerScreen() {
   const [fromFocus, setFromFocus] = useState(false);
   const [toFocus, setToFocus] = useState(false);
 
+  useEffect(() => { let active=true; void api.metro().then(result => { if(active) setMetroStops((result.stops||[]).filter((s:any)=>s.stop_id&&s.name).map((s:any)=>({id:String(s.stop_id),label:String(s.name),mode:'metro' as const}))); }).catch(() => { if(active) setMetroStops([]); }); return () => { active=false; }; }, []);
+
   useEffect(() => {
     const value=from.trim();
     if(value.length<2){setFromSuggestions([]);return;}
@@ -46,13 +48,22 @@ export default function PlannerScreen() {
   const swap = () => { const value = from; const valueId = fromStopId; const mode=fromMode; setFrom(to); setTo(value); setFromStopId(toStopId); setToStopId(valueId); setFromMode(toMode); setToMode(mode); };
 
   const plan = async () => {
-    if (from.trim().length < 2 || to.trim().length < 2) {
-      setError('Select a starting bus stop and destination.');
+    if (from.trim().length < 2 || to.trim().length < 2 || !fromStopId || !toStopId) {
+      setError('Choose a bus stop or Metro station from the suggestions in both fields.');
       return;
     }
     setLoading(true); setError(null); setOptions([]); setFromFocus(false); setToFocus(false);
     try {
-      const result = (fromMode==='bus'&&toMode==='bus') ? await api.plan(from.trim(), to.trim(), fromStopId ?? undefined, toStopId ?? undefined) : await api.planMultimodal(fromMode,toMode,String(fromStopId),String(toStopId));
+      let result:any;
+      if (fromMode==='bus'&&toMode==='bus') {
+        const replies=await Promise.allSettled([api.plan(from.trim(),to.trim(),fromStopId??undefined,toStopId??undefined),api.planMultimodal('bus','bus',fromStopId,toStopId)]);
+        const bus=replies[0].status==='fulfilled'?replies[0].value:null;
+        const multi=replies[1].status==='fulfilled'?replies[1].value:null;
+        const all=[...(bus?.options||[]),...(multi?.options||[])];
+        const unique=new Map<string,TripPlanOption>();
+        for(const option of all){const key=(option.legs||[]).map((leg:any)=>[leg.mode||'bus',leg.routeId||'',leg.fromStopId||'',leg.toStopId||''].join(':')).join('|');const previous=unique.get(key);if(!previous||(option.durationMinutes||999)<(previous.durationMinutes||999))unique.set(key,option)}
+        result={status:bus?.status==='OK'||multi?.status==='OK'?'OK':'ERROR',options:[...unique.values()].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999)),reason:bus?.reason||multi?.reason};
+      } else result=await api.planMultimodal(fromMode,toMode,fromStopId,toStopId);
       if (result.status === 'OK') setOptions(result.options);
       else setError(result.reason || 'No journey could be planned.');
     } catch (e) {
@@ -109,12 +120,12 @@ export default function PlannerScreen() {
               </View>
               <View style={styles.walkPill}><Text style={styles.walkText}>{option.durationIsEstimate?'ESTIMATED TIME':'TRAVEL TIME'}{option.walkingMinutes!=null?` · ${option.walkingMinutes} min walk`:''}</Text></View>
             </View>
-            {option.legs.map((leg, legIndex) => (
-              <View key={`${leg.routeId}-${legIndex}`} style={styles.leg}>
-                {(() => { const name=displayRouteName(leg.routeName)||'Bus'; const rc=resolveRouteColor(name,leg.routeColor,leg.routeTextColor); return <View style={[styles.routeBadge,{backgroundColor:rc.background}]}><Text style={[styles.routeBadgeText,{color:rc.text}]}>{name}</Text></View>; })()}
+            {option.legs.map((leg:any, legIndex) => (
+              <View key={`${leg.mode||'bus'}-${leg.routeId||'walk'}-${legIndex}`} style={styles.leg}>
+                {leg.mode==='walk' ? <View style={[styles.routeBadge,{backgroundColor:'#64748B'}]}><Text style={styles.routeBadgeText}>WALK</Text></View> : (() => { const name=displayRouteName(leg.routeName)||(leg.mode==='metro'?'Metro':'Bus'); const rc=resolveRouteColor(name,leg.routeColor,leg.routeTextColor); return <View style={[styles.routeBadge,{backgroundColor:rc.background}]}><Text style={[styles.routeBadgeText,{color:rc.text}]}>{leg.mode==='metro'?'M ':''}{name}</Text></View>; })()}
                 <View style={styles.legCopy}>
-                  <Text style={styles.legRoute}>Bus {displayRouteName(leg.routeName) || 'Bus'}</Text>
-                  <Text style={styles.legStops} numberOfLines={1}>{leg.fromStop} → {leg.toStop}</Text>
+                  <Text style={styles.legRoute}>{leg.mode==='walk'?'Walk':leg.mode==='metro'?'Metro':'Bus'}{leg.mode==='walk'?'':' · '+(displayRouteName(leg.routeName)||leg.routeName||'Bus')}{leg.mode==='walk'&&leg.walkingMinutes?' · '+leg.walkingMinutes+' min':''}</Text>
+                  <Text style={styles.legStops} numberOfLines={2}>{leg.fromStop} → {leg.toStop}{leg.mode==='walk'&&leg.walkMeters?' · '+Math.round(leg.walkMeters)+' m':''}</Text>
                 </View>
               </View>
             ))}
