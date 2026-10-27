@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS public.metro_stops (
 
 CREATE TABLE IF NOT EXISTS public.metro_route_stops (
   route_id TEXT NOT NULL REFERENCES public.metro_routes(route_id) ON DELETE CASCADE,
-  direction_id TEXT NOT NULL DEFAULT '0',
+  direction_id INTEGER NOT NULL DEFAULT 0,
   stop_id TEXT NOT NULL REFERENCES public.metro_stops(stop_id) ON DELETE CASCADE,
   stop_sequence INTEGER NOT NULL,
   PRIMARY KEY(route_id, direction_id, stop_sequence, stop_id)
@@ -119,3 +119,8 @@ CREATE TABLE IF NOT EXISTS public.metro_feed_meta (
 ALTER TABLE public.metro_feed_meta ADD COLUMN IF NOT EXISTS route_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE public.metro_feed_meta ADD COLUMN IF NOT EXISTS stop_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE public.metro_feed_meta ADD COLUMN IF NOT EXISTS route_stop_count INTEGER NOT NULL DEFAULT 0;
+
+-- Preserve imported direction data while aligning with integer direction IDs in the API.
+ALTER TABLE public.metro_route_stops ALTER COLUMN direction_id DROP DEFAULT;
+ALTER TABLE public.metro_route_stops ALTER COLUMN direction_id TYPE INTEGER USING direction_id::integer;
+ALTER TABLE public.metro_route_stops ALTER COLUMN direction_id SET DEFAULT 0;
