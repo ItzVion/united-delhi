@@ -45,17 +45,8 @@ CREATE TABLE IF NOT EXISTS public.static_feed_meta (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   imported_route_count INTEGER NOT NULL DEFAULT 0,
   imported_stop_count INTEGER NOT NULL DEFAULT 0,
-  imported_route_stop_count INTEGER NOT NULL DEFAULT 0,
-  -- Compatibility fields used by metro-sync.js.
-  route_count INTEGER NOT NULL DEFAULT 0,
-  stop_count INTEGER NOT NULL DEFAULT 0,
-  route_stop_count INTEGER NOT NULL DEFAULT 0
+  imported_route_stop_count INTEGER NOT NULL DEFAULT 0
 );
-
--- Also upgrades an already-created table without dropping or replacing data.
-ALTER TABLE public.metro_feed_meta ADD COLUMN IF NOT EXISTS route_count INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE public.metro_feed_meta ADD COLUMN IF NOT EXISTS stop_count INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE public.metro_feed_meta ADD COLUMN IF NOT EXISTS route_stop_count INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS public.vehicle_positions (
   vehicle_id TEXT PRIMARY KEY,
@@ -117,5 +108,14 @@ CREATE TABLE IF NOT EXISTS public.metro_feed_meta (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   imported_route_count INTEGER NOT NULL DEFAULT 0,
   imported_stop_count INTEGER NOT NULL DEFAULT 0,
-  imported_route_stop_count INTEGER NOT NULL DEFAULT 0
+  imported_route_stop_count INTEGER NOT NULL DEFAULT 0,
+  -- Compatibility fields used by metro-sync.js.
+  route_count INTEGER NOT NULL DEFAULT 0,
+  stop_count INTEGER NOT NULL DEFAULT 0,
+  route_stop_count INTEGER NOT NULL DEFAULT 0
 );
+
+-- Also upgrades an already-created table without dropping or replacing data.
+ALTER TABLE public.metro_feed_meta ADD COLUMN IF NOT EXISTS route_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.metro_feed_meta ADD COLUMN IF NOT EXISTS stop_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.metro_feed_meta ADD COLUMN IF NOT EXISTS route_stop_count INTEGER NOT NULL DEFAULT 0;
