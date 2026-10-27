@@ -13,7 +13,7 @@
         { "key": "Origin-Agent-Cluster", "value": "?1" },
         { "key": "X-Permitted-Cross-Domain-Policies", "value": "none" },
         { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; connect-src 'self' https://ud-api.mangotyping.fun; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:" }
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; connect-src 'self' https://united-delhi-api.onrender.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:" }
       ]
     },
     {
@@ -27,11 +27,11 @@
   "rewrites": [
     {
       "source": "/api/realtime/vehicles",
-      "destination": "https://ud-api.mangotyping.fun/api/realtime/vehicles"
+      "destination": "https://united-delhi-api.onrender.com/api/realtime/vehicles"
     },
     {
       "source": "/api/:path*",
-      "destination": "https://ud-api.mangotyping.fun/api/:path*"
+      "destination": "https://united-delhi-api.onrender.com/api/:path*"
     },
     {
       "source": "/((?!.*\\.).*)",
