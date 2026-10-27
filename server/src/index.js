@@ -11,16 +11,14 @@ import { sha256Hex, sourceHasSha256 } from './gtfs-feed-utils.js';
 import {syncMetroStatic} from './metro-sync.js';
 import {createRealtimeRequest} from './realtime-provider.js';
 import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,classifyFleetTypeFromRegistration,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
-const COLOR_FIELD=parseColorFieldSpec(process.env.OTD_COLOR_FIELD||process.env.TRANSPORT_STACK_COLOR_FIELD);
+const COLOR_FIELD=parseColorFieldSpec(process.env.TRANSPORT_STACK_COLOR_FIELD);
 
 const {Pool}=pg,app=express();
 const PORT=Number(process.env.PORT)||10000;
 const DB=String(process.env.DATABASE_URL||'').trim();
-const OTD_API_KEY=String(process.env.OTD_API_KEY||'').trim();
-const OTD_REALTIME_FEED=String(process.env.OTD_REALTIME_URL||'https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb').trim();
 const TRANSPORT_STACK_KEY=String(process.env.TRANSPORT_STACK_API_KEY||'').trim();
 const TRANSPORT_STACK_FEED=String(process.env.TRANSPORT_STACK_REALTIME_URL||'https://dts-backend.transportstack.in/api/dataset/otd/get-file?agency=delhi-buses&category=realtime_gtfs&filename=VehiclePositions.pb').trim();
-const HAS_REALTIME_KEY=Boolean(OTD_API_KEY||TRANSPORT_STACK_KEY);
+const HAS_REALTIME_KEY=Boolean(TRANSPORT_STACK_KEY);
 const REALTIME_PERSIST_INTERVAL_MS=Math.max(15000,Number(process.env.REALTIME_PERSIST_INTERVAL_MS)||60000);
 let DB_CONNECTION=DB;try{if(DB){const u=new URL(DB);u.searchParams.delete('sslmode');DB_CONNECTION=u.toString()}}catch{} const pool=DB?new Pool({connectionString:DB_CONNECTION,max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000,ssl:/localhost|127(?:\.\d+){3}|::1/i.test(DB)?false:{rejectUnauthorized:true}}):null;
 
@@ -31,7 +29,7 @@ const dist=(a,b,c,d)=>{const R=6371000,r=Math.PI/180,la=(c-a)*r,lo=(d-b)*r,x=Mat
 const UNKNOWN_BUS_MARKER_COLOR='#64748B';
 const classifyFleet=(id,...aliases)=>classifyFleetTypeFromRegistration(id,...aliases);
 const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>classifyFleet(id,licensePlate,vehicleLabel);
-const cache={vehicles:[],status:HAS_REALTIME_KEY?'STARTING':'UNAVAILABLE',reason:HAS_REALTIME_KEY?'United Delhi API is starting':'OTD_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
+const cache={vehicles:[],status:HAS_REALTIME_KEY?'STARTING':'UNAVAILABLE',reason:HAS_REALTIME_KEY?'United Delhi API is starting':'TRANSPORT_STACK_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
 let refreshing=null,poll=null,routeMetaLoadedAt=0,persistPromise=null,lastPersistAt=0,dtcAutoImportRunning=false;
 const routeMeta=new Map();
 const fleetRegistry=new Map();
@@ -292,10 +290,9 @@ function parseVehicle(e,feedTs,colors){
 }
 async function fetchLive(){
  const request=createRealtimeRequest({
-  otdApiKey:OTD_API_KEY,otdUrl:OTD_REALTIME_FEED,
   transportStackApiKey:TRANSPORT_STACK_KEY,transportStackUrl:TRANSPORT_STACK_FEED
  });
- // The request builder keeps the OTD key server-side and rejects redirects that could forward it.
+ // The provider helper enforces HTTPS, restricts the host, and rejects redirects.
  const ac=new AbortController(),t=setTimeout(()=>ac.abort(),12000);
  try{
   const r=await fetch(request.url,{signal:ac.signal,headers:request.headers,redirect:request.redirect});
@@ -340,7 +337,7 @@ async function refresh(){
   }catch(e){
    cache.status=cache.fetchedAt?'STALE':'UNAVAILABLE';
    const message=e instanceof Error?e.message:String(e||'Realtime request failed');
-   cache.reason=cache.vehicles.length?'Live '+(OTD_API_KEY?'OTD':'Transport Stack')+' data is temporarily unavailable; showing the last known bus positions.':message;
+   cache.reason=cache.vehicles.length?'Live Transport Stack data is temporarily unavailable; showing the last known bus positions.':message;
    console.error('Realtime poll failed:',message);
   }
  })().finally(()=>{refreshing=null});
