@@ -23,7 +23,7 @@ Website
   npm ci
   npm run dev
 
-The current API base URL is https://ud-api.mangotyping.fun. Vite proxies local /api requests to this host; production uses the existing Vercel rewrites.
+The current VPS API base URL is https://ud-api.mangotyping.fun. Temporary Render API base URL: https://united-delhi-api.onrender.com. Update app/src/config.ts, web/src/api.ts deployment configuration, and web/vercel.json only after the Render service is live and verified.
 
 Vercel settings:
 - Root Directory: web
