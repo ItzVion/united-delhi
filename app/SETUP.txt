@@ -6,6 +6,14 @@ Repository folders
 - server/  Express backend and tests
 - legal/   Legal and third-party notices
 
+Current production architecture (verified 28 October 2026)
+- Website: Vercel, https://united-delhi.vercel.app
+- API: Render, https://united-delhi-api.onrender.com
+- PostgreSQL: Neon (Singapore)
+- Transport Stack has two independent backend credentials: TRANSPORT_STACK_API_KEY for live GTFS-RT vehicle positions and TRANSPORT_STACK_PLANNER_API_KEY for Multimodal Journey Planner requests.
+- Both credentials and DATABASE_URL belong only in the Render backend environment. Never commit them or bundle them into web/ or app/.
+- GitHub Actions CI is manual-only to avoid consuming Actions minutes. Render and Vercel deploy from main through their existing integrations.
+
 Android app
   cd app
   npm ci
@@ -16,23 +24,22 @@ Android app
 Local Windows APK (no cloud build):
   npm run build:apk
 
-Requirements: Node 22, JDK 17, Android SDK/platform-tools and PowerShell.
+Requirements: Node 22, JDK 17, Android SDK/platform-tools and PowerShell. Local APK building remains the preferred path; no EAS or GitHub Actions build is required.
 
 Website
   cd web
   npm ci
   npm run dev
 
-The current VPS API base URL is https://ud-api.mangotyping.fun. Temporary Render API base URL: https://united-delhi-api.onrender.com. Update app/src/config.ts, web/src/api.ts deployment configuration, and web/vercel.json only after the Render service is live and verified.
+The Vite development proxy, web/Vercel API rewrite and Android build profiles must target https://united-delhi-api.onrender.com. app/src/config.ts uses the same default and accepts EXPO_PUBLIC_API_BASE_URL for an intentional override.
 
-Vercel settings:
+Vercel settings
 - Root Directory: web
-- Include files outside root directory: Off
 - Framework: Vite
-- Install Command: npm install
+- Install Command: npm ci
 - Build Command: npm run build
 - Output Directory: dist
-- The Vercel "Skip deployments when there are no changes to the root directory or its dependencies" setting is enabled. Keep it enabled so server-only commits do not rebuild the website.
+- Keep the existing setting that skips builds when no files under web/ or its dependencies changed.
 
 Backend development
   cd server
@@ -41,22 +48,21 @@ Backend development
   npm test
   npm start
 
-Production architecture
-- Website: Vercel with its existing native Git integration.
-- API and PostgreSQL: Ubuntu/Debian VPS; the public API hostname is https://ud-api.mangotyping.fun.
-- Backend auto-deploy timer: disabled by default. Keep it disabled unless separately reviewed and intentionally enabled.
-- Android builds: local/manual only. Do not use EAS, GitHub Actions, or paid build services.
+Render environment variables
+- DATABASE_URL
+- TRANSPORT_STACK_API_KEY (live GTFS-RT feed)
+- TRANSPORT_STACK_PLANNER_API_KEY (Multimodal Journey Planner)
+- TRANSPORT_STACK_REALTIME_URL
+- APP_ORIGINS=https://united-delhi.vercel.app
+- DTC_STATIC_URL and DTC_STATIC_SOURCE_KEY
+- METRO_STATIC_URL and METRO_STATIC_SOURCE_KEY
+- METRO_ALLOW_EXPIRED_CALENDAR=true is currently used only for Metro line/station connectivity from the older feed. Do not represent its timetable as current.
 
-The current app build and website configurations use the VPS API hostname above. See server/deploy/SETUP.txt for operational notes; do not enable its VPS auto-deploy timer as part of routine source changes.
+Live-data caveat
+The current Render deployment has a working database connection and imported transit tables, but Transport Stack has been returning HTTP 401 for the live GTFS-RT key currently configured. Rotate that key with Transport Stack and update TRANSPORT_STACK_API_KEY in Render before expecting live bus positions. The separate planner key must not be placed in that variable.
 
-VPS environment variables
-- DATABASE_URL (PostgreSQL connection string for the VPS database)
-- TRANSPORT_STACK_API_KEY
-- APP_ORIGINS (include https://united-delhi.vercel.app)
-- PORT=10000
-- TRANSPORT_STACK_REALTIME_URL (optional; defaults to the approved Transport Stack endpoint)
-
-Keep DATABASE_URL and TRANSPORT_STACK_API_KEY only in /etc/united-delhi/server.env on the VPS. Never commit these values or add them to web/ or app/.
+Legacy VPS runbooks
+The files under server/deploy/VPS-* describe an optional, inactive VPS migration path. They are not the current production architecture. Keep VPS auto-deploy timers disabled unless intentionally migrating back and verifying that deployment independently.
 
 Vehicle colours
-Only a valid upstream per-vehicle serviceColor is shown as the bus colour. If the live feed does not provide one, the marker stays neutral and is labelled unknown. Do not infer physical livery from route colours, vehicle type or registration prefix.
+Only a valid upstream per-vehicle serviceColor or a reviewed livery record is treated as physical-colour evidence. Route/category/display colours are not claims about physical paint.

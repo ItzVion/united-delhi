@@ -1,15 +1,19 @@
-UNITED DELHI — VPS BUILD AND AUTO-DEPLOYMENT
+UNITED DELHI — LEGACY VPS BUILD AND AUTO-DEPLOYMENT RUNBOOK
+
+CURRENT PRODUCTION WARNING
+- The active production architecture is Vercel + Render + Neon. This file describes an optional, inactive VPS migration path only.
+- Do not enable the VPS updater, change the frontend API host, or run cleanup/rebuild steps as routine maintenance.
 
 ARCHITECTURE
 - Website remains hosted on Vercel, but this VPS runs the web build and uploads prebuilt output to Vercel.
 - Backend API runs on this Ubuntu/Debian VPS as the unprivileged united-delhi service user.
 - PostgreSQL is local to this VPS: database united_delhi, role united_delhi_app.
-- API hostname: https://ud-api.mangotyping.fun through Cloudflare Tunnel to http://localhost:10000.
+- Optional VPS API hostname: https://ud-api.mangotyping.fun through Cloudflare Tunnel to http://localhost:10000.
 - Adminer hostname: https://ud-db.mangotyping.fun through Cloudflare Tunnel to http://127.0.0.1:18080; protect it with Cloudflare Access for your own email.
 - GTFS archives live at /opt/united-delhi/data/dtc-static.zip and /opt/united-delhi/data/metro-static.zip, outside code releases.
 
-NO GITHUB ACTIONS
-There are no GitHub Actions workflows in this repository. The VPS itself fetches origin/main every two minutes via systemd. It builds/tests backend changes and activates a rollback-safe release, builds/deploys the Vercel project using Vercel CLI prebuilt output when web/ changes, and builds a local Android test APK when app/ changes. It never commits or pushes.
+DEPLOYMENT AUTOMATION
+GitHub Actions is manual-only and is not used for routine builds. The active production path uses Render's main-branch auto-deploy and Vercel's native Git integration. The optional VPS flow fetches origin/main only if its systemd timer is explicitly enabled; it must remain disabled in the current setup.
 Vercel's Git integration can independently build source on main unless its Ignored Build Step is configured after a successful VPS prebuilt deployment. See the supplied AutoBuild Kit instructions.
 
 ONE-TIME VPS KIT
@@ -30,7 +34,7 @@ The local DB was restored from a verified Neon SQL backup. Keep Neon and /root/u
 - /etc/united-delhi/server.env: root:united-delhi, mode 0640.
 - /etc/united-delhi/deploy.env: root:uddeploy, mode 0640.
 - DATABASE_URL must point to postgresql://united_delhi_app:<password>@127.0.0.1:5432/united_delhi.
-- Copy TRANSPORT_STACK_API_KEY from the existing secret store/Render settings to server.env if live vehicle tracking is required. Never commit or paste it.
+- Copy `TRANSPORT_STACK_API_KEY` (live GTFS-RT) and `TRANSPORT_STACK_PLANNER_API_KEY` (trip planning) from secure provider/Render settings into `server.env` only if this optional VPS deployment is deliberately enabled. Never commit or paste either key.
 - Set VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID in deploy.env for Vercel CLI prebuilt deployments. Do not share the token.
 - Do not run server/sql/001_reset_and_schema.sql; it is a disabled legacy destructive reset and raises an exception.
 

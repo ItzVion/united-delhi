@@ -13,7 +13,7 @@ try {
 
   # Release builds must always target the currently deployed public backend.
   # This prevents a stale shell environment variable from baking an old hostname into the APK.
-  $env:EXPO_PUBLIC_API_BASE_URL = "https://ud-api.mangotyping.fun"
+  $env:EXPO_PUBLIC_API_BASE_URL = "https://united-delhi-api.onrender.com"
   Write-Host "API base URL = $env:EXPO_PUBLIC_API_BASE_URL"
 
   Write-Host "=== UNITED DELHI LOCAL V1 BUILD ==="

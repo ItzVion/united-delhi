@@ -1,4 +1,6 @@
-# VPS-only auto-deploy and Discord failure logs
+# VPS-only auto-deploy and Discord failure logs (legacy / optional)
+
+> Current production is Vercel + Render + Neon. Keep this optional VPS timer disabled unless an explicit migration back to a VPS is planned.
 
 United Delhi no longer uses GitHub Actions for backend deploys. The workflow was removed to avoid consuming GitHub Actions minutes. A systemd timer on the VPS polls the existing `main` checkout once per minute, runs the backend checks locally, and sends the full compressed failed-run log as a Discord attachment.
 
@@ -20,7 +22,7 @@ The VPS bootstrap installs `united-delhi-autodeploy.service` and `united-delhi-a
    UD_API_BASE_URL=https://ud-api.mangotyping.fun
    DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN
    ```
-   Preserve any other values already in the file. The OTD API key belongs separately in `/etc/united-delhi/server.env`.
+   Preserve any other values already in the file. `TRANSPORT_STACK_API_KEY` (live GTFS-RT) and `TRANSPORT_STACK_PLANNER_API_KEY` (multimodal planner) belong separately in `/etc/united-delhi/server.env`; the two values are distinct and neither belongs in source control.
 3. Ensure the deploy user owns the updater's writable directories, then configure the environment and enable the timer:
    ```bash
    sudo chown uddeploy:uddeploy /opt/united-delhi

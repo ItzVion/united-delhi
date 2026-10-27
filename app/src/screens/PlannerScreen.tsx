@@ -4,11 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api, TripPlanOption } from '../api/client';
-type PlannerSuggestion = {id:string;label:string;mode:'bus'|'metro'};
 import { colors } from '../theme';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
+
+type PlannerSuggestion = {id:string;label:string;mode:'bus'|'metro'};
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Planner'>;
 

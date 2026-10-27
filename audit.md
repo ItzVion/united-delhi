@@ -92,3 +92,14 @@ No separate lint command is configured in these package scripts. The app's initi
 3. The web production build still emits a 570.22 kB chunk-size warning.
 4. The backend path fix has unit coverage, but static import/sync behavior against a populated database was not integration-tested to avoid touching live or unisolated data.
 5. Native UI flows were source-reviewed and typechecked/tested, but not exercised on a device or emulator.
+
+
+## Deployment/configuration audit — 28 October 2026
+
+- The active website is Vercel and the active API is Render at `https://united-delhi-api.onrender.com`; PostgreSQL is on Neon.
+- Fixed stale VPS defaults in the Vite development proxy, EAS build profiles and local APK build script so new web/mobile builds use the same Render API origin as `app/src/config.ts` and `web/vercel.json`.
+- Split credentials by responsibility: `TRANSPORT_STACK_API_KEY` for live GTFS-RT and `TRANSPORT_STACK_PLANNER_API_KEY` for multimodal planning. Both are backend-only secrets.
+- Added regression coverage for the real Transport Stack v2 response shape (`data[].directions.routes[]`) so the planner cannot turn a valid provider response into a generic placeholder trip.
+- GitHub Actions remains manual-only. Routine deployments use Render and Vercel integrations.
+- Remaining external blocker: the configured GTFS-RT credential is being rejected by Transport Stack with HTTP 401. Rotate it at the provider and replace `TRANSPORT_STACK_API_KEY` in Render; do not reuse the planner key for this purpose.
+- No production APK was built in this audit. The committed Android source/profile is aligned to the current API; local typecheck/test and on-device verification remain necessary for the APK built locally.

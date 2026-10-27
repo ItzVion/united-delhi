@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://ud-api.mangotyping.fun',
+        target: 'https://united-delhi-api.onrender.com',
         changeOrigin: true,
         secure: true,
         configure: proxy => {

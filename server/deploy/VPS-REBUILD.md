@@ -1,4 +1,6 @@
-# United Delhi VPS rebuild checklist
+# United Delhi VPS rebuild checklist (legacy / optional migration)
+
+> **Current production is Vercel + Render + Neon.** Use this procedure only if intentionally migrating back to a separate VPS; do not treat the VPS hostname below as the app's default API.
 
 This procedure is designed for an existing Ubuntu VPS with PostgreSQL and a Cloudflare Tunnel that must be preserved.
 
@@ -40,7 +42,7 @@ runuser -u uddeploy -- env HOME=/home/uddeploy USER=uddeploy LOGNAME=uddeploy gi
 - Only start the backend service after confirming the current schema/data are compatible.
 - Verify `http://127.0.0.1:10000/health` and `http://127.0.0.1:10000/api/status`; the status must report database OK.
 - Verify the public API hostname through the existing Cloudflare Tunnel.
-- The current app/web API origin is `https://ud-api.mangotyping.fun`. After a rebuild, verify that this hostname and its health/database checks work before changing the production target.
+- If intentionally migrating back to a VPS, verify its public API host and database checks before changing the app/web production target.
 
 ## Security / resource limits
 
@@ -53,7 +55,7 @@ runuser -u uddeploy -- env HOME=/home/uddeploy USER=uddeploy LOGNAME=uddeploy gi
 
 ## Post-migration drift checks
 
-The default frontend/API targets must stay in sync with the public VPS hostname, `https://ud-api.mangotyping.fun`. Check `web/vercel.json`, `app/eas.json`, `app/src/config.ts`, and the local Android build script when rebuilding; do not silently fall back to Render in a fresh production build.
+The current frontend/API target is Render (`https://united-delhi-api.onrender.com`). Only switch `web/vercel.json`, `app/eas.json`, `app/src/config.ts`, and the local Android build script back to a VPS hostname after a deliberate migration and a successful live verification.
 
 The read-only Git deploy key means the VPS can fetch but cannot push hotfixes. Any runtime source fix must be committed through an authorized developer workflow; keep the live deployment healthy until the fixed commit is fetched and tested.
 

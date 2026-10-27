@@ -9,6 +9,8 @@ services:
     plan: free
     region: singapore
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: TRANSPORT_STACK_API_KEY
         sync: false
       - key: TRANSPORT_STACK_PLANNER_API_KEY
@@ -21,3 +23,22 @@ services:
         value: "10000"
       - key: APP_ORIGINS
         value: "https://united-delhi.vercel.app"
+      - key: DTC_STATIC_URL
+        value: "https://ethanc8.github.io/delhi-gtfs/bus.zip"
+      - key: DTC_STATIC_SOURCE_KEY
+        value: "ethanc8-delhi-gtfs-bus"
+      - key: DTC_STATIC_AUTO_IMPORT
+        value: "true"
+      - key: METRO_STATIC_URL
+        value: "https://ethanc8.github.io/delhi-gtfs/metro.zip"
+      - key: METRO_STATIC_SOURCE_KEY
+        value: "ethanc8-delhi-gtfs-metro"
+      - key: METRO_AUTO_SYNC
+        value: "true"
+      # Expired-calendar Metro feed is for topology/connectivity only; never claim its times are current.
+      - key: METRO_ALLOW_EXPIRED_CALENDAR
+        value: "true"
+      - key: DTC_STATIC_ALLOW_REPLACEMENT
+        value: "false"
+      - key: METRO_STATIC_ALLOW_REPLACEMENT
+        value: "false"
