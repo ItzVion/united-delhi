@@ -1,10 +1,8 @@
 name: CI
 
+# Manual-only by default to avoid consuming GitHub Actions minutes on every main push.
+# Local checks and Render's backend build/test command continue to validate deploys.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
