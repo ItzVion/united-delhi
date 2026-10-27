@@ -47,4 +47,4 @@ The VPS bootstrap installs `united-delhi-autodeploy.service` and `united-delhi-a
 ## Notes
 
 - Polling has a maximum nominal delay of around one minute, plus build time. Instant deployment would require a GitHub webhook into a protected public endpoint on the VPS.
-- Keep the repo's deploy SSH key read-only. Never put `OTD_API_KEY`, database credentials, or the Discord webhook into the repository.
+- Keep the repo's deploy SSH key read-only. Never put `TRANSPORT_STACK_API_KEY`, database credentials, or the Discord webhook into the repository.
