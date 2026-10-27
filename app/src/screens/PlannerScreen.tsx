@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api, TripPlanOption } from '../api/client';
+type PlannerSuggestion = {id:string;label:string;mode:'bus'|'metro'};
 import { colors } from '../theme';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
@@ -20,8 +21,11 @@ export default function PlannerScreen() {
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState<TripPlanOption[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [fromSuggestions, setFromSuggestions] = useState<{id:string;label:string}[]>([]);
-  const [toSuggestions, setToSuggestions] = useState<{id:string;label:string}[]>([]);
+  const [fromSuggestions, setFromSuggestions] = useState<PlannerSuggestion[]>([]);
+  const [toSuggestions, setToSuggestions] = useState<PlannerSuggestion[]>([]);
+  const [metroStops, setMetroStops] = useState<PlannerSuggestion[]>([]);
+  const [fromMode, setFromMode] = useState<'bus'|'metro'>('bus');
+  const [toMode, setToMode] = useState<'bus'|'metro'>('bus');
   const [fromFocus, setFromFocus] = useState(false);
   const [toFocus, setToFocus] = useState(false);
 
@@ -29,17 +33,17 @@ export default function PlannerScreen() {
     const value=from.trim();
     if(value.length<2){setFromSuggestions([]);return;}
     let active=true;
-    const timer=setTimeout(async()=>{try{const r=await api.search(value);if(active)setFromSuggestions((r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label})));}catch{if(active)setFromSuggestions([]);}},180);
+    const timer=setTimeout(async()=>{try{const r=await api.search(value);if(active){const bus=(r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label,mode:'bus' as const}));const metro=metroStops.filter(x=>x.label.toLowerCase().includes(value.toLowerCase())).map(x=>({...x,mode:'metro' as const}));setFromSuggestions([...bus,...metro].slice(0,8));}}catch{if(active)setFromSuggestions([]);}},180);
     return()=>{active=false;clearTimeout(timer);};
-  },[from]);
+  },[from,metroStops]);
   useEffect(() => {
     const value=to.trim();
     if(value.length<2){setToSuggestions([]);return;}
     let active=true;
-    const timer=setTimeout(async()=>{try{const r=await api.search(value);if(active)setToSuggestions((r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label})));}catch{if(active)setToSuggestions([]);}},180);
+    const timer=setTimeout(async()=>{try{const r=await api.search(value);if(active){const bus=(r.results||[]).filter(x=>x.type==='stop').slice(0,8).map(x=>({id:x.id,label:x.label,mode:'bus' as const}));const metro=metroStops.filter(x=>x.label.toLowerCase().includes(value.toLowerCase())).map(x=>({...x,mode:'metro' as const}));setToSuggestions([...bus,...metro].slice(0,8));}}catch{if(active)setToSuggestions([]);}},180);
     return()=>{active=false;clearTimeout(timer);};
-  },[to]);
-  const swap = () => { const value = from; const valueId = fromStopId; setFrom(to); setTo(value); setFromStopId(toStopId); setToStopId(valueId); };
+  },[to,metroStops]);
+  const swap = () => { const value = from; const valueId = fromStopId; const mode=fromMode; setFrom(to); setTo(value); setFromStopId(toStopId); setToStopId(valueId); setFromMode(toMode); setToMode(mode); };
 
   const plan = async () => {
     if (from.trim().length < 2 || to.trim().length < 2) {
@@ -48,7 +52,7 @@ export default function PlannerScreen() {
     }
     setLoading(true); setError(null); setOptions([]); setFromFocus(false); setToFocus(false);
     try {
-      const result = await api.plan(from.trim(), to.trim(), fromStopId ?? undefined, toStopId ?? undefined);
+      const result = (fromMode==='bus'&&toMode==='bus') ? await api.plan(from.trim(), to.trim(), fromStopId ?? undefined, toStopId ?? undefined) : await api.planMultimodal(fromMode,toMode,String(fromStopId),String(toStopId));
       if (result.status === 'OK') setOptions(result.options);
       else setError(result.reason || 'No journey could be planned.');
     } catch (e) {
@@ -66,7 +70,7 @@ export default function PlannerScreen() {
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>JOURNEY PLANNER</Text>
             <Text style={styles.title}>Plan your ride</Text>
-            <Text style={styles.subtitle}>Bus journeys across Delhi</Text>
+            <Text style={styles.subtitle}>Bus, Metro and combined journeys across Delhi</Text>
           </View>
         </View>
 
@@ -76,20 +80,20 @@ export default function PlannerScreen() {
             <View style={styles.fields}>
               <Text style={styles.fieldLabel}>FROM</Text>
               <View style={styles.inputWrap}>
-                <TextInput value={from} onFocus={()=>setFromFocus(true)} onChangeText={value=>{setFrom(value);setFromStopId(null);setFromFocus(true);}} placeholder="Starting stop or place" placeholderTextColor={colors.textMuted} style={styles.input}/>
-                {fromFocus && fromSuggestions.length>0 ? <View style={styles.suggestions}>{fromSuggestions.map(s=><Pressable key={s.id} style={styles.suggestion} onPress={()=>{setFrom(s.label);setFromStopId(s.id);setFromSuggestions([]);setFromFocus(false);}}><View style={styles.suggestionIcon}><Text style={styles.suggestionDot}>●</Text></View><View style={styles.suggestionCopy}><Text style={styles.suggestionTitle} numberOfLines={1}>{s.label}</Text><Text style={styles.suggestionMeta}>Bus stop · {s.id}</Text></View><Text style={styles.suggestionArrow}>›</Text></Pressable>)}</View> : null}
+                <TextInput value={from} onFocus={()=>setFromFocus(true)} onChangeText={value=>{setFrom(value);setFromStopId(null);setFromFocus(true);}} placeholder="Starting bus stop or Metro station" placeholderTextColor={colors.textMuted} style={styles.input}/>
+                {fromFocus && fromSuggestions.length>0 ? <View style={styles.suggestions}>{fromSuggestions.map(s=><Pressable key={s.mode+':'+s.id} style={styles.suggestion} onPress={()=>{setFrom(s.label);setFromStopId(s.id);setFromMode(s.mode);setFromSuggestions([]);setFromFocus(false);}}><View style={styles.suggestionIcon}><Text style={styles.suggestionDot}>{s.mode==='metro'?'M':'B'}</Text></View><View style={styles.suggestionCopy}><Text style={styles.suggestionTitle} numberOfLines={1}>{s.label}</Text><Text style={styles.suggestionMeta}>{s.mode==='metro'?'Metro station':'Bus stop'} · {s.id}</Text></View><Text style={styles.suggestionArrow}>›</Text></Pressable>)}</View> : null}
               </View>
               <View style={styles.divider}/>
               <Text style={styles.fieldLabel}>TO</Text>
               <View style={styles.inputWrap}>
-                <TextInput value={to} onFocus={()=>setToFocus(true)} onChangeText={value=>{setTo(value);setToStopId(null);setToFocus(true);}} placeholder="Where do you want to go?" placeholderTextColor={colors.textMuted} style={styles.input}/>
-                {toFocus && toSuggestions.length>0 ? <View style={styles.suggestions}>{toSuggestions.map(s=><Pressable key={s.id} style={styles.suggestion} onPress={()=>{setTo(s.label);setToStopId(s.id);setToSuggestions([]);setToFocus(false);}}><View style={styles.suggestionIcon}><Text style={styles.suggestionDot}>●</Text></View><View style={styles.suggestionCopy}><Text style={styles.suggestionTitle} numberOfLines={1}>{s.label}</Text><Text style={styles.suggestionMeta}>Bus stop · {s.id}</Text></View><Text style={styles.suggestionArrow}>›</Text></Pressable>)}</View> : null}
+                <TextInput value={to} onFocus={()=>setToFocus(true)} onChangeText={value=>{setTo(value);setToStopId(null);setToFocus(true);}} placeholder="Destination bus stop or Metro station" placeholderTextColor={colors.textMuted} style={styles.input}/>
+                {toFocus && toSuggestions.length>0 ? <View style={styles.suggestions}>{toSuggestions.map(s=><Pressable key={s.mode+':'+s.id} style={styles.suggestion} onPress={()=>{setTo(s.label);setToStopId(s.id);setToMode(s.mode);setToSuggestions([]);setToFocus(false);}}><View style={styles.suggestionIcon}><Text style={styles.suggestionDot}>{s.mode==='metro'?'M':'B'}</Text></View><View style={styles.suggestionCopy}><Text style={styles.suggestionTitle} numberOfLines={1}>{s.label}</Text><Text style={styles.suggestionMeta}>{s.mode==='metro'?'Metro station':'Bus stop'} · {s.id}</Text></View><Text style={styles.suggestionArrow}>›</Text></Pressable>)}</View> : null}
               </View>
             </View>
             <Pressable onPress={swap} style={styles.swap}><Text style={styles.swapText}>↕</Text></Pressable>
           </View>
           <Pressable style={styles.planButton} onPress={plan} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff"/> : <Text style={styles.planText}>Find buses</Text>}
+            {loading ? <ActivityIndicator color="#fff"/> : <Text style={styles.planText}>Find journeys</Text>}
           </Pressable>
         </View>
 
@@ -100,10 +104,10 @@ export default function PlannerScreen() {
           <View key={`${option.type}-${index}`} style={[styles.option, index === 0 && styles.optionFeatured]}>
             <View style={styles.optionTop}>
               <View>
-                <Text style={styles.optionType}>{option.type === 'direct' ? 'DIRECT BUS' : 'ONE CHANGE'}</Text>
+                <Text style={styles.optionType}>{option.journeyMode==='mixed'?'BUS + METRO':option.journeyMode==='metro'?'METRO JOURNEY':option.type === 'direct' ? 'DIRECT BUS' : 'BUS TRANSFER'}</Text>
                 <Text style={styles.duration}>{option.durationMinutes} min</Text>
               </View>
-              <View style={styles.walkPill}><Text style={styles.walkText}>Walking time not estimated</Text></View>
+              <View style={styles.walkPill}><Text style={styles.walkText}>{option.durationIsEstimate?'ESTIMATED TIME':'TRAVEL TIME'}{option.walkingMinutes!=null?` · ${option.walkingMinutes} min walk`:''}</Text></View>
             </View>
             {option.legs.map((leg, legIndex) => (
               <View key={`${leg.routeId}-${legIndex}`} style={styles.leg}>
