@@ -1,10 +1,10 @@
 {
   "name": "united-delhi-server",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22 <23"
+    "node": "22.x"
   },
   "scripts": {
     "start": "node src/index.js",
@@ -19,8 +19,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
-    "gtfs-realtime-bindings": "^2.2.0",
     "express-rate-limit": "^8.7.0",
+    "gtfs-realtime-bindings": "^2.2.0",
     "pg": "^8.16.3"
   }
 }
