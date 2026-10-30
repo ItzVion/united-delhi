@@ -1,7 +1,12 @@
 import {roundCoordinate} from './lib';
 
-export const API=String(import.meta.env.VITE_API_BASE_URL || '/api').trim().replace(/\/+$/,'');
-const LIVE_CACHE_KEY='ud-live-vehicles-v10';
+const configuredApiBase=String(import.meta.env.VITE_API_BASE_URL||'').trim().replace(/\/+$/,'');
+const RENDER_API_BASE='https://united-delhi-api.onrender.com/api';
+export const API=import.meta.env.DEV
+ ? (configuredApiBase||'/api')
+ : (!configuredApiBase||configuredApiBase==='/api'
+   ? RENDER_API_BASE
+   : (/^https:\/\/united-delhi-api\.onrender\.com$/i.test(configuredApiBase)?configuredApiBase+'/api':configuredApiBase));const LIVE_CACHE_KEY='ud-live-vehicles-v11';
 export const SERVICE_WAKING_MESSAGE='The live service is waking up or reconnecting. It can take up to a minute after inactivity; we will retry automatically.';
 type LiveryVerification={status:'verified';colorName?:string|null;source?:string|null;evidenceUrl?:string|null;verifiedAt?:string|null};
 export type Vehicle={
@@ -59,7 +64,10 @@ export const api={
   vehicles:async():Promise<VehicleResponse>=>{
     try{
       const data=await request<VehicleResponse>('/realtime/vehicles',{},65000,0);
-      if(Array.isArray(data.vehicles)&&data.vehicles.length)writeVehicleCache(data);
+      if(Array.isArray(data.vehicles)){
+        if(data.vehicles.length)writeVehicleCache(data);
+        else{try{window.localStorage.removeItem(LIVE_CACHE_KEY)}catch{}}
+      }
       return data;
     }catch{
       const cached=readVehicleCache();
