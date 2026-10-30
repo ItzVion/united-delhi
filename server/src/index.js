@@ -329,6 +329,16 @@ async function startStaticImport(kind,archive){
   job.status=code===0?'SUCCEEDED':'FAILED';
   job.exitCode=Number.isInteger(code)?code:null;
   job.finishedAt=new Date().toISOString();
+  if(code===0&&kind==='dtc'){
+   routeMetaLoadedAt=0;
+   try{
+    await loadRouteMeta();
+    cache.vehicles=cache.vehicles.map(applyRouteMeta);
+    console.log('DTC static import committed; cached live-vehicle route metadata refreshed.');
+   }catch(refreshError){
+    console.error('Post-import route metadata refresh failed:',refreshError?.message||refreshError);
+   }
+  }
   staticImportRunning=null;
   await fs.rm(dir,{recursive:true,force:true}).catch(e=>console.warn('Static import temp cleanup failed:',e?.message||e));
   if(staticImportJobs.size>30){
