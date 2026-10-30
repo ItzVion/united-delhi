@@ -34,7 +34,7 @@ The local DB was restored from a verified Neon SQL backup. Keep Neon and /root/u
 - /etc/united-delhi/server.env: root:united-delhi, mode 0640.
 - /etc/united-delhi/deploy.env: root:uddeploy, mode 0640.
 - DATABASE_URL must point to postgresql://united_delhi_app:<password>@127.0.0.1:5432/united_delhi.
-- Copy `TRANSPORT_STACK_API_KEY` (live GTFS-RT) and `TRANSPORT_STACK_PLANNER_API_KEY` (trip planning) from secure provider/Render settings into `server.env` only if this optional VPS deployment is deliberately enabled. Never commit or paste either key.
+- If deliberately deploying this optional VPS, set `OTD_API_KEY` in `/etc/united-delhi/server.env` to an authorised Delhi OTD private key. Keep it root-owned and never commit it.
 - Set VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID in deploy.env for Vercel CLI prebuilt deployments. Do not share the token.
 - Do not run server/sql/001_reset_and_schema.sql; it is a disabled legacy destructive reset and raises an exception.
 
@@ -56,7 +56,7 @@ After the first successful VPS prebuilt deployment, you may configure Vercel Pro
 Vercel treats exit code 0 as skip. The VPS's Vercel CLI prebuilt deployment is independent of Git-triggered builds. Confirm in the Vercel UI before relying on it.
 
 CURRENT API TARGETS
-The current production API target is https://ud-api.mangotyping.fun. `web/vercel.json`, `app/eas.json`, `app/src/config.ts`, the local Android build script, and Vite's local proxy should stay aligned with it. Before changing this hostname or rebuilding production configuration, verify `/health`, `/api/status`, and the public realtime endpoint; realtime may be unavailable if the Transport Stack key is not configured. Retain any existing fallback resources until the VPS/data cutover has been independently verified.
+Current production remains Vercel + Render + Neon; the active API is https://united-delhi-api.onrender.com. This legacy VPS runbook does not change the app's API target. The optional VPS hostname above is only for a deliberate migration. If you intentionally migrate, set OTD_API_KEY in the backend environment and keep it private.
 Keep PostgreSQL port 5432 private; never expose it publicly. Do not enable UFW without confirming SSH rules. Do not expose Adminer without Cloudflare Access. A local APK is a testing artifact unless a production upload keystore is securely configured.
 
 

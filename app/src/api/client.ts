@@ -17,8 +17,6 @@ export interface TripPlanLeg { mode?:TripLegMode; routeId?:string|null; routeNam
 export interface TripPlanOption { type:string; journeyMode?:'bus'|'metro'|'mixed'; durationMinutes:number; durationIsEstimate?:boolean; walkingMinutes:number|null; legs:TripPlanLeg[]; transferStop?:string|null; }
 export interface TripPlanStop { stop_id:string; name:string; latitude:number; longitude:number; }
 export interface TripPlanResponse { status:string; origin:TripPlanStop|null; destination:TripPlanStop|null; originStopIds?:string[]; destinationStopIds?:string[]; options:TripPlanOption[]; reason?:string; }
-export interface PlannerProviderStop { id:string; stop_id:string; name:string; label:string; latitude:number|null; longitude:number|null; stop_code?:string|null; mode:'bus'|'metro'|'multi'; }
-export interface PlannerProviderStopsResponse { status:string; mode:string; stops:PlannerProviderStop[]; total?:number; reason?:string; }
 export interface Arrival { vehicleId:string; routeId:string|null; routeShortName?:string|null; routeColor?:string|null; routeTextColor?:string|null; serviceType?:'dtc'|'electric'|'unknown'; serviceColor?:string|null; fleetColorSource?:'upstream-api'|'verified-livery-record'|'not-provided-by-realtime-feed'; busType?:string|null; distanceMeters:number; observedAgeSeconds:number; fromStop?:string|null; toStop?:string|null; }
 export interface VehicleResponse { status:string; count:number; vehicles:Vehicle[]; reason?:string; fetchedAt?:string; stale?:boolean; source?:string; cacheAgeSeconds?:number|null; }
 class ApiError extends Error { status:number; constructor(message:string,status:number){super(message);this.status=status;} }
@@ -74,8 +72,6 @@ export const api={
  arrivals:(stopId:string)=>request<{status:string;arrivals:Arrival[];reason?:string}>(`/api/stops/${encodeURIComponent(stopId)}/arrivals`),
  metro:()=>request<MetroResponse>('/api/metro',12000),
  metroRoute:(routeId:string)=>request<MetroRouteResponse>(`/api/metro/routes/${encodeURIComponent(routeId)}`,12000),
- plannerStops:(mode:'bus'|'metro'|'multi',q='')=>{const params=new URLSearchParams({mode});if(q.trim())params.set('q',q.trim());return request<PlannerProviderStopsResponse>('/api/planner/stops?'+params.toString(),15000,{},0);},
- planTransportStack:(fromType:'bus'|'metro',toType:'bus'|'metro',fromStopId:string,toStopId:string,fromName:string,toName:string)=>{const mode=fromType==='metro'&&toType==='metro'?'metro':'multi';const params=new URLSearchParams({fromType,toType,fromStopId,toStopId,fromName,toName,mode});return request<TripPlanResponse>('/api/planner/multimodal?'+params.toString(),25000,{},0);},
  plan:(from:string,to:string,fromStopId?:string,toStopId?:string)=>{const params=new URLSearchParams({from,to});if(fromStopId)params.set('fromStopId',fromStopId);if(toStopId)params.set('toStopId',toStopId);return request<TripPlanResponse>('/api/plan?'+params.toString(),15000);},
  planMultimodal:(fromType:'bus'|'metro',toType:'bus'|'metro',fromStopId:string,toStopId:string)=>{const params=new URLSearchParams({fromType,toType,fromStopId,toStopId});return request<TripPlanResponse>('/api/plan/multimodal?'+params.toString(),20000);}
 };

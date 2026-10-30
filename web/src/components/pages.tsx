@@ -76,7 +76,7 @@ function normalisePlannerPlace(value:unknown):string{
 }
 function getPlannerMetroStops():Promise<any[]>{
  if(plannerMetroStopsCache)return Promise.resolve(plannerMetroStopsCache);
- if(!plannerMetroStopsPromise)plannerMetroStopsPromise=api.plannerStops('metro').then(d=>{
+ if(!plannerMetroStopsPromise)plannerMetroStopsPromise=api.metro().then(d=>{
   plannerMetroStopsCache=Array.isArray(d?.stops)?d.stops.filter((s:any)=>s?.stop_id&&s?.name):[];
   return plannerMetroStopsCache;
  }).catch(()=>{plannerMetroStopsPromise=null;return[]});
@@ -102,11 +102,11 @@ function StopField({label,value,onChange,placeholder,active,setActive,onEdit}:{l
   setBusy(true);
   const t=window.setTimeout(async()=>{
    try{
-    const [busResult,metroStops]=await Promise.all([api.plannerStops('bus',term,{signal:controller.signal}),getPlannerMetroStops()]);
+    const [busResult,metroStops]=await Promise.all([api.search(term,{signal:controller.signal}),getPlannerMetroStops()]);
     if(!on)return;
-    const busRaw=(Array.isArray(busResult?.stops)?busResult.stops:[])
-     .filter((x:any)=>x.stop_id&&x.name)
-     .map((x:any)=>({...x,id:String(x.stop_id),label:String(x.name),type:'stop',mode:'bus',stopContext:'Bus stop'}));
+    const busRaw=(Array.isArray(busResult?.results)?busResult.results:[])
+     .filter((x:any)=>x.type==='stop'&&x.id&&x.label)
+     .map((x:any)=>({...x,mode:'bus',stopContext:x.stopContext||'Bus stop'}));
     const bus:any[]=[];
     for(const item of busRaw){
      const lat=Number(item.latitude),lon=Number(item.longitude);
@@ -178,7 +178,7 @@ export function Planner({go}:{go:Go}){
    }
    const fromMode=f.mode==='metro'?'metro':'bus';
    const toMode=t.mode==='metro'?'metro':'bus';
-   const result=await api.planTransportStack(fromMode,toMode,f.id,t.id,f.label,t.label);
+   const result=await api.planMultimodal(fromMode,toMode,f.id,t.id);
    if(result.status!=='OK'){
     setErr(result.reason||'No journey could be found. Try another stop or station.');
     return;

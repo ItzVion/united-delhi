@@ -1,24 +1,23 @@
-export const DEFAULT_TRANSPORT_STACK_REALTIME_URL='https://dts-backend.transportstack.in/api/dataset/otd/get-file?agency=delhi-buses&category=realtime_gtfs&filename=VehiclePositions.pb';
+export const DEFAULT_OTD_REALTIME_URL='https://otd.delhi.gov.in/api/realtime/VehiclePositions.pb';
 
 /**
- * United Delhi uses Transport Stack only for live bus positions.
- * The credential is read from the backend environment and sent in x-api-key.
+ * Delhi OTD publishes GTFS-Realtime VehiclePositions as protobuf.
+ * Authorised access uses the OTD private key in the documented "key" query parameter.
+ * Keep this helper backend-only; never expose the resulting URL to a client or log it.
  */
-export function createRealtimeRequest({
-  transportStackApiKey='',
-  transportStackUrl=DEFAULT_TRANSPORT_STACK_REALTIME_URL
-}={}){
-  const key=String(transportStackApiKey??'').trim();
-  if(!key)throw new Error('TRANSPORT_STACK_API_KEY is not configured');
-  const url=new URL(String(transportStackUrl||DEFAULT_TRANSPORT_STACK_REALTIME_URL));
-  if(url.protocol!=='https:'||url.hostname!=='dts-backend.transportstack.in'){
-    throw new Error('Transport Stack realtime URL must use the approved HTTPS host');
+export function createRealtimeRequest({otdApiKey=''}={}){
+  const key=String(otdApiKey??'').trim();
+  if(!key)throw new Error('OTD_API_KEY is not configured');
+  const url=new URL(DEFAULT_OTD_REALTIME_URL);
+  if(url.protocol!=='https:'||url.hostname!=='otd.delhi.gov.in'||url.pathname!=='/api/realtime/VehiclePositions.pb'){
+    throw new Error('Delhi OTD realtime endpoint is not the approved HTTPS endpoint');
   }
+  url.searchParams.set('key',key);
   return {
-    provider:'Transport Stack',
-    source:'transport-stack-live',
+    provider:'Delhi OTD',
+    source:'otd-live',
     url,
-    headers:{'x-api-key':key,accept:'*/*','user-agent':'United-Delhi/2.1'},
+    headers:{accept:'application/x-protobuf, application/octet-stream','user-agent':'United-Delhi/2.2'},
     redirect:'error'
   };
 }

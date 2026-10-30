@@ -30,7 +30,7 @@ section "ENVIRONMENT PRESENCE (NO VALUES/SECRETS)"
 python3 - <<'PY'
 from pathlib import Path
 for file, keys in [
- (Path('/etc/united-delhi/server.env'), ['DATABASE_URL','TRANSPORT_STACK_API_KEY','TRANSPORT_STACK_REALTIME_URL','DTC_STATIC_FILE','METRO_STATIC_FILE']),
+ (Path('/etc/united-delhi/server.env'), ['DATABASE_URL','OTD_API_KEY','DTC_STATIC_FILE','METRO_STATIC_FILE']),
  (Path('/etc/united-delhi/deploy.env'), ['AUTODEPLOY_ENABLED','API_DEPLOY_ENABLED','WEB_DEPLOY_ENABLED','ANDROID_BUILD_ENABLED','VERCEL_TOKEN','VERCEL_ORG_ID','VERCEL_PROJECT_ID']),
 ]:
  print(file, 'present' if file.exists() else 'MISSING')

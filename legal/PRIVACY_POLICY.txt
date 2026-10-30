@@ -32,9 +32,9 @@ United Delhi does not currently use advertising SDKs, analytics SDKs, crash-repo
 ## 2. Third-party services
 
 United Delhi currently uses or may rely on:
-- **Delhi Open Transit Data (OTD) and Transport Stack:** transit route, stop and realtime vehicle data.
+- **Delhi Open Transit Data (OTD):** authorised real-time vehicle positions and published transit datasets.
 - **OpenStreetMap:** map data and standard map tiles.
-- **VPS hosting:** hosting for the United Delhi API and PostgreSQL database.
+- **Render and Neon:** hosting for the United Delhi API and PostgreSQL database.
 - **Vercel:** hosting for the web client.
 - **GitHub:** source-code hosting and project infrastructure.
 

@@ -30,6 +30,6 @@ An expired or invalid metro calendar is refused by default. `METRO_ALLOW_EXPIRED
 
 ## Vehicle colours
 
-GTFS-Realtime has no standard physical-paint colour field, and unknown protobuf extension fields are not trusted as paint evidence. The API accepts a colour only from a confirmed provider-specific extension explicitly configured using `TRANSPORT_STACK_COLOR_FIELD`, or from a reviewed vehicle-specific livery record. Do not set an extension field number just because its values resemble hex colours.
+GTFS-Realtime has no standard physical-paint colour field, and unknown protobuf extension fields are not trusted as paint evidence. The API accepts a colour only from a confirmed OTD protobuf extension explicitly configured using `OTD_COLOR_FIELD`, or from a reviewed vehicle-specific livery record. Do not set an extension field number just because its values resemble hex colours.
 
 Until an authoritative field or reviewed livery evidence exists, grey (`#64748B)) and an “unknown physical colour” label are correct. Route line colours and fleet-type classifications remain separate from physical bus paint.

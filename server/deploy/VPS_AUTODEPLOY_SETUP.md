@@ -22,7 +22,7 @@ The VPS bootstrap installs `united-delhi-autodeploy.service` and `united-delhi-a
    UD_API_BASE_URL=https://ud-api.mangotyping.fun
    DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN
    ```
-   Preserve any other values already in the file. `TRANSPORT_STACK_API_KEY` (live GTFS-RT) and `TRANSPORT_STACK_PLANNER_API_KEY` (multimodal planner) belong separately in `/etc/united-delhi/server.env`; the two values are distinct and neither belongs in source control.
+   Preserve any other values already in the file. `OTD_API_KEY` (authorised Delhi OTD live vehicle positions) belongs in `/etc/united-delhi/server.env` only if this optional VPS backend is deliberately enabled. The in-house trip planner uses Neon and does not require a separate planner API key.
 3. Ensure the deploy user owns the updater's writable directories, then configure the environment and enable the timer:
    ```bash
    sudo chown uddeploy:uddeploy /opt/united-delhi
@@ -49,4 +49,4 @@ The VPS bootstrap installs `united-delhi-autodeploy.service` and `united-delhi-a
 ## Notes
 
 - Polling has a maximum nominal delay of around one minute, plus build time. Instant deployment would require a GitHub webhook into a protected public endpoint on the VPS.
-- Keep the repo's deploy SSH key read-only. Never put `TRANSPORT_STACK_API_KEY`, database credentials, or the Discord webhook into the repository.
+- Keep the repo's deploy SSH key read-only. Never put `OTD_API_KEY`, database credentials, or the Discord webhook into the repository.

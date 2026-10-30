@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node src/index.js",
-    "check": "node --check src/index.js && node --check src/realtime-provider.js && node --check src/vehicle-color.js && node --check src/route-colors.js && node --check src/gtfs-feed-utils.js && node --check src/metro-sync.js && node --check src/transport-stack-planner.js && node --check scripts/import-dtc-static.mjs && node --check scripts/backfill-route-colors.mjs && node --check scripts/sync-dmrc-static.mjs && node --check scripts/inspect-realtime.mjs",
+    "check": "node --check src/index.js && node --check src/realtime-provider.js && node --check src/vehicle-color.js && node --check src/route-colors.js && node --check src/gtfs-feed-utils.js && node --check src/metro-sync.js && node --check scripts/import-dtc-static.mjs && node --check scripts/backfill-route-colors.mjs && node --check scripts/sync-dmrc-static.mjs && node --check scripts/inspect-realtime.mjs",
     "import:dtc": "node scripts/import-dtc-static.mjs",
     "inspect:realtime": "node scripts/inspect-realtime.mjs",
     "test": "node --test test/*.test.js",

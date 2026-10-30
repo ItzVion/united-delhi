@@ -1,18 +1,18 @@
 UNITED DELHI — DEVELOPMENT AND DEPLOYMENT
 
-Repository folders
-- app/     Expo React Native app and local Android APK builder
-- web/     Vite/React website; Vercel root directory
-- server/  Express backend and tests
-- legal/   Legal and third-party notices
+Current production
+- Website: https://united-delhi.vercel.app (Vercel, root directory web/)
+- API: https://united-delhi-api.onrender.com (Render, root directory server/)
+- PostgreSQL: Neon, database neondb
+- GitHub branch: main only
+- GitHub Actions is manual-only. Routine deploys use Render and Vercel integrations.
 
-Current production architecture (verified 28 October 2026)
-- Website: Vercel, https://united-delhi.vercel.app
-- API: Render, https://united-delhi-api.onrender.com
-- PostgreSQL: Neon (Singapore)
-- Transport Stack has two independent backend credentials: TRANSPORT_STACK_API_KEY for live GTFS-RT vehicle positions and TRANSPORT_STACK_PLANNER_API_KEY for Multimodal Journey Planner requests.
-- Both credentials and DATABASE_URL belong only in the Render backend environment. Never commit them or bundle them into web/ or app/.
-- GitHub Actions CI is manual-only to avoid consuming Actions minutes. Render and Vercel deploy from main through their existing integrations.
+Data and integrations
+- Live bus vehicle positions: Delhi Open Transit Data (OTD) GTFS-Realtime protobuf feed.
+- OTD access requires an authorised private key. The backend reads OTD_API_KEY and sends it only to the official OTD endpoint as its documented key query parameter. Keep the value in Render backend secrets; never in app/, web/, or GitHub.
+- Trip planning: United Delhi's own multimodal route engine using routes, stops, route_stops, metro_routes, metro_stops and metro_route_stops in Neon. No Transport Stack Journey Planner API is used.
+- Search suggestions use United Delhi /api/search and /api/metro endpoints.
+- Static bus and Metro network data is loaded into Neon separately from the live OTD vehicle feed. Metro timetable data currently supports network topology only; its older calendar must not be presented as a current timetable.
 
 Android app
   cd app
@@ -21,17 +21,16 @@ Android app
   npm test
   npx expo start
 
-Local Windows APK (no cloud build):
+Local Windows APK
   npm run build:apk
-
-Requirements: Node 22, JDK 17, Android SDK/platform-tools and PowerShell. Local APK building remains the preferred path; no EAS or GitHub Actions build is required.
+Requirements: Node 22, JDK 17, Android SDK/platform-tools and PowerShell. Prefer local APK builds; no EAS or GitHub Actions build is required.
 
 Website
   cd web
   npm ci
   npm run dev
 
-The Vite development proxy, web/Vercel API rewrite and Android build profiles must target https://united-delhi-api.onrender.com. app/src/config.ts uses the same default and accepts EXPO_PUBLIC_API_BASE_URL for an intentional override.
+Web Vite proxy, web/vercel.json and Android build profiles use https://united-delhi-api.onrender.com. app/src/config.ts accepts EXPO_PUBLIC_API_BASE_URL for an intentional override.
 
 Vercel settings
 - Root Directory: web
@@ -39,30 +38,26 @@ Vercel settings
 - Install Command: npm ci
 - Build Command: npm run build
 - Output Directory: dist
-- Keep the existing setting that skips builds when no files under web/ or its dependencies changed.
 
-Backend development
+Backend
   cd server
   npm ci
   npm run check
   npm test
   npm start
 
-Render environment variables
+Render environment
 - DATABASE_URL
-- TRANSPORT_STACK_API_KEY (live GTFS-RT feed)
-- TRANSPORT_STACK_PLANNER_API_KEY (Multimodal Journey Planner)
-- TRANSPORT_STACK_REALTIME_URL
+- OTD_API_KEY (authorised OTD realtime access; backend only)
 - APP_ORIGINS=https://united-delhi.vercel.app
 - DTC_STATIC_URL and DTC_STATIC_SOURCE_KEY
 - METRO_STATIC_URL and METRO_STATIC_SOURCE_KEY
-- METRO_ALLOW_EXPIRED_CALENDAR=true is currently used only for Metro line/station connectivity from the older feed. Do not represent its timetable as current.
+- OTD_COLOR_FIELD is optional and should remain unset until an upstream extension is verified.
 
-Live-data caveat
-The current Render deployment has a working database connection and imported transit tables, but Transport Stack has been returning HTTP 401 for the live GTFS-RT key currently configured. Rotate that key with Transport Stack and update TRANSPORT_STACK_API_KEY in Render before expecting live bus positions. The separate planner key must not be placed in that variable.
+Live feed setup
+The OTD documentation specifies /api/realtime/VehiclePositions.pb?key=YOUR_PRIVATE_KEY. To enable live buses, add your authorised OTD private key to Render as OTD_API_KEY. Do not reuse either former Transport Stack key; they have been cleared from Render configuration.
 
-Legacy VPS runbooks
-The files under server/deploy/VPS-* describe an optional, inactive VPS migration path. They are not the current production architecture. Keep VPS auto-deploy timers disabled unless intentionally migrating back and verifying that deployment independently.
+Security
+Never commit DATABASE_URL or OTD_API_KEY. Both web and Android clients use only the public backend base URL. Keep all provider credentials in Render's secret environment.
 
-Vehicle colours
-Only a valid upstream per-vehicle serviceColor or a reviewed livery record is treated as physical-colour evidence. Route/category/display colours are not claims about physical paint.
+Legacy VPS documents under server/deploy/ are optional historical migration procedures; keep their timers disabled while production runs on Render.

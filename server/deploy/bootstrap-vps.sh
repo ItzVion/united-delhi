@@ -38,9 +38,8 @@ NODE_ENV=production
 PORT=10000
 APP_ORIGINS=https://united-delhi.vercel.app
 DATABASE_URL=${db_url}
-TRANSPORT_STACK_API_KEY=
-TRANSPORT_STACK_PLANNER_API_KEY=
-TRANSPORT_STACK_REALTIME_URL=https://dts-backend.transportstack.in/api/dataset/otd/get-file?agency=delhi-buses&category=realtime_gtfs&filename=VehiclePositions.pb
+OTD_API_KEY=
+OTD_COLOR_FIELD=
 DTC_STATIC_FILE=/opt/united-delhi/data/dtc-static.zip
 DTC_STATIC_SOURCE_KEY=uploaded-dtc-static-local-v1-20261013
 DTC_STATIC_AUTO_IMPORT=true

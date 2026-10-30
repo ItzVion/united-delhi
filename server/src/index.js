@@ -10,19 +10,14 @@ import { SERVER_ROOT, STATIC_IMPORTER_PATH, resolveServerPath } from './runtime-
 import { sha256Hex, sourceHasSha256 } from './gtfs-feed-utils.js';
 import {syncMetroStatic} from './metro-sync.js';
 import {createRealtimeRequest} from './realtime-provider.js';
-import {plannerPayloadRows,normaliseTransportPlannerStop,normaliseTransportPlannerTrip} from './transport-stack-planner.js';
 import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,classifyFleetTypeFromRegistration,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
-const COLOR_FIELD=parseColorFieldSpec(process.env.TRANSPORT_STACK_COLOR_FIELD);
+const COLOR_FIELD=parseColorFieldSpec(process.env.OTD_COLOR_FIELD);
 
 const {Pool}=pg,app=express();
 const PORT=Number(process.env.PORT)||10000;
 const DB=String(process.env.DATABASE_URL||'').trim();
-const TRANSPORT_STACK_KEY=String(process.env.TRANSPORT_STACK_API_KEY||'').trim();
-const TRANSPORT_STACK_PLANNER_KEY=String(process.env.TRANSPORT_STACK_PLANNER_API_KEY||'').trim();
-const TRANSPORT_STACK_PLANNER_BASE='https://dts-backend.transportstack.in/api/serviceset/journey-planner';
-const plannerStopsCache=new Map();
-const TRANSPORT_STACK_FEED=String(process.env.TRANSPORT_STACK_REALTIME_URL||'https://dts-backend.transportstack.in/api/dataset/otd/get-file?agency=delhi-buses&category=realtime_gtfs&filename=VehiclePositions.pb').trim();
-const HAS_REALTIME_KEY=Boolean(TRANSPORT_STACK_KEY);
+const OTD_API_KEY=String(process.env.OTD_API_KEY||'').trim();
+const HAS_OTD_API_KEY=Boolean(OTD_API_KEY);
 const REALTIME_PERSIST_INTERVAL_MS=Math.max(15000,Number(process.env.REALTIME_PERSIST_INTERVAL_MS)||60000);
 let DB_CONNECTION=DB;try{if(DB){const u=new URL(DB);u.searchParams.delete('sslmode');DB_CONNECTION=u.toString()}}catch{} const pool=DB?new Pool({connectionString:DB_CONNECTION,max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000,ssl:/localhost|127(?:\.\d+){3}|::1/i.test(DB)?false:{rejectUnauthorized:true}}):null;
 
@@ -33,7 +28,7 @@ const dist=(a,b,c,d)=>{const R=6371000,r=Math.PI/180,la=(c-a)*r,lo=(d-b)*r,x=Mat
 const UNKNOWN_BUS_MARKER_COLOR='#64748B';
 const classifyFleet=(id,...aliases)=>classifyFleetTypeFromRegistration(id,...aliases);
 const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>classifyFleet(id,licensePlate,vehicleLabel);
-const cache={vehicles:[],status:HAS_REALTIME_KEY?'STARTING':'UNAVAILABLE',reason:HAS_REALTIME_KEY?'United Delhi API is starting':'TRANSPORT_STACK_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
+const cache={vehicles:[],status:HAS_OTD_API_KEY?'STARTING':'UNAVAILABLE',reason:HAS_OTD_API_KEY?'United Delhi API is starting':'OTD_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
 let refreshing=null,poll=null,routeMetaLoadedAt=0,persistPromise=null,lastPersistAt=0,dtcAutoImportRunning=false;
 const routeMeta=new Map();
 const fleetRegistry=new Map();
@@ -246,25 +241,6 @@ app.use(cors({origin:(o,cb)=>{if(!o||ALLOWED_ORIGINS.includes(o))return cb(null,
 app.use(express.json({limit:'32kb'}));
 app.use((_q,r,n)=>{r.setHeader('X-Content-Type-Options','nosniff');r.setHeader('Referrer-Policy','no-referrer');r.setHeader('X-Frame-Options','DENY');r.setHeader('Permissions-Policy','geolocation=(self)');if(_q.secure||String(_q.headers['x-forwarded-proto']||'').split(',')[0].trim()==='https')r.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');n()});
 app.use('/api',rateLimit({windowMs:60000,limit:180,standardHeaders:'draft-8',legacyHeaders:false}));
-// Transport Stack Journey Planner is a separate service/key from the live GTFS-RT feed.
-// All provider requests are made server-side; the key is never sent to either client.
-async function transportPlannerRequest(endpoint,params){
- if(!TRANSPORT_STACK_PLANNER_KEY)throw new Error('Transport Stack Journey Planner key is not configured.');
- const url=new URL(TRANSPORT_STACK_PLANNER_BASE+'/'+endpoint);
- for(const [key,value] of Object.entries(params||{}))if(value!==undefined&&value!==null&&String(value).trim()!=='')url.searchParams.set(key,String(value));
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),18000);
- try{
-  const response=await fetch(url,{method:'GET',headers:{accept:'application/json','x-api-key':TRANSPORT_STACK_PLANNER_KEY},redirect:'error',signal:controller.signal});
-  const text=await response.text();let payload=null;
-  try{payload=text?JSON.parse(text):{}}catch{throw new Error('Transport Stack Journey Planner returned invalid JSON.');}
-  if(!response.ok)throw new Error('Transport Stack Journey Planner returned HTTP '+response.status+'.');
-  return payload;
- }finally{clearTimeout(timer)}
-}
-
-
-
-
 async function ensureRuntimeSchema(){if(!pool)return;const c=await pool.connect();try{
  await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS trip_id TEXT');
  await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS route_id TEXT');
@@ -311,10 +287,9 @@ function parseVehicle(e,feedTs,colors){
  return{id,routeId:str(v?.trip?.routeId),tripId:str(v?.trip?.tripId),stopId:str(v?.stopId),vehicleLabel:str(v?.vehicle?.label),licensePlate:str(v?.vehicle?.licensePlate),serviceColor,latitude:lat,longitude:lon,bearing:num(p.bearing),observedAt:new Date(ts*1000).toISOString()};
 }
 async function fetchLive(){
- const request=createRealtimeRequest({
-  transportStackApiKey:TRANSPORT_STACK_KEY,transportStackUrl:TRANSPORT_STACK_FEED
- });
- // The provider helper enforces HTTPS, restricts the host, and rejects redirects.
+ const request=createRealtimeRequest({otdApiKey:OTD_API_KEY});
+ // Delhi OTD requires its authorised private key in the documented "key" query parameter.
+ // The endpoint is fixed in the provider helper; the key is never exposed to clients or logged.
  const ac=new AbortController(),t=setTimeout(()=>ac.abort(),12000);
  try{
   const r=await fetch(request.url,{signal:ac.signal,headers:request.headers,redirect:request.redirect});
@@ -359,7 +334,7 @@ async function refresh(){
   }catch(e){
    cache.status=cache.fetchedAt?'STALE':'UNAVAILABLE';
    const message=e instanceof Error?e.message:String(e||'Realtime request failed');
-   cache.reason=cache.vehicles.length?'Live Transport Stack data is temporarily unavailable; showing the last known bus positions.':message;
+   cache.reason=cache.vehicles.length?'Live Delhi OTD data is temporarily unavailable; showing the last known bus positions.':message;
    console.error('Realtime poll failed:',message);
   }
  })().finally(()=>{refreshing=null});
@@ -374,12 +349,12 @@ const publicRealtimeReason=(hasData,stale)=>{
  const detail=String(cache.reason||'');
  if(/\bHTTP 401\b|\bHTTP 403\b|unauthori[sz]ed|forbidden/i.test(detail)){
   return hasData
-   ?'Showing last known bus positions. Transport Stack rejected the live-feed credential; rotate it and update TRANSPORT_STACK_API_KEY in Render.'
-   :'Transport Stack rejected the live-feed credential. Rotate the GTFS-RT key and update TRANSPORT_STACK_API_KEY in Render.';
+   ?'Showing last known bus positions. Delhi OTD rejected the OTD_API_KEY; check that the authorised OTD private key is current.'
+   :'Delhi OTD rejected the OTD_API_KEY. Check that the authorised OTD private key is current in Render.';
  }
  if(hasData)return stale?'Showing the last known bus positions while live data reconnects.':null;
- if(!HAS_REALTIME_KEY)return 'Live bus tracking is not configured. Add TRANSPORT_STACK_API_KEY to the backend environment.';
- return 'The live bus service is waking up or reconnecting. It can take up to a minute after inactivity; retrying automatically.';
+ if(!HAS_OTD_API_KEY)return 'Live bus tracking is not configured. Add the authorised OTD_API_KEY to the backend environment.';
+ return 'Delhi OTD live data is reconnecting. United Delhi will retry automatically.';
 };
 app.get('/api/status',async(_q,r)=>{
  let database='NOT_CONFIGURED';
@@ -412,7 +387,7 @@ app.get('/api/realtime/vehicles',(_q,r)=>{
  const stale=!Number.isFinite(ageMs)||ageMs>90000||cache.status!=='OK';
  // Never hold a client request open while a sleeping service or upstream feed wakes up.
  // Kick off the refresh in the background and return cached data (or a friendly empty state).
- if(stale&&HAS_REALTIME_KEY)void refresh().catch(()=>{});
+ if(stale&&HAS_OTD_API_KEY)void refresh().catch(()=>{});
  const hasData=cache.vehicles.length>0;
  const responseAge=cache.fetchedAt?Date.now()-Date.parse(cache.fetchedAt):Infinity;
  const responseStale=!Number.isFinite(responseAge)||responseAge>90000||cache.status!=='OK';
@@ -421,64 +396,6 @@ app.get('/api/realtime/vehicles',(_q,r)=>{
  r.json({status:hasData?(responseStale?'STALE':'OK'):cache.status,count:cache.vehicles.length,vehicles:cache.vehicles,fetchedAt:cache.fetchedAt,stale:responseStale,source:cache.source,cacheAgeSeconds:Number.isFinite(responseAge)?Math.max(0,Math.round(responseAge/1000)):null,reason:publicRealtimeReason(hasData,responseStale)});
 });
 
-app.get('/api/planner/stops',async(q,r)=>{
- if(!TRANSPORT_STACK_PLANNER_KEY)return r.status(503).json({status:'UNAVAILABLE',stops:[],reason:'Transport Stack Journey Planner key is not configured on the backend.'});
- const mode=String(q.query.mode||'bus').trim().toLowerCase();
- if(!['bus','metro','multi'].includes(mode))return r.status(400).json({status:'ERROR',stops:[],reason:'Choose bus, metro, or multi mode.'});
- const query=String(q.query.q||'').trim().toLocaleLowerCase();
- try{
-  let rows=plannerStopsCache.get(mode);
-  if(!rows||Date.now()-rows.cachedAt>5*60*1000){
-   const payload=await transportPlannerRequest('get_stops',{mode});
-   const message=String(payload?.message||'').toLowerCase();
-   if(message&&!message.includes('success')&&message.includes('failure'))throw new Error(String(payload?.description||'Journey Planner could not load stops.'));
-   rows={cachedAt:Date.now(),stops:plannerPayloadRows(payload).map(stop=>normaliseTransportPlannerStop(stop,mode)).filter(Boolean)};
-   plannerStopsCache.set(mode,rows);
-  }
-  const filtered=query?rows.stops.filter(stop=>(stop.name+' '+String(stop.stop_code||'')).toLocaleLowerCase().includes(query)):rows.stops;
-  const limit=query?12:Math.min(filtered.length,30000);
-  return r.json({status:'OK',mode,stops:filtered.slice(0,limit),total:filtered.length,source:'transport-stack'});
- }catch(error){
-  const detail=String(error?.message||error||'');
-  const authRejected=/\bHTTP 401\b|\bHTTP 403\b|unauthori[sz]ed|forbidden/i.test(detail);
-  console.error('Transport Stack planner stop lookup failed:',detail);
-  const reason=authRejected
-   ?'Transport Stack rejected the Journey Planner credential. Request a fresh Multimodal Journey Planner key and update TRANSPORT_STACK_PLANNER_API_KEY in Render.'
-   :'Transport Stack Journey Planner could not load stops right now.';
-  return r.status(502).json({status:'ERROR',stops:[],reason});
- }
-});
-app.get('/api/planner/multimodal',async(q,r)=>{
- if(!TRANSPORT_STACK_PLANNER_KEY)return r.status(503).json({status:'UNAVAILABLE',options:[],reason:'Transport Stack Journey Planner key is not configured on the backend.'});
- const fromType=['bus','metro','place'].includes(String(q.query.fromType||''))?String(q.query.fromType):'';
- const toType=['bus','metro','place'].includes(String(q.query.toType||''))?String(q.query.toType):'';
- const fromStopId=str(q.query.fromStopId,256),toStopId=str(q.query.toStopId,256);
- const fromName=str(q.query.fromName,160)||'Origin',toName=str(q.query.toName,160)||'Destination';
- if(!fromType||!toType||!fromStopId||!toStopId)return r.status(400).json({status:'ERROR',options:[],reason:'Choose valid origin and destination stops.'});
- if(fromStopId===toStopId&&fromType===toType)return r.status(400).json({status:'ERROR',options:[],reason:'Choose two different stops or stations.'});
- const mode=String(q.query.mode||((fromType==='metro'&&toType==='metro')?'metro':'multi')).toLowerCase();
- if(!['bus','metro','multi'].includes(mode))return r.status(400).json({status:'ERROR',options:[],reason:'Choose bus, metro, or multi journey mode.'});
- const time=String(q.query.time||'').trim();
- if(time&&!/^\d{2}:\d{2}:\d{2}$/.test(time))return r.status(400).json({status:'ERROR',options:[],reason:'Departure time must use HH:MM:SS.'});
- try{
-  const params={src:fromStopId,src_type:fromType,dst:toStopId,dst_type:toType,mode,src_name:fromName,dst_name:toName};
-  if(time)params.time=time;
-  const payload=await transportPlannerRequest('multi_modal',params);
-  const rows=plannerPayloadRows(payload);
-  const options=rows.map((row,index)=>normaliseTransportPlannerTrip(row,{fromType,toType,fromStopId,toStopId,fromName,toName},index)).filter(Boolean).slice(0,12);
-  const message=String(payload?.message||'').toLowerCase();
-  if(!options.length||message.includes('failure'))return r.json({status:'ERROR',options,reason:String(payload?.description||'No journey was found between those stops.')});
-  return r.json({status:'OK',options,reason:null,source:'transport-stack',providerMessage:payload?.message||null});
- }catch(error){
-  const detail=String(error?.message||error||'');
-  const authRejected=/\bHTTP 401\b|\bHTTP 403\b|unauthori[sz]ed|forbidden/i.test(detail);
-  console.error('Transport Stack multimodal planning failed:',detail);
-  const reason=authRejected
-   ?'Transport Stack rejected the Journey Planner credential. Request a fresh Multimodal Journey Planner key and update TRANSPORT_STACK_PLANNER_API_KEY in Render.'
-   :'Transport Stack Journey Planner is temporarily unavailable. Please try again.';
-  return r.status(502).json({status:'ERROR',options:[],reason});
- }
-});
 app.get('/api/metro',async(_q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',routes:[],stops:[],reason:'Database is not configured'});try{const meta=(await pool.query('SELECT * FROM metro_feed_meta WHERE id=1')).rows[0]||null;const routes=(await pool.query('SELECT route_id,agency_id,short_name,long_name,route_type,route_color,route_text_color FROM metro_routes ORDER BY short_name,route_id')).rows;const stops=(await pool.query('SELECT stop_id,name,latitude,longitude FROM metro_stops ORDER BY name,stop_id')).rows;r.json({status:'OK',routes,stops,meta})}catch(e){r.status(500).json({status:'ERROR',routes:[],stops:[],reason:'Metro data is temporarily unavailable'})}});
 app.get('/api/metro/routes/:id',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE'});try{const id=str(q.params.id),route=(await pool.query('SELECT route_id,agency_id,short_name,long_name,route_type,route_color,route_text_color FROM metro_routes WHERE route_id=$1',[id])).rows[0];if(!route)return r.status(404).json({status:'NOT_FOUND'});const rows=(await pool.query('SELECT s.stop_id,s.name,s.latitude,s.longitude,rs.stop_sequence,COALESCE(rs.direction_id,0) AS direction_id FROM metro_route_stops rs JOIN metro_stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=$1 ORDER BY rs.direction_id,rs.stop_sequence,s.stop_id',[id])).rows;const grouped=new Map();for(const stop of rows){const key=String(stop.direction_id);if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(stop)}const directions=[...grouped.entries()].map(([directionId,stops])=>({directionId,fromStop:stops[0]?.name||null,toStop:stops[stops.length-1]?.name||null,stops}));r.json({status:'OK',route,directions,stops:directions[0]?.stops||[]})}catch(e){console.error('Metro route query failed:',e?.message||e);r.status(500).json({status:'ERROR',reason:'Failed to load metro route'})}});
 app.get('/api/routes/:id',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',reason:'Database is not configured'});try{const id=str(q.params.id),route=(await pool.query(`SELECT r.route_id,r.agency_id,r.short_name,r.long_name,r.route_color,r.route_text_color,first_stop.name AS from_stop,last_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.stop_id ASC LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true WHERE r.route_id=$1`,[id])).rows[0];let routeFallback=false;if(!route){const live=cache.vehicles.find(v=>String(v.routeId||'')===id);if(live){routeFallback=true;route={route_id:id,agency_id:live.operator||null,short_name:live.routeShortName||id,long_name:live.routeLongName||null,route_color:live.routeColor||null,route_text_color:live.routeTextColor||null,from_stop:live.fromStop||null,to_stop:live.toStop||null}}else return r.status(404).json({status:'NOT_FOUND',reason:'Route not found'});}if(!route)return r.status(404).json({status:'NOT_FOUND',reason:'Route not found'});const stops=routeFallback?[]:(await pool.query('SELECT s.stop_id,s.name,s.latitude,s.longitude,rs.stop_sequence FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=$1 ORDER BY rs.stop_sequence,s.stop_id',[id])).rows;r.json({status:'OK',route,stops,vehicles:cache.vehicles.filter(v=>String(v.routeId||'')===id),staticDataAvailable:!routeFallback})}catch{r.status(500).json({status:'ERROR',reason:'Failed to load route'})}});
@@ -799,7 +716,7 @@ function runMetroStaticSync(){
 }
 app.use((_q,r)=>r.status(404).json({status:'NOT_FOUND',reason:'Endpoint not found'}));
 app.use((e,_q,r,_n)=>{console.error('Unhandled request error:',e?.message||e);if(!r.headersSent)r.status(500).json({status:'ERROR',reason:'Internal server error'})});
-const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(async()=>{try{if(pool){await ensureRuntimeSchema();await loadFleetRegistry(true);await loadVerifiedLiveries(true);await loadRouteMeta();await loadDatabaseVehicleCache();autoImportDtcStaticIfEmpty()}}catch(e){console.error('Database bootstrap failed:',e?.message||e)}if(HAS_REALTIME_KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}if(pool&&String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()!=='false'){setTimeout(runMetroStaticSync,5000);setInterval(runMetroStaticSync,24*60*60*1000)}},1500)});
+const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(async()=>{try{if(pool){await ensureRuntimeSchema();await loadFleetRegistry(true);await loadVerifiedLiveries(true);await loadRouteMeta();await loadDatabaseVehicleCache();autoImportDtcStaticIfEmpty()}}catch(e){console.error('Database bootstrap failed:',e?.message||e)}if(HAS_OTD_API_KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}if(pool&&String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()!=='false'){setTimeout(runMetroStaticSync,5000);setInterval(runMetroStaticSync,24*60*60*1000)}},1500)});
 server.requestTimeout=30000;server.headersTimeout=40000;server.keepAliveTimeout=65000;
 process.on('unhandledRejection',e=>console.error('Unhandled rejection:',e));process.on('uncaughtException',e=>console.error('Uncaught exception:',e));
 for(const sig of ['SIGTERM','SIGINT'])process.on(sig,async()=>{if(poll)clearInterval(poll);server.close();await pool?.end().catch(()=>{});process.exit(0)});

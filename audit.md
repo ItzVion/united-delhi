@@ -94,12 +94,13 @@ No separate lint command is configured in these package scripts. The app's initi
 5. Native UI flows were source-reviewed and typechecked/tested, but not exercised on a device or emulator.
 
 
-## Deployment/configuration audit — 28 October 2026
 
-- The active website is Vercel and the active API is Render at `https://united-delhi-api.onrender.com`; PostgreSQL is on Neon.
-- Fixed stale VPS defaults in the Vite development proxy, EAS build profiles and local APK build script so new web/mobile builds use the same Render API origin as `app/src/config.ts` and `web/vercel.json`.
-- Split credentials by responsibility: `TRANSPORT_STACK_API_KEY` for live GTFS-RT and `TRANSPORT_STACK_PLANNER_API_KEY` for multimodal planning. Both are backend-only secrets.
-- Added regression coverage for the real Transport Stack v2 response shape (`data[].directions.routes[]`) so the planner cannot turn a valid provider response into a generic placeholder trip.
-- GitHub Actions remains manual-only. Routine deployments use Render and Vercel integrations.
-- Remaining external blocker: the configured GTFS-RT credential is being rejected by Transport Stack with HTTP 401. Rotate it at the provider and replace `TRANSPORT_STACK_API_KEY` in Render; do not reuse the planner key for this purpose.
-- No production APK was built in this audit. The committed Android source/profile is aligned to the current API; local typecheck/test and on-device verification remain necessary for the APK built locally.
+## Provider and journey-planner architecture — 30 October 2026
+
+- Removed both Transport Stack API integrations and cleared their Render environment values. No external Journey Planner API is called by the app, web client or server.
+- Live bus positions now use Delhi OTD's authorised GTFS-Realtime VehiclePositions endpoint. The server reads the private key from `OTD_API_KEY` and passes it in OTD's documented `key` query parameter; the key is never sent to the clients or written to logs.
+- Trip planning is calculated by United Delhi's own backend using the transit network stored in Neon. Bus suggestions use `/api/search`; Metro suggestions use `/api/metro`; route results use `/api/plan/multimodal`.
+- Added OTD request-builder tests for the correct endpoint, query authentication, missing-key fail-closed behavior and query encoding.
+- Live tracking remains unavailable until an authorised OTD private key is entered in Render as `OTD_API_KEY`. No substitute or fabricated key is configured.
+- GitHub Actions remains manual-only; no branches were created. Render and Vercel continue to deploy from `main`.
+- Metro timetable data remains topology-only because its imported static calendar is expired. All computed travel times are estimates.
