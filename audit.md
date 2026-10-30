@@ -97,7 +97,7 @@ No separate lint command is configured in these package scripts. The app's initi
 
 ## Provider and journey-planner architecture — 30 October 2026
 
-- Removed both Transport Stack API integrations and cleared their Render environment values. No external Journey Planner API is called by the app, web client or server.
+- Removed the external realtime relay and external journey-planner dependency; transit planning now runs entirely against the network stored in Neon.
 - Live bus positions now use Delhi OTD's authorised GTFS-Realtime VehiclePositions endpoint. The server reads the private key from `OTD_API_KEY` and passes it in OTD's documented `key` query parameter; the key is never sent to the clients or written to logs.
 - Trip planning is calculated by United Delhi's own backend using the transit network stored in Neon. Bus suggestions use `/api/search`; Metro suggestions use `/api/metro`; route results use `/api/plan/multimodal`.
 - Added OTD request-builder tests for the correct endpoint, query authentication, missing-key fail-closed behavior and query encoding.

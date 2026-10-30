@@ -10,7 +10,7 @@ Current production
 Data and integrations
 - Live bus vehicle positions: Delhi Open Transit Data (OTD) GTFS-Realtime protobuf feed.
 - OTD access requires an authorised private key. The backend reads OTD_API_KEY and sends it only to the official OTD endpoint as its documented key query parameter. Keep the value in Render backend secrets; never in app/, web/, or GitHub.
-- Trip planning: United Delhi's own multimodal route engine using routes, stops, route_stops, metro_routes, metro_stops and metro_route_stops in Neon. No Transport Stack Journey Planner API is used.
+- Trip planning: United Delhi's own multimodal route engine using routes, stops, route_stops, metro_routes, metro_stops and metro_route_stops in Neon. It does not require a separate planner API key.
 - Search suggestions use United Delhi /api/search and /api/metro endpoints.
 - Static bus and Metro network data is loaded into Neon separately from the live OTD vehicle feed. Metro timetable data currently supports network topology only; its older calendar must not be presented as a current timetable.
 
@@ -55,7 +55,7 @@ Render environment
 - OTD_COLOR_FIELD is optional and should remain unset until an upstream extension is verified.
 
 Live feed setup
-The OTD documentation specifies /api/realtime/VehiclePositions.pb?key=YOUR_PRIVATE_KEY. To enable live buses, add your authorised OTD private key to Render as OTD_API_KEY. Do not reuse either former Transport Stack key; they have been cleared from Render configuration.
+The OTD documentation specifies /api/realtime/VehiclePositions.pb?key=YOUR_PRIVATE_KEY. To enable live buses, add your authorised OTD private key to Render as OTD_API_KEY. This is the only external API credential required by the current backend.
 
 Security
 Never commit DATABASE_URL or OTD_API_KEY. Both web and Android clients use only the public backend base URL. Keep all provider credentials in Render's secret environment.
