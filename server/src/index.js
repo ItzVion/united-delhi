@@ -30,7 +30,7 @@ const str=(v,max=160)=>{const x=String(v??'').trim();return x&&x.length<=max?x:n
 const num=v=>{const x=Number(v);return Number.isFinite(x)?x:null};
 const coord=(v,a,b)=>{const x=num(v);return x!==null&&x>=a&&x<=b?x:null};
 const dist=(a,b,c,d)=>{const R=6371000,r=Math.PI/180,la=(c-a)*r,lo=(d-b)*r,x=Math.sin(la/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(lo/2)**2;return 2*R*Math.asin(Math.sqrt(x))};
-const normalizeStopName=value=>String(value??'').normalize('NFKC').trim().replace(/\\s+/g,' ').toLocaleLowerCase('en-IN');
+const normalizeStopName=value=>String(value??'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase('en-IN');
 function dedupeNearbyStops(rows,limit=30,toleranceMeters=8){
  const ordered=[...rows].sort((a,b)=>Number(a.distanceMeters)-Number(b.distanceMeters)||String(a.stop_id).localeCompare(String(b.stop_id)));
  const groups=new Map(),result=[];
