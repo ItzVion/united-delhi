@@ -7,12 +7,17 @@ Current production
 - GitHub branch: main only
 - GitHub Actions is manual-only. Routine deploys use Render and Vercel integrations.
 
-Data and integrations
-- Live bus vehicle positions: Delhi Open Transit Data (OTD) GTFS-Realtime protobuf feed.
-- OTD access requires an authorised private key. The backend reads OTD_API_KEY and sends it only to the official OTD endpoint as its documented key query parameter. Keep the value in Render backend secrets; never in app/, web/, or GitHub.
-- Trip planning: United Delhi's own multimodal route engine using routes, stops, route_stops, metro_routes, metro_stops and metro_route_stops in Neon. It does not require a separate planner API key.
-- Search suggestions use United Delhi /api/search and /api/metro endpoints.
-- Static bus and Metro network data is loaded into Neon separately from the live OTD vehicle feed. Metro timetable data currently supports network topology only; its older calendar must not be presented as a current timetable.
+Static transit network
+- Android and web both read the same routes, stops and Metro network from Neon; no static GTFS copy is bundled into either client.
+- Upload the supplied bus and Metro GTFS ZIPs once at https://united-delhi.vercel.app/static-import.html.
+- The backend validates the ZIPs and imports them transactionally. Before replacement, it creates hash-named backup tables for the current routes, stops, route-stop links and metadata. Failed imports roll back.
+- Bus routes and stops come from the uploaded bus archive. Metro directions and stations come from the uploaded Metro archive.
+- The supplied Metro calendar ends 31 December 2025. The file is used for network topology only; Metro timetable claims are not made and trip durations remain estimates.
+- Once imported, Neon is the static source for both Android and website. Automatic external static feed refresh remains disabled.
+
+Live vehicle feed
+- Delhi OTD GTFS-Realtime is used for live vehicle positions.
+- OTD access requires an authorised private key. The backend reads OTD_API_KEY and sends it only to the official endpoint as its documented key query parameter. Keep it in Render secrets only.
 
 Android app
   cd app
@@ -29,8 +34,7 @@ Website
   cd web
   npm ci
   npm run dev
-
-Web Vite proxy, web/vercel.json and Android build profiles use https://united-delhi-api.onrender.com. app/src/config.ts accepts EXPO_PUBLIC_API_BASE_URL for an intentional override.
+Vite, Vercel and Android configurations use https://united-delhi-api.onrender.com.
 
 Vercel settings
 - Root Directory: web
@@ -49,15 +53,11 @@ Backend
 Render environment
 - DATABASE_URL
 - OTD_API_KEY (authorised OTD realtime access; backend only)
+- STATIC_IMPORT_TOKEN (temporary; clear after both ZIPs are imported)
 - APP_ORIGINS=https://united-delhi.vercel.app
-- DTC_STATIC_URL and DTC_STATIC_SOURCE_KEY
-- METRO_STATIC_URL and METRO_STATIC_SOURCE_KEY
-- OTD_COLOR_FIELD is optional and should remain unset until an upstream extension is verified.
-
-Live feed setup
-The OTD documentation specifies /api/realtime/VehiclePositions.pb?key=YOUR_PRIVATE_KEY. To enable live buses, add your authorised OTD private key to Render as OTD_API_KEY. This is the only external API credential required by the current backend.
+- DTC_STATIC_AUTO_IMPORT=false
+- METRO_AUTO_SYNC=false
+- METRO_ALLOW_EXPIRED_CALENDAR=true permits Metro topology-only use; it does not validate timetable dates.
 
 Security
-Never commit DATABASE_URL or OTD_API_KEY. Both web and Android clients use only the public backend base URL. Keep all provider credentials in Render's secret environment.
-
-Legacy VPS documents under server/deploy/ are optional historical migration procedures; keep their timers disabled while production runs on Render.
+Never commit DATABASE_URL, OTD_API_KEY or STATIC_IMPORT_TOKEN. The upload token is accepted only in the x-static-import-token header over HTTPS and is never stored in the client browser. Clear it from Render after both imports finish.

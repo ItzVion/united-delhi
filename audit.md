@@ -104,3 +104,12 @@ No separate lint command is configured in these package scripts. The app's initi
 - Live tracking remains unavailable until an authorised OTD private key is entered in Render as `OTD_API_KEY`. No substitute or fabricated key is configured.
 - GitHub Actions remains manual-only; no branches were created. Render and Vercel continue to deploy from `main`.
 - Metro timetable data remains topology-only because its imported static calendar is expired. All computed travel times are estimates.
+
+
+## Supplied GTFS network refresh — 30 October 2026
+
+- Inspected the uploaded bus and Metro ZIP archives, including table schemas, row counts and all route/trip/stop references.
+- The supplied bus ZIP contains 2,554 routes and 6,812 stops with complete route/trip/stop references. The existing database held an older 2,403-route/10,559-stop snapshot.
+- The supplied Metro ZIP contains 36 directional route records and 262 stations. Its calendar ended 31 December 2025, so it is suitable for topology only and not a current timetable.
+- Added a password-protected one-time ZIP import page, transaction-based backend job runner, hash-named Neon snapshots and status polling for long imports.
+- Production static network replacement is complete only after the two uploads have been run and the resulting Neon metadata/counts are verified.

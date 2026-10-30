@@ -4,6 +4,7 @@ import path from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import { sha256Hex, sourceWithSha256, sourceHasSha256, inspectGtfsServiceCoverage } from './gtfs-feed-utils.js';
+import { snapshotStaticTables } from './static-import.js';
 
 const execFileAsync=promisify(execFile);
 const URL=String(process.env.METRO_STATIC_URL||'').trim();
@@ -128,7 +129,7 @@ export async function syncMetroStatic(pool,{allowReplacement=false,allowExpiredC
       const prefix=esc(baseRoute.route_long_name).split('_',1)[0].toUpperCase();
       const lineName=lineNames[prefix]||prefix||'Metro Line';
       const detail=esc(baseRoute.route_long_name).split('_').slice(1).join('_').trim();
-      groupedRoutes.push({route_id:routeId,agency_id:esc(baseRoute.agency_id)||esc(feed.agency[0]?.agency_id)||'DMRC',short_name:lineName,long_name:lineName+(detail?' · '+detail:''),route_type:num(baseRoute.route_type)||1,route_color:lineColors[prefix]||null,route_text_color:'FFFFFF'});
+      groupedRoutes.push({route_id:routeId,agency_id:esc(baseRoute.agency_id)||esc(feed.agency[0]?.agency_id)||'DMRC',short_name:lineName+(detail?' · '+detail:''),long_name:lineName+(detail?' · '+detail:''),route_type:num(baseRoute.route_type)||1,route_color:lineColors[prefix]||null,route_text_color:'FFFFFF'});
       rawRouteToGroup.set(esc(baseRoute.route_id),{routeId,directionId:0});
       rawRouteToGroup.set(esc(reverse.route_id),{routeId,directionId:1});
     }
@@ -241,6 +242,8 @@ export async function syncMetroStatic(pool,{allowReplacement=false,allowExpiredC
       await c.query('ALTER TABLE metro_route_stops DROP CONSTRAINT IF EXISTS metro_route_stops_pkey');
       await c.query('ALTER TABLE metro_route_stops ADD CONSTRAINT metro_route_stops_pkey PRIMARY KEY(route_id,direction_id,stop_id,stop_sequence)');
       await c.query(`CREATE TABLE IF NOT EXISTS metro_feed_meta(id INTEGER PRIMARY KEY CHECK(id=1),source_url TEXT NOT NULL,source_key TEXT NOT NULL,imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),route_count INTEGER NOT NULL DEFAULT 0,stop_count INTEGER NOT NULL DEFAULT 0,route_stop_count INTEGER NOT NULL DEFAULT 0)`);
+      const backupTables=await snapshotStaticTables(c,'metro',archiveHash);
+      console.log('Created rollback-safe DMRC snapshot tables: '+backupTables.join(', '));
       await c.query('TRUNCATE metro_route_stops,metro_routes,metro_stops');
       for(let i=0;i<groupedRoutes.length;i+=300){
         const chunk=groupedRoutes.slice(i,i+300),vals=[];

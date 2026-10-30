@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import { resolveServerPath } from '../src/runtime-paths.js';
 import { sha256Hex, sourceWithSha256, sourceHasSha256, inspectGtfsServiceCoverage } from '../src/gtfs-feed-utils.js';
 import { resolveGtfsRouteColors } from '../src/route-colors.js';
+import { snapshotStaticTables } from '../src/static-import.js';
 
 const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
 const STATIC_URL_OVERRIDE = String(process.env.DTC_STATIC_URL || '').trim();
@@ -397,6 +398,8 @@ async function main() {
       try {
         await client.query('BEGIN');
         await client.query("SET LOCAL statement_timeout='120000'");
+        const backupTables=await snapshotStaticTables(client,'dtc',archiveHash);
+        console.log('Created rollback-safe DTC snapshot tables: '+backupTables.join(', '));
         await client.query('TRUNCATE route_stops, routes, stops CASCADE');
 
         for (const batch of batches(routes, 300)) {

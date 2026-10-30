@@ -1,35 +1,19 @@
-# Static GTFS Refresh Safety
+# Static GTFS feed operations
 
-## Startup policy
+## One-time import
+Open https://united-delhi.vercel.app/static-import.html, enter the temporary backend token, and upload the bus and Metro ZIPs. The page sends the exact archives to Render over HTTPS and polls each import job.
 
-The API may initialize bus or metro static tables automatically only when the corresponding static network is empty. When transit tables already contain data, automatic refresh is a no-op unless the configured archive has a matching SHA-256 fingerprint in the saved metadata and the recorded counts match the database. A missing fingerprint is intentionally treated as unverified, not as permission to replace data.
+## Safety
+- One import runs at a time.
+- Only ZIP uploads are accepted.
+- Importer checks GTFS files, row counts, references and service calendar.
+- Each importer creates hash-named backup tables before replacing current static tables.
+- All replacements are transaction-scoped. On validation or SQL failure, PostgreSQL rolls back and existing data remains available.
+- The token is compared in constant time, sent in a header, never logged, and removed from child-process environments.
+- Clear STATIC_IMPORT_TOKEN in Render after the two successful imports.
 
-The importer records the archive fingerprint in the existing metadata `source_url` field as `#sha256=<hex>`; this avoids an implicit schema migration. Calendar checks use the Asia/Kolkata service date and inspect both `calendar.txt` and `calendar_dates.txt`. An advertised `feed_info.txt` date is not proof that a timetable is current.
+## Uploaded Metro archive caveat
+The supplied Metro ZIP contains 36 directional GTFS routes and 262 stations. Its calendar ended on 31 December 2025. Import it for route topology and station ordering only; journey times remain estimates.
 
-## Explicit DTC replacement
-
-Only run this after reviewing the source archive, verifying a current backup, and deciding to replace the current bus route/stop tables:
-
-```bash
-cd /opt/united-delhi/repo/server
-DTC_STATIC_ALLOW_REPLACEMENT=true node scripts/import-dtc-static.mjs
-```
-
-If the feed calendar has expired or contains invalid service-date rows, the import refuses by default. `DTC_ALLOW_EXPIRED_CALENDAR=true` and `DTC_ALLOW_INVALID_CALENDAR=true` are separate overrides for intentionally approved topology-only use; they must not be used to imply current timetable accuracy.
-
-## Explicit Metro replacement
-
-The scheduled API sync does not replace populated metro tables automatically. After source and backup review, the manual path is:
-
-```bash
-cd /opt/united-delhi/repo/server
-METRO_STATIC_ALLOW_REPLACEMENT=true npm run sync:metro
-```
-
-An expired or invalid metro calendar is refused by default. `METRO_ALLOW_EXPIRED_CALENDAR=true` and `METRO_ALLOW_INVALID_CALENDAR=true` separately allow a reviewed topology-only import, not a claim that current train schedules are represented. Keep these override variables absent/false in service startup environments.
-
-## Vehicle colours
-
-GTFS-Realtime has no standard physical-paint colour field, and unknown protobuf extension fields are not trusted as paint evidence. The API accepts a colour only from a confirmed OTD protobuf extension explicitly configured using `OTD_COLOR_FIELD`, or from a reviewed vehicle-specific livery record. Do not set an extension field number just because its values resemble hex colours.
-
-Until an authoritative field or reviewed livery evidence exists, grey (`#64748B)) and an “unknown physical colour” label are correct. Route line colours and fleet-type classifications remain separate from physical bus paint.
+## After upload
+Verify static_feed_meta and metro_feed_meta source keys and counts, plus /api/search, /api/metro, /api/routes/:id, /api/metro/routes/:id and /api/plan/multimodal. Keep DTC_STATIC_AUTO_IMPORT=false and METRO_AUTO_SYNC=false so an external archive cannot overwrite this snapshot.

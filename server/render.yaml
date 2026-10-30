@@ -13,24 +13,18 @@ services:
         value: production
       - key: OTD_API_KEY
         sync: false
+      - key: STATIC_IMPORT_TOKEN
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: PORT
         value: "10000"
       - key: APP_ORIGINS
         value: "https://united-delhi.vercel.app"
-      - key: DTC_STATIC_URL
-        value: "https://ethanc8.github.io/delhi-gtfs/bus.zip"
-      - key: DTC_STATIC_SOURCE_KEY
-        value: "ethanc8-delhi-gtfs-bus"
       - key: DTC_STATIC_AUTO_IMPORT
-        value: "true"
-      - key: METRO_STATIC_URL
-        value: "https://ethanc8.github.io/delhi-gtfs/metro.zip"
-      - key: METRO_STATIC_SOURCE_KEY
-        value: "ethanc8-delhi-gtfs-metro"
+        value: "false"
       - key: METRO_AUTO_SYNC
-        value: "true"
+        value: "false"
       # Expired-calendar Metro feed is for topology/connectivity only; never claim its times are current.
       - key: METRO_ALLOW_EXPIRED_CALENDAR
         value: "true"
