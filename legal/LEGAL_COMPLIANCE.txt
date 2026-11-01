@@ -1,6 +1,6 @@
 # United Delhi — Legal & Compliance Checklist
 
-**Review date:** 4 October 2026
+**Review date:** 2 November 2026
 
 This file is an internal engineering/compliance checklist. It is not legal advice.
 
@@ -15,8 +15,8 @@ This file is an internal engineering/compliance checklist. It is not legal advic
 - Nearby requests are transient API requests and are not intentionally stored as user location history.
 - Production API traffic uses HTTPS.
 - Database credentials and the OTD realtime key remain server-side.
-- Security controls are documented in SECURITY_AUDIT.md.
-- Third-party notices are documented in THIRD_PARTY_NOTICES.md.
+- Security reporting instructions are documented in `SECURITY_POLICY.txt`.
+- Third-party notices are documented in `THIRD_PARTY_NOTICES.txt`.
 
 ## India legal framework reviewed
 
@@ -71,10 +71,10 @@ For Delhi Open Transit Data, comply with its Terms & Conditions and any permissi
 ## Legal documents
 
 Required before public release:
-- PRIVACY_POLICY.md
-- TERMS_OF_SERVICE.md
-- THIRD_PARTY_NOTICES.md
-- SECURITY.md
+- PRIVACY_POLICY.txt
+- TERMS_OF_SERVICE.txt
+- THIRD_PARTY_NOTICES.txt
+- SECURITY_POLICY.txt
 - a working privacy/legal contact (vion4712@gmail.com)
 - an in-app legal entry point
 - a stable public HTTPS policy URL
