@@ -95,6 +95,21 @@ No separate lint command is configured in these package scripts. The app's initi
 
 
 
+## Production platform and repository review — 2 November 2026
+
+- Reviewed the current `main` tree, recent commit history, the open GitHub issue and all currently open Dependabot PR patches; no new GitHub Actions jobs were run and no additional branch was created.
+- **Render:** `united-delhi-api` is configured for automatic deployment from `main`, rooted at `server/`, and its current deployment on commit `b0b9608` is live. Recent runtime logs showed the Delhi OTD poll decoding approximately 60–66 vehicles, with no warnings or errors in the sampled 4-hour window.
+- **Neon:** the `united-delhi-api` project’s single default `main` branch is ready. The stored static network currently contains 2,403 DTC routes, 10,559 DTC stops and 99,286 route-stop links; Metro contains 18 grouped lines, 262 stations and 830 route-stop links. The Metro import metadata uses `route_count`, `stop_count`, and `route_stop_count`; these match the runtime sync implementation. Earlier zero values were from querying the unrelated `imported_*` columns, not a data inconsistency. Read-only health checks found no locks or vacuum issue.
+- **Vercel:** the project remains linked to this repository and the verified production domain `united-delhi.vercel.app` is attached to the last successful `main` web deployment. The newest preview deployment is a Dependabot branch and is not the production domain. The latest `main` commit `b0b9608` only changed backend files, so Vercel's unchanged frontend deployment is expected; the existing production web version remains on the last frontend-changing commit. No Vercel settings or environment variables were changed. No runtime error clusters were reported for the last seven days.
+- Closed GitHub issue #29 as completed: `web/package-lock.json` is present on `main`, and this audit's recorded web verification includes reproducible install, clean npm audit, typecheck, tests and build.
+- The production app still has **15 high npm audit advisories** in the Expo/Metro/React Native dependency tree per the prior package audit. The broad npm auto-remediation is a breaking downgrade to older Expo/React Native releases; it was not applied. Open Dependabot PRs were reviewed but not merged without package-specific test execution.
+- The mobile first-launch privacy copy contained stale provider names (VPS/Transport Stack). Updated it to match the current Render/Neon/OTD/Vercel architecture. Corrected the privacy-request email's accidental four-asterisk Markdown formatting.
+- The internal compliance checklist now points to the actual `.txt` legal/security document names and has a current review date. This remains an engineering checklist, not legal advice.
+- **Data work intentionally blocked:** the more recent supplied DTC archive (2,554 routes/6,812 stops) has not been imported into production; the currently deployed database still contains the older counts. The archive is not attached to this task and the one-time import credential is not available here. No production data replacement, truncation, migration, or backup manipulation was performed. Metro service dates expired on 31 December 2025, so existing Metro information remains topology-only; don't present it as current schedule data.
+- **Live tracking dependency:** Render logs show OTD polling works in the sampled window. The actual OTD private key is required and remains a server-side secret; this review did not read or expose it.
+- **Validation limits:** no Node 22 local install/test execution was available through the connected repository tools, no Android APK/device test was run, no end-to-end static-feed upload was performed, and no live external API/browser smoke test was available. Do not infer those checks passed from a successful past build or from the platform deployment state.
+
+
 ## Provider and journey-planner architecture — 30 October 2026
 
 - Removed the external realtime relay and external journey-planner dependency; transit planning now runs entirely against the network stored in Neon.
