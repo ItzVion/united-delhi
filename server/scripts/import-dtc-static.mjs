@@ -16,6 +16,7 @@ const STATIC_FILE_OVERRIDE = String(process.env.DTC_STATIC_FILE || '').trim();
 const STATIC_FILE_PATH = STATIC_FILE_OVERRIDE ? resolveServerPath(STATIC_FILE_OVERRIDE) : '';
 const STATIC_URLS = STATIC_URL_OVERRIDE ? [STATIC_URL_OVERRIDE] : [];
 const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'united-delhi-github-dtc-v1').trim();
+const EXPECTED_STATIC_SHA256 = String(process.env.DTC_STATIC_EXPECTED_SHA256 || '').trim().toLowerCase();
 const MAX_COMPRESSED_BYTES = 100 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES = 300 * 1024 * 1024;
 
@@ -427,6 +428,9 @@ export async function ensureDtcStaticData() {
         ? 'ethanc8-delhi-gtfs-bus'
         : SOURCE_KEY;
       const archiveHash = sha256Hex(downloaded.data);
+      if (EXPECTED_STATIC_SHA256 && archiveHash !== EXPECTED_STATIC_SHA256) {
+        throw new Error('DTC static ZIP SHA-256 does not match the reviewed repository archive; refusing to import. Expected ' + EXPECTED_STATIC_SHA256 + ', received ' + archiveHash + '.');
+      }
       const persistedSourceUrl = sourceWithSha256(sourceUrl, archiveHash);
       const existingCounts = (await client.query(`SELECT
         (SELECT COUNT(*)::int FROM routes) AS routes,
