@@ -13,7 +13,7 @@ type LiveryVerification={status:'verified';colorName?:string|null;source?:string
 export type Vehicle={
   id:string;routeId:string|null;routeShortName:string|null;routeColor?:string|null;routeTextColor?:string|null;
   routeLongName?:string|null;fromStop?:string|null;toStop?:string|null;serviceType?:'dtc'|'electric'|'unknown';
-  busType?:string|null;serviceColor?:string|null;fleetColorSource?:'upstream-api'|'verified-livery-record'|'not-provided-by-realtime-feed';
+  busType?:string|null;operator?:string|null;agencyId?:string|null;operatorType?:'dtc'|'cluster'|'unknown';fuelType?:'cng'|'electric'|'unknown';airConditioned?:boolean|null;markerColor?:string|null;markerColorSource?:'fleet-category'|'unclassified';serviceColor?:string|null;fleetColorSource?:'upstream-api'|'verified-livery-record'|'not-provided-by-realtime-feed';
   liveryVerification?:LiveryVerification;vehicleLabel?:string|null;licensePlate?:string|null;latitude:number;longitude:number;
   observedAt?:string;tripHeadsign?:string|null;directionId?:number|null
 };
