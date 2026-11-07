@@ -35,7 +35,7 @@ export default function Legend({open,onClose,vehicles}:Props){
   return <div className="modal legend-modal" role="dialog" aria-modal="true" aria-label="Map Marker Colour Legend" onClick={onClose}>
     <div className="modal-card legend-exact" onClick={event=>event.stopPropagation()}>
       <h2>Map Marker Colours</h2>
-      <p className="legend-colour-note">Category defaults and route colours improve map readability; they are not claims about physical paint. A real vehicle colour is shown only when the live API supplies it or reviewed vehicle evidence verifies it. We show a real vehicle colour only when the live API supplies it or reviewed vehicle evidence verifies it.</p>
+      <p className="legend-colour-note">Category markers describe the operator and fleet type; they do not verify physical paint. Exact vehicle colours are shown only when supplied by the live API or backed by reviewed evidence.</p>
       <div className="legend-section-title">Verified physical bus colours</div>
       {rows.length?rows.map(row=><div className="legend-exact-row" key={row.key}>
         <div className="legend-exact-icons"><span className="legend-exact-bus" style={{backgroundColor:row.color}}><Icon n="bus" size={22}/></span></div>
@@ -43,9 +43,10 @@ export default function Legend({open,onClose,vehicles}:Props){
       </div>):<p className="legend-empty">No verified physical bus colours are currently supplied for the visible live fleet.</p>}
       <div className="legend-section-title">Default colours by bus category</div>
       <div className="legend-route-counts">
-        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC}}/>CNG non-AC · light orange</span>
-        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.CNG_AC}}/>CNG AC · Blue Whale blue</span>
-        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.EV_DEVI_AC}}/>EV AC (Devi) · light green</span>
+        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC}}/>DTC CNG non-AC · green</span>
+        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.DTC_AC}}/>DTC CNG AC · red</span>
+        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC}}/>DIMTS / Cluster CNG non-AC · orange</span>
+        <span><i className="legend-route-swatch" style={{backgroundColor:BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC}}/>DIMTS / Cluster AC · blue</span>
         <span>Visible buses using a category default <b>{categoryDefaultCount}</b></span>
       </div>
       <div className="legend-section-title">Other route distinction colours</div>
