@@ -329,7 +329,7 @@ function markerFor(v){
  const bg=validColor(v.color)?v.color:'transparent';
  const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
  const knownColour=v.colourKnown===true,estimatedColour=v.colourEstimated===true,displayableColour=knownColour||estimatedColour;
- const markerTitle=estimatedColour?'Estimated bus colour; it may be inaccurate':knownColour?'Colour supplied by the API or a reviewed vehicle record':'Physical bus colour unknown';
+ const markerTitle=estimatedColour?'Fleet category marker; physical paint is unverified':knownColour?'Colour supplied by the API or a reviewed vehicle record':'Physical bus colour unknown';
  const width=label?Math.max(48,Math.min(96,label.length*6.5+29)):28;
  const html='<div class="ud-mobile-bus'+(displayableColour?'':' unknown-colour')+'" title="'+markerTitle+'" style="background:'+bg+';color:#FFFFFF">'+
    '<span class="ud-mobile-bus-glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V7.5A3.5 3.5 0 0 1 8.5 4h7A3.5 3.5 0 0 1 19 7.5V19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M5 10h14M8 7h8M7.5 15h.01M16.5 15h.01M7 19v2m10-2v2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>'+
