@@ -162,7 +162,7 @@ const legendRows = [...fleetLegendRows(vehicles), { key:'unknown', label:'Unknow
       buses:visible.map(v=>{
         const route=displayRouteName(v.routeShortName) || displayRouteName(v.routeId) || 'BUS';
         const c=resolveVehicleColor(v);
-        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,colourKnown:hasEvidenceBackedVehicleColor(v),colourEstimated:false,lat:v.latitude,lon:v.longitude}];
+        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,colourKnown:hasEvidenceBackedVehicleColor(v),colourEstimated:v.markerColorSource==='fleet-category',lat:v.latitude,lon:v.longitude}];
       }).flat(),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
     };
