@@ -1,19 +1,26 @@
-# Static GTFS feed operations
+GTFS NETWORK DATA
 
-## One-time import
-Open https://united-delhi.vercel.app/static-import.html, enter the temporary backend token, and upload the bus and Metro ZIPs. The page sends the exact archives to Render over HTTPS and polls each import job.
+The website and Android app read static transit data from Neon. Static GTFS is loaded only by an operator-run command from the Render Shell. The backend has no browser uploader or public admin loading endpoint.
 
-## Safety
-- One import runs at a time.
-- Only ZIP uploads are accepted.
-- Importer checks GTFS files, row counts, references and service calendar.
-- Each importer creates hash-named backup tables before replacing current static tables.
-- All replacements are transaction-scoped. On validation or SQL failure, PostgreSQL rolls back and existing data remains available.
-- The token is compared in constant time, sent in a header, never logged, and removed from child-process environments.
-- Clear STATIC_IMPORT_TOKEN in Render after the two successful imports.
+DTC bus network
+1. Place the reviewed archive temporarily at server/data/delhi_buses_static_gtfs_v1.zip.
+2. Deploy the main branch to Render.
+3. Open the Render Shell for united-delhi-api and run the loader from the service's server directory:
 
-## Uploaded Metro archive caveat
-The supplied Metro ZIP contains 36 directional GTFS routes and 262 stations. Its calendar ended on 31 December 2025. Import it for route topology and station ordering only; journey times remain estimates.
+   DTC_STATIC_FILE=./data/delhi_buses_static_gtfs_v1.zip DTC_STATIC_ALLOW_REPLACEMENT=true npm run import:dtc
 
-## After upload
-Verify static_feed_meta and metro_feed_meta source keys and counts, plus /api/search, /api/metro, /api/routes/:id, /api/metro/routes/:id and /api/plan/multimodal. Keep DTC_STATIC_AUTO_IMPORT=false and METRO_AUTO_SYNC=false so an external archive cannot overwrite this snapshot.
+The loader validates required GTFS files, route and stop references, public labels, route-stop links and recent live-route ID coverage. It creates hash-named snapshots before replacing the live tables. Replacement and metadata updates commit in one transaction; a failed import rolls back.
+
+The reviewed DTC archive contains 2,554 routes, 6,812 stops, 65,322 trips and 2,385,381 stop-time rows. It matches 947 of 996 distinct live route IDs (95.08%) in the measured sample; 49 remain unmatched. The loader warns below 98% and refuses below 90%.
+
+Metro topology
+The supplied Metro archive has 36 directional routes and 262 stops. Its calendar ended on 31 December 2025. Do not use it as a current timetable. To load topology only:
+
+   METRO_STATIC_FILE=./data/dmrc_static_gtfs_v1.zip METRO_STATIC_ALLOW_REPLACEMENT=true METRO_ALLOW_EXPIRED_CALENDAR=true npm run sync:metro
+
+Metro journey durations remain estimates. A current official schedule is needed before timetable-based claims can be made.
+
+After loading
+- Verify static_feed_meta and metro_feed_meta counts and source hashes.
+- Check /api/search, /api/routes/:id, /api/metro, /api/metro/routes/:id and /api/plan/multimodal.
+- Remove the temporary ZIP files from the repository and deploy the clean tree. No GTFS archive should remain in the production source tree.

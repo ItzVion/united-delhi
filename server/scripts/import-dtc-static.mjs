@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import { resolveServerPath } from '../src/runtime-paths.js';
 import { sha256Hex, sourceWithSha256, sourceHasSha256, inspectGtfsServiceCoverage, publicGtfsRouteNames } from '../src/gtfs-feed-utils.js';
 import { resolveGtfsRouteColors } from '../src/route-colors.js';
-import { snapshotStaticTables } from '../src/static-import.js';
+import { snapshotStaticTables } from '../src/static-table-snapshots.js';
 
 const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
 const STATIC_URL_OVERRIDE = String(process.env.DTC_STATIC_URL || '').trim();
@@ -207,7 +207,7 @@ async function downloadZip() {
         signal: controller.signal,
         headers: {
           Accept: 'application/zip, application/octet-stream;q=0.9',
-          'User-Agent': 'United-Delhi-static-import/1.1'
+          'User-Agent': 'United-Delhi-GTFS-loader/1.1'
         }
       });
       if (!response.ok) throw new Error('HTTP ' + response.status);

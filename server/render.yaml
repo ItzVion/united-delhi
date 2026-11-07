@@ -13,22 +13,9 @@ services:
         value: production
       - key: OTD_API_KEY
         sync: false
-      - key: STATIC_IMPORT_TOKEN
-        sync: false
       - key: DATABASE_URL
         sync: false
       - key: PORT
         value: "10000"
       - key: APP_ORIGINS
         value: "https://united-delhi.vercel.app"
-      - key: DTC_STATIC_AUTO_IMPORT
-        value: "false"
-      - key: METRO_AUTO_SYNC
-        value: "false"
-      # Expired-calendar Metro feed is for topology/connectivity only; never claim its times are current.
-      - key: METRO_ALLOW_EXPIRED_CALENDAR
-        value: "true"
-      - key: DTC_STATIC_ALLOW_REPLACEMENT
-        value: "false"
-      - key: METRO_STATIC_ALLOW_REPLACEMENT
-        value: "false"

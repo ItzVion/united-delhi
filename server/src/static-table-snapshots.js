@@ -1,36 +1,3 @@
-import { timingSafeEqual } from 'node:crypto';
-
-const BUS_SOURCE_KEY='user-uploaded-dtc-static-v1-20261030';
-const METRO_SOURCE_KEY='user-uploaded-dmrc-static-v1-20261030';
-
-export function isStaticImportTokenValid(expected,supplied){
-  const a=Buffer.from(String(expected??'').trim(),'utf8');
-  const b=Buffer.from(String(supplied??''),'utf8');
-  return a.length>0&&a.length===b.length&&timingSafeEqual(a,b);
-}
-
-export function createStaticImportEnvironment(kind,filePath,base=process.env){
-  if(kind!=='dtc'&&kind!=='metro')throw new Error('Unsupported static feed kind');
-  const env={...base};
-  delete env.STATIC_IMPORT_TOKEN;
-  if(kind==='dtc'){
-    env.DTC_STATIC_FILE=String(filePath);
-    env.DTC_STATIC_URL='';
-    env.DTC_STATIC_SOURCE_KEY=BUS_SOURCE_KEY;
-    env.DTC_STATIC_ALLOW_REPLACEMENT='true';
-    env.DTC_ALLOW_EXPIRED_CALENDAR='false';
-    env.DTC_ALLOW_INVALID_CALENDAR='false';
-  }else{
-    env.METRO_STATIC_FILE=String(filePath);
-    env.METRO_STATIC_URL='';
-    env.METRO_STATIC_SOURCE_KEY=METRO_SOURCE_KEY;
-    env.METRO_STATIC_ALLOW_REPLACEMENT='true';
-    env.METRO_ALLOW_EXPIRED_CALENDAR='true';
-    env.METRO_ALLOW_INVALID_CALENDAR='false';
-  }
-  return env;
-}
-
 export function staticBackupTableNames(archiveSha256,kind){
   const digest=String(archiveSha256??'').toLowerCase();
   if(!/^[a-f0-9]{64}$/.test(digest))throw new Error('A full archive SHA-256 digest is required');

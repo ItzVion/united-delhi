@@ -40,12 +40,6 @@ APP_ORIGINS=https://united-delhi.vercel.app
 DATABASE_URL=${db_url}
 OTD_API_KEY=
 OTD_COLOR_FIELD=
-DTC_STATIC_FILE=/opt/united-delhi/data/dtc-static.zip
-DTC_STATIC_SOURCE_KEY=uploaded-dtc-static-local-v1-20261013
-DTC_STATIC_AUTO_IMPORT=true
-METRO_STATIC_FILE=/opt/united-delhi/data/metro-static.zip
-METRO_STATIC_SOURCE_KEY=uploaded-dmrc-static-local-v1-20261013
-METRO_AUTO_SYNC=true
 ENV
   chown root:united-delhi /etc/united-delhi/server.env
   chmod 0640 /etc/united-delhi/server.env

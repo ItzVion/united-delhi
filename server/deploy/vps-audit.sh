@@ -30,7 +30,7 @@ section "ENVIRONMENT PRESENCE (NO VALUES/SECRETS)"
 python3 - <<'PY'
 from pathlib import Path
 for file, keys in [
- (Path('/etc/united-delhi/server.env'), ['DATABASE_URL','OTD_API_KEY','DTC_STATIC_FILE','METRO_STATIC_FILE']),
+ (Path('/etc/united-delhi/server.env'), ['DATABASE_URL','OTD_API_KEY']),
  (Path('/etc/united-delhi/deploy.env'), ['AUTODEPLOY_ENABLED','API_DEPLOY_ENABLED','WEB_DEPLOY_ENABLED','ANDROID_BUILD_ENABLED','VERCEL_TOKEN','VERCEL_ORG_ID','VERCEL_PROJECT_ID']),
 ]:
  print(file, 'present' if file.exists() else 'MISSING')
@@ -45,12 +45,6 @@ for file, keys in [
 PY
 stat -c '%U:%G %a %n' /etc/united-delhi/server.env /etc/united-delhi/deploy.env 2>&1 || true
 namei -l /etc/united-delhi/server.env 2>&1 || true
-
-section "STATIC ARCHIVES"
-ls -lh "$ROOT/data" 2>&1 || true
-for file in "$ROOT/data/dtc-static.zip" "$ROOT/data/metro-static.zip"; do
- if [ -s "$file" ]; then unzip -t "$file" 2>&1 | tail -1; else echo "MISSING/EMPTY: $file"; fi
-done
 
 section "DATABASE COUNTS"
 if command -v psql >/dev/null 2>&1; then

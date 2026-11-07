@@ -87,7 +87,7 @@ GITHUB
 - Existing test files cover route display, vehicle classification, web marker colours, GTFS parsing and API helpers. No fresh full local install/typecheck/test/build was run through the connected GitHub tools in this audit.
 - The existing the earlier repository review records a previous app dependency audit of 15 HIGH findings and 0 critical findings (16 October 2026), in the Expo/Metro/React Native dependency tree. That result is historical, not a fresh 7 November npm audit. Re-run npm audit for app, web and server with npm registry access; do not use npm audit fix --force or downgrade Expo/React Native without compatibility review.
 - Previous audit recorded web bundle size warning (570.22 kB > 500 kB). Recheck current build output and consider code splitting if still present.
-- No source secrets were found/confirmed in this audit pass, but a complete current secret-scanning run was not available. Continue keeping OTD_API_KEY, DATABASE_URL and STATIC_IMPORT_TOKEN in server-side environment variables only.
+- No source secrets were found/confirmed in this audit pass, but a complete current secret-scanning run was not available. Continue keeping OTD_API_KEY and DATABASE_URL in backend-only environment variables.
 
 RENDER
 - Service: united-delhi-api; free plan; Singapore; root directory server/; branch main; auto-deploy on commit.
@@ -95,7 +95,7 @@ RENDER
 - Runtime logs on 7 November show repeated successful Delhi OTD feed decoding, often hundreds to over two thousand vehicle records. The log messages repeatedly state 0 exact per-vehicle colours supplied.
 - Some realtime polls are rejected intermittently with messages including "Delhi OTD realtime feed returned no valid vehicles" and "missing required 'header'"; successful polls occur between these events. Add feed-quality counters and alerting, and distinguish transient malformed upstream snapshots from a sustained outage.
 - A separate attempt to retrieve a filtered Render warning/error log view returned a Render log-service 503, so a complete error-only log analysis was unavailable.
-- The API is intentionally public for read-only transit data. Admin static-import endpoints require x-static-import-token, use timing-safe token comparison, and accept ZIP uploads with a 45 MB limit. Keep the token private and rotate it if it has ever been exposed.
+- The API is intentionally public for read-only transit data. Admin manual GTFS loading endpoints require temporary browser upload header, use timing-safe token comparison, and accept ZIP uploads with a 45 MB limit. Keep the token private and rotate it if it has ever been exposed.
 - API rate limiting is configured at 180 requests per minute. JSON body size is limited to 32 KB. Security headers are set by the backend.
 - Render service IP allowlist is 0.0.0.0/0 (public API access); this is expected for the public API but makes strict abuse monitoring/rate limiting important.
 
@@ -234,4 +234,10 @@ FINAL VALIDATION NOTES — 7 NOVEMBER 2026
 - Vercel web deployment 67c3e2bd228a032d2e240776770a360199fa1682 is READY with the operator-category help/legend copy. A later cancelled production-target build was for the Android-only source update and did not replace the last READY web deployment.
 - Android source changes include the category legend and About copy, but no APK build or device/emulator test was run in this environment.
 - The main branch contains no Markdown files and the repository review note no longer contains tool attribution. The remaining operational/recovery material is kept in plain-text files.
-- The production Neon network still has the previous 2,403-route snapshot. The 26 MB uploaded bus archive was inspected locally but could not be transferred into the authenticated Render import endpoint through the connected tool actions available in this session. The existing browser uploader is served at /static-import.html and requires the Render STATIC_IMPORT_TOKEN; upload only the DTC bus ZIP, not the expired Metro calendar. No production database rows were replaced. The new archive matches 947/996 distinct live route IDs in the measured sample; 49 are still unmatched, so do not claim complete route-label coverage.
+- The production Neon network still has the previous 2,403-route snapshot. The 26 MB uploaded bus archive was inspected locally but could not be transferred into the authenticated Render import endpoint through the connected tool actions available in this session. The existing browser uploader is served at the old browser upload page and requires the Render temporary browser upload token; upload only the DTC bus ZIP, not the expired Metro calendar. No production database rows were replaced. The new archive matches 947/996 distinct live route IDs in the measured sample; 49 are still unmatched, so do not claim complete route-label coverage.
+
+
+MANUAL GTFS LOADING
+- The browser upload page and public admin upload endpoints have been removed from the application.
+- The temporary browser upload token setting has been removed from the backend configuration. Static data loading is operator-invoked through the Render Shell using the reviewed one-shot loaders.
+- The DTC loader retains transaction-scoped rollback snapshots and route-ID coverage checks. No static data is automatically replaced at API startup.

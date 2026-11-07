@@ -8,16 +8,16 @@ Current production
 - GitHub Actions is manual-only. Routine deploys use Render and Vercel integrations.
 
 Static transit network
-- Android and web both read the same routes, stops and Metro network from Neon; no static GTFS copy is bundled into either client.
-- Upload the supplied bus and Metro GTFS ZIPs once at https://united-delhi.vercel.app/static-import.html.
-- The backend validates the ZIPs and imports them transactionally. Before replacement, it creates hash-named backup tables for the current routes, stops, route-stop links and metadata. Failed imports roll back.
-- Bus routes and stops come from the uploaded bus archive. Metro directions and stations come from the uploaded Metro archive.
-- The supplied Metro calendar ends 31 December 2025. The file is used for network topology only; Metro timetable claims are not made and trip durations remain estimates.
-- Once imported, Neon is the static source for both Android and website. Automatic external static feed refresh remains disabled.
+- Android and web both read bus and Metro network data from Neon.
+- Static GTFS data is loaded manually with one-shot commands from the Render Shell. The backend does not expose a browser file upload or public admin loading endpoint.
+- The DTC loader validates the archive, route labels, references, route-stop links and recent live-route ID coverage. It creates hash-named snapshots and replaces the tables inside one database transaction.
+- Keep GTFS ZIPs out of the repository except for the short deployment used for a data load. Remove them from the repository immediately after the load and deploy the clean tree.
+- The reviewed DTC feed contains 2,554 routes and 6,812 stops. It matched 947 of 996 distinct live route IDs (95.08%) in the measured sample; 49 remain unmatched. The loader warns below 98% and refuses below 90%.
+- The supplied Metro feed calendar ended 31 December 2025. It may only be loaded for topology; Metro journey durations remain estimates until a current timetable is supplied.
 
 Live vehicle feed
 - Delhi OTD GTFS-Realtime is used for live vehicle positions.
-- OTD access requires an authorised private key. The backend reads OTD_API_KEY and sends it only to the official endpoint as its documented key query parameter. Keep it in Render secrets only.
+- OTD access requires an authorised private key. The backend reads OTD_API_KEY and sends it only to the official endpoint. Keep it in Render secrets only.
 
 Android app
   cd app
@@ -52,12 +52,8 @@ Backend
 
 Render environment
 - DATABASE_URL
-- OTD_API_KEY (authorised OTD realtime access; backend only)
-- STATIC_IMPORT_TOKEN (temporary; clear after both ZIPs are imported)
+- OTD_API_KEY
 - APP_ORIGINS=https://united-delhi.vercel.app
-- DTC_STATIC_AUTO_IMPORT=false
-- METRO_AUTO_SYNC=false
-- METRO_ALLOW_EXPIRED_CALENDAR=true permits Metro topology-only use; it does not validate timetable dates.
 
 Security
-Never commit DATABASE_URL, OTD_API_KEY or STATIC_IMPORT_TOKEN. The upload token is accepted only in the x-static-import-token header over HTTPS and is never stored in the client browser. Clear it from Render after both imports finish.
+Never commit DATABASE_URL or OTD_API_KEY. Use only the backend's private environment for these values.

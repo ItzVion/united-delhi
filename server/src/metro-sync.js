@@ -4,7 +4,7 @@ import path from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import { sha256Hex, sourceWithSha256, sourceHasSha256, inspectGtfsServiceCoverage } from './gtfs-feed-utils.js';
-import { snapshotStaticTables } from './static-import.js';
+import { snapshotStaticTables } from './static-table-snapshots.js';
 
 const execFileAsync=promisify(execFile);
 const URL=String(process.env.METRO_STATIC_URL||'').trim();

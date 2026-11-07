@@ -4,15 +4,6 @@ import cors from 'cors';
 import pg from 'pg';
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { rateLimit } from 'express-rate-limit';
-import { spawn } from 'node:child_process';
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import { randomUUID } from 'node:crypto';
-import {isStaticImportTokenValid,createStaticImportEnvironment} from './static-import.js';
-import { SERVER_ROOT, STATIC_IMPORTER_PATH, resolveServerPath } from './runtime-paths.js';
-import { sha256Hex, sourceHasSha256 } from './gtfs-feed-utils.js';
-import {syncMetroStatic} from './metro-sync.js';
 import {createRealtimeRequest} from './realtime-provider.js';
 import {publicRouteName} from './route-display.js';
 import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,classifyFleetTypeFromRegistration,classifyOperatorType,classifyBusType,resolveFleetCategoryColor,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
@@ -23,7 +14,6 @@ const PORT=Number(process.env.PORT)||10000;
 const DB=String(process.env.DATABASE_URL||'').trim();
 const OTD_API_KEY=String(process.env.OTD_API_KEY||'').trim();
 const HAS_OTD_API_KEY=Boolean(OTD_API_KEY);
-const STATIC_IMPORT_TOKEN=String(process.env.STATIC_IMPORT_TOKEN||'').trim();
 const REALTIME_PERSIST_INTERVAL_MS=Math.max(15000,Number(process.env.REALTIME_PERSIST_INTERVAL_MS)||60000);
 let DB_CONNECTION=DB;try{if(DB){const u=new URL(DB);u.searchParams.delete('sslmode');DB_CONNECTION=u.toString()}}catch{} const pool=DB?new Pool({connectionString:DB_CONNECTION,max:5,connectionTimeoutMillis:5000,idleTimeoutMillis:30000,statement_timeout:15000,ssl:/localhost|127(?:\.\d+){3}|::1/i.test(DB)?false:{rejectUnauthorized:true}}):null;
 
@@ -84,9 +74,7 @@ const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>{
  return {...classified,operator,agencyId:agency||null,operatorType};
 };
 const cache={vehicles:[],status:HAS_OTD_API_KEY?'STARTING':'UNAVAILABLE',reason:HAS_OTD_API_KEY?'United Delhi API is starting':'OTD_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
-let refreshing=null,poll=null,routeMetaLoadedAt=0,persistPromise=null,lastPersistAt=0,dtcAutoImportRunning=false;
-let staticImportRunning=null;
-const staticImportJobs=new Map();
+let refreshing=null,poll=null,routeMetaLoadedAt=0,persistPromise=null,lastPersistAt=0;
 const routeMeta=new Map();
 const fleetRegistry=new Map();
 const verifiedLiveryByKey=new Map();
@@ -183,105 +171,6 @@ const busLiveryForRoute=routeId=>{
  return summarizeRouteLivery(active)||{};
 };
 const decoratePlannerOptions=options=>(Array.isArray(options)?options:[]).map(option=>({...option,legs:(Array.isArray(option.legs)?option.legs:[]).map(leg=>!leg.mode||leg.mode==='bus'?{...leg,...busLiveryForRoute(leg.routeId)}:leg)}));
-const DTC_STATIC_SOURCE_KEY=String(process.env.DTC_STATIC_SOURCE_KEY||'uploaded-dtc-static-local-v1-20261013').trim();
-const DTC_STATIC_FILE_INPUT=String(process.env.DTC_STATIC_FILE||'').trim();
-const DTC_STATIC_FILE=DTC_STATIC_FILE_INPUT?resolveServerPath(DTC_STATIC_FILE_INPUT):'';
-const DTC_STATIC_BUNDLE_URL=String(process.env.DTC_STATIC_URL||'').trim();
-function scheduleDtcStaticRetry(){
- const retry=setTimeout(autoImportDtcStaticIfEmpty,5*60*1000);
- retry.unref?.();
-}
-function autoImportDtcStaticIfEmpty(){
- if(!pool||String(process.env.DTC_STATIC_AUTO_IMPORT??'true').toLowerCase()==='false'||dtcAutoImportRunning)return;
- void (async()=>{
-  try{
-   const [countResult,metaResult]=await Promise.all([
-    pool.query(`SELECT
-      (SELECT COUNT(*)::int FROM routes) AS routes,
-      (SELECT COUNT(*)::int FROM stops) AS stops,
-      (SELECT COUNT(*)::int FROM route_stops) AS route_stops`),
-    pool.query('SELECT source_key,source_url,imported_route_count,imported_stop_count,imported_route_stop_count FROM static_feed_meta WHERE id=1').catch(()=>({rows:[]}))
-   ]);
-   const counts=countResult.rows[0]||{};
-   const routeCount=Number(counts.routes)||0,stopCount=Number(counts.stops)||0,linkCount=Number(counts.route_stops)||0;
-   const meta=metaResult.rows[0]||{};
-   const populated=routeCount>0||stopCount>0||linkCount>0;
-   if(populated){
-    let digest=null;
-    if(DTC_STATIC_FILE){
-     try{
-      const stat=await fs.stat(DTC_STATIC_FILE);
-      if(stat.isFile()&&stat.size>0)digest=sha256Hex(await fs.readFile(DTC_STATIC_FILE));
-     }catch(error){console.warn('Cannot fingerprint local DTC GTFS archive:',error?.message||error)}
-    }
-    const metadataMatches=meta.source_key===DTC_STATIC_SOURCE_KEY
-      &&Number(meta.imported_route_count)===routeCount
-      &&Number(meta.imported_stop_count)===stopCount
-      &&Number(meta.imported_route_stop_count)===linkCount;
-    if(digest&&sourceHasSha256(meta.source_url,digest)&&metadataMatches)return;
-    console.warn('Automatic DTC replacement suppressed: the populated database has no matching archive SHA-256 fingerprint, or its counts differ. Existing transit data is preserved. Review the feed and backups, then use the explicit import command with DTC_STATIC_ALLOW_REPLACEMENT=true if replacement is approved.');
-    return;
-   }
-   // Automatic import is permitted only for a genuinely empty static network.
-   let sourceAvailable=false;
-   const sourceDescription=DTC_STATIC_FILE||DTC_STATIC_BUNDLE_URL||'(not configured)';
-   if(DTC_STATIC_FILE){
-    try{
-     const fileStat=await fs.stat(DTC_STATIC_FILE);
-     sourceAvailable=fileStat.isFile()&&fileStat.size>0;
-    }catch(error){console.warn('Local DTC GTFS archive is unavailable:',error?.message||error)}
-   }else if(DTC_STATIC_BUNDLE_URL){
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
-    try{
-     const response=await fetch(DTC_STATIC_BUNDLE_URL,{method:'HEAD',signal:controller.signal});
-     sourceAvailable=response.ok;
-     if(!response.ok)console.warn('DTC GTFS URL returned HTTP '+response.status+'.');
-    }catch(error){console.warn('DTC GTFS source check failed:',error?.message||error)}
-    finally{clearTimeout(timer)}
-   }
-   if(!sourceAvailable){
-    console.warn('DTC GTFS source is unavailable ('+sourceDescription+'); empty database left unchanged; retrying in five minutes.');
-    scheduleDtcStaticRetry();
-    return;
-   }
-   if(dtcAutoImportRunning)return;
-   dtcAutoImportRunning=true;
-   console.log('DTC GTFS source is available; initializing the empty static database from '+sourceDescription+'.');
-   const importEnv={...process.env,DTC_STATIC_SOURCE_KEY};
-   delete importEnv.DTC_STATIC_ALLOW_REPLACEMENT;
-   if(DTC_STATIC_FILE){
-    importEnv.DTC_STATIC_FILE=DTC_STATIC_FILE;
-    delete importEnv.DTC_STATIC_URL;
-   }else{
-    importEnv.DTC_STATIC_URL=DTC_STATIC_BUNDLE_URL;
-   }
-   const child=spawn(process.execPath,[STATIC_IMPORTER_PATH],{cwd:SERVER_ROOT,env:importEnv,stdio:['ignore','pipe','pipe']});
-   child.stdout.on('data',chunk=>console.log('[DTC static importer] '+String(chunk).trimEnd()));
-   child.stderr.on('data',chunk=>console.warn('[DTC static importer] '+String(chunk).trimEnd()));
-   child.on('error',error=>{
-    dtcAutoImportRunning=false;
-    console.error('Could not start DTC static importer:',error?.message||error);
-    scheduleDtcStaticRetry();
-   });
-   child.on('close',code=>{
-    dtcAutoImportRunning=false;
-    if(code===0){
-     routeMetaLoadedAt=0;
-     void (async()=>{
-      await loadRouteMeta();
-      cache.vehicles=cache.vehicles.map(applyRouteMeta);
-      console.log('Supplied DTC static feed initialized; route metadata and cached vehicles refreshed.');
-     })().catch(error=>console.error('Post-import metadata refresh failed:',error?.message||error));
-    }else{
-     console.error('Automatic DTC initial import exited with code '+code+'. Existing database was empty at launch.');
-    }
-   });
-  }catch(error){
-   dtcAutoImportRunning=false;
-   console.error('DTC static source check failed:',error?.message||error);
-  }
- })();
-}
 async function loadDatabaseVehicleCache(){
  if(!pool)return;
  try{
@@ -324,85 +213,6 @@ app.use('/api',(_q,r,n)=>{
 app.use(express.json({limit:'32kb'}));
 app.use((_q,r,n)=>{r.setHeader('X-Content-Type-Options','nosniff');r.setHeader('Referrer-Policy','no-referrer');r.setHeader('X-Frame-Options','DENY');r.setHeader('Permissions-Policy','geolocation=(self)');if(_q.secure||String(_q.headers['x-forwarded-proto']||'').split(',')[0].trim()==='https')r.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');n()});
 app.use('/api',rateLimit({windowMs:60000,limit:180,standardHeaders:'draft-8',legacyHeaders:false}));
-
-function requireStaticImportToken(req,res,next){
- const supplied=String(req.get('x-static-import-token')||'');
- if(!STATIC_IMPORT_TOKEN)return res.status(503).json({status:'UNAVAILABLE',reason:'Static import is not enabled on this backend.'});
- if(!isStaticImportTokenValid(STATIC_IMPORT_TOKEN,supplied))return res.status(401).json({status:'ERROR',reason:'The one-time upload token is invalid.'});
- next();
-}
-function appendStaticImportOutput(job,chunk){
- const value=String(chunk||'');
- if(value)job.output=(job.output+value).slice(-30000);
-}
-async function startStaticImport(kind,archive){
- const jobId=randomUUID();
- const job={id:jobId,kind,status:'RUNNING',createdAt:new Date().toISOString(),finishedAt:null,output:''};
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'united-delhi-static-'));
- const file=path.join(dir,kind==='dtc'?'buses.zip':'metro.zip');
- try{await fs.writeFile(file,archive,{flag:'wx'});}catch(error){await fs.rm(dir,{recursive:true,force:true});throw error;}
- const script=kind==='dtc'?STATIC_IMPORTER_PATH:path.join(SERVER_ROOT,'scripts','sync-dmrc-static.mjs');
- const child=spawn(process.execPath,[script],{cwd:SERVER_ROOT,env:createStaticImportEnvironment(kind,file,process.env),stdio:['ignore','pipe','pipe']});
- staticImportJobs.set(jobId,job);
- staticImportRunning=jobId;
- let finished=false;
- const finish=async(code,error=null)=>{
-  if(finished)return;
-  finished=true;
-  if(error)appendStaticImportOutput(job,'\n'+String(error?.message||error));
-  job.status=code===0?'SUCCEEDED':'FAILED';
-  job.exitCode=Number.isInteger(code)?code:null;
-  job.finishedAt=new Date().toISOString();
-  if(code===0&&kind==='dtc'){
-   routeMetaLoadedAt=0;
-   try{
-    await loadRouteMeta();
-    cache.vehicles=cache.vehicles.map(applyRouteMeta);
-    console.log('DTC static import committed; cached live-vehicle route metadata refreshed.');
-   }catch(refreshError){
-    console.error('Post-import route metadata refresh failed:',refreshError?.message||refreshError);
-   }
-  }
-  staticImportRunning=null;
-  await fs.rm(dir,{recursive:true,force:true}).catch(e=>console.warn('Static import temp cleanup failed:',e?.message||e));
-  if(staticImportJobs.size>30){
-   const old=[...staticImportJobs.values()].filter(x=>x.finishedAt).sort((a,b)=>String(a.finishedAt).localeCompare(String(b.finishedAt)));
-   for(const x of old.slice(0,staticImportJobs.size-25))staticImportJobs.delete(x.id);
-  }
- };
- child.stdout.on('data',chunk=>appendStaticImportOutput(job,chunk));
- child.stderr.on('data',chunk=>appendStaticImportOutput(job,chunk));
- child.on('error',error=>{void finish(null,error)});
- child.on('close',code=>{void finish(code)});
- return jobId;
-}
-app.post('/api/admin/static-import/:kind',requireStaticImportToken,express.raw({type:['application/zip','application/x-zip-compressed'],limit:'45mb'}),async(req,res)=>{
- const kind=String(req.params.kind||'').toLowerCase();
- if(!['dtc','metro'].includes(kind))return res.status(404).json({status:'NOT_FOUND'});
- if(!pool)return res.status(503).json({status:'UNAVAILABLE',reason:'Database is not configured.'});
- if(staticImportRunning)return res.status(409).json({status:'BUSY',reason:'Another static feed is currently importing. Wait for it to finish.'});
- const archive=Buffer.isBuffer(req.body)?req.body:null;
- if(!archive||archive.length<1000||archive[0]!==0x50||archive[1]!==0x4b)return res.status(400).json({status:'ERROR',reason:'Select a valid GTFS ZIP archive.'});
- try{
-  const sourceKey=kind==='dtc'?'user-uploaded-dtc-static-v1-20261030':'user-uploaded-dmrc-static-v1-20261030';
-  const table=kind==='dtc'?'static_feed_meta':'metro_feed_meta';
-  const existing=(await pool.query('SELECT source_key FROM '+table+' WHERE id=1')).rows[0]||null;
-  if(existing?.source_key===sourceKey)return res.status(409).json({status:'ALREADY_IMPORTED',reason:'This uploaded source is already recorded. No data was changed.'});
-  const jobId=await startStaticImport(kind,archive);
-  res.setHeader('Cache-Control','no-store');
-  return res.status(202).json({status:'RUNNING',jobId,kind,reason:'Upload accepted. The previous network remains available until the database transaction commits.'});
- }catch(error){
-  staticImportRunning=null;
-  console.error('Static import could not start:',error?.message||error);
-  return res.status(500).json({status:'ERROR',reason:'The static import could not be started. No data was changed.'});
- }
-});
-app.get('/api/admin/static-import/status/:jobId',requireStaticImportToken,(req,res)=>{
- res.setHeader('Cache-Control','no-store');
- const job=staticImportJobs.get(String(req.params.jobId||''));
- if(!job)return res.status(404).json({status:'NOT_FOUND',reason:'Static import job not found.'});
- res.json({status:job.status,jobId:job.id,kind:job.kind,createdAt:job.createdAt,finishedAt:job.finishedAt,exitCode:job.exitCode??null,output:job.output.slice(-12000)});
-});
 
 async function ensureRuntimeSchema(){if(!pool)return;const c=await pool.connect();try{
  await c.query('ALTER TABLE vehicle_positions ADD COLUMN IF NOT EXISTS trip_id TEXT');
@@ -909,27 +719,9 @@ app.get('/api/plan',async(q,r)=>{
   return r.json({status:'OK',origin,destination,originStopIds:fromIds,destinationStopIds:toIds,options:decoratePlannerOptions(ranked.slice(0,10)),reason:ranked.length?null:'No bus journey was found between the selected stops.'});
  }catch(e){console.error('Journey planner failed:',e?.message||e);return r.status(500).json({status:'ERROR',options:[],reason:'Journey planner is temporarily unavailable. Please try again.'})}
 });
-function scheduleMetroStaticRetry(){
- const retry=setTimeout(runMetroStaticSync,5*60*1000);
- retry.unref?.();
-}
-function runMetroStaticSync(){
- if(!pool||String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()==='false')return;
- void syncMetroStatic(pool,{
-  allowReplacement:String(process.env.METRO_STATIC_ALLOW_REPLACEMENT||'false').toLowerCase()==='true',
-  allowExpiredCalendar:String(process.env.METRO_ALLOW_EXPIRED_CALENDAR||'false').toLowerCase()==='true',
-  allowInvalidCalendar:String(process.env.METRO_ALLOW_INVALID_CALENDAR||'false').toLowerCase()==='true'
- }).then(result=>{
-  if(result?.requiresApproval){console.warn(result.reason||'DMRC refresh requires explicit approval; existing data preserved.');return;}
-  if(!result?.ok)throw new Error(result?.reason||'Metro static sync did not complete');
- }).catch(error=>{
-  console.error('Uploaded DMRC static sync failed:',error?.message||error);
-  scheduleMetroStaticRetry();
- });
-}
 app.use((_q,r)=>r.status(404).json({status:'NOT_FOUND',reason:'Endpoint not found'}));
 app.use((e,_q,r,_n)=>{console.error('Unhandled request error:',e?.message||e);if(!r.headersSent)r.status(500).json({status:'ERROR',reason:'Internal server error'})});
-const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(async()=>{try{if(pool){await ensureRuntimeSchema();await loadFleetRegistry(true);await loadVerifiedLiveries(true);await loadRouteMeta();await loadDatabaseVehicleCache();autoImportDtcStaticIfEmpty()}}catch(e){console.error('Database bootstrap failed:',e?.message||e)}if(HAS_OTD_API_KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}if(pool&&String(process.env.METRO_AUTO_SYNC??'true').toLowerCase()!=='false'){setTimeout(runMetroStaticSync,5000);setInterval(runMetroStaticSync,24*60*60*1000)}},1500)});
+const server=app.listen(PORT,'0.0.0.0',()=>{console.log('United Delhi API listening on 0.0.0.0:'+PORT);setTimeout(async()=>{try{if(pool){await ensureRuntimeSchema();await loadFleetRegistry(true);await loadVerifiedLiveries(true);await loadRouteMeta();await loadDatabaseVehicleCache()}}catch(e){console.error('Database bootstrap failed:',e?.message||e)}if(HAS_OTD_API_KEY){void refresh();poll=setInterval(()=>void refresh(),15000)}},1500)});
 server.requestTimeout=30000;server.headersTimeout=40000;server.keepAliveTimeout=65000;
 process.on('unhandledRejection',e=>console.error('Unhandled rejection:',e));process.on('uncaughtException',e=>console.error('Uncaught exception:',e));
 for(const sig of ['SIGTERM','SIGINT'])process.on(sig,async()=>{if(poll)clearInterval(poll);server.close();await pool?.end().catch(()=>{});process.exit(0)});
