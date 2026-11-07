@@ -73,12 +73,13 @@ export function classifyBusType(busType) {
 export function resolveFleetCategoryColor(operatorType, busType) {
   const operator = String(operatorType ?? '').trim().toLowerCase();
   const { fuelType, airConditioned } = classifyBusType(busType);
-  if (airConditioned === null || fuelType === 'unknown') return null;
   if (operator === 'dtc') {
+    if (fuelType !== 'cng' || airConditioned === null) return null;
     return airConditioned ? BUS_CATEGORY_MARKER_COLORS.DTC_AC : BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC;
   }
   if (operator === 'cluster') {
-    return airConditioned ? BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC : BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC;
+    if (airConditioned === true && (fuelType === 'cng' || fuelType === 'electric')) return BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC;
+    if (airConditioned === false && fuelType === 'cng') return BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC;
   }
   return null;
 }
