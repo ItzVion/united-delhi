@@ -1,26 +1,31 @@
 GTFS NETWORK DATA
 
-The website and Android app read static transit data from Neon. Static GTFS is loaded only by an operator-run command from the Render Shell. The backend has no browser uploader or public admin loading endpoint.
+Static DTC bus data is maintained from the reviewed ZIP committed at:
+server/data/delhi_buses_static_gtfs_v1.zip
 
-DTC bus network
-1. Place the reviewed archive temporarily at server/data/delhi_buses_static_gtfs_v1.zip.
-2. Deploy the main branch to Render.
-3. Open the Render Shell for united-delhi-api and run the loader from the service's server directory:
+Automated maintenance
+- GitHub Actions runs on every push to main and every six hours.
+- The ensureDtcStaticData function validates the archive, computes its SHA-256, checks route/stop/link counts and fingerprints the actual Neon rows.
+- If the database is already an exact match, it exits without writing data.
+- If data is missing or differs, it validates the source first, snapshots the old static tables, replaces the data in one transaction, then verifies every persisted row fingerprint before commit.
+- If validation or post-import verification fails, the transaction rolls back and the GitHub workflow fails.
+- On a main push, Render is deployed only after the database check/import succeeds. On scheduled runs, Render is redeployed only if data had to be repaired.
+- Render auto-deploy must remain disabled. Do not manually deploy code changes that have not passed the static-data workflow.
 
-   DTC_STATIC_FILE=./data/delhi_buses_static_gtfs_v1.zip DTC_STATIC_ALLOW_REPLACEMENT=true npm run import:dtc
+Required GitHub Actions secrets
+- NEON_DATABASE_URL: the Neon connection string for the production database.
+- RENDER_DEPLOY_HOOK_URL: a Render deploy hook URL for united-delhi-api, configured for the main branch.
 
-The loader validates required GTFS files, route and stop references, public labels, route-stop links and recent live-route ID coverage. It creates hash-named snapshots before replacing the live tables. Replacement and metadata updates commit in one transaction; a failed import rolls back.
+Required repository file
+- server/data/delhi_buses_static_gtfs_v1.zip
 
-The reviewed DTC archive contains 2,554 routes, 6,812 stops, 65,322 trips and 2,385,381 stop-time rows. It matches 947 of 996 distinct live route IDs (95.08%) in the measured sample; 49 remain unmatched. The loader warns below 98% and refuses below 90%.
+Source archive checks
+The reviewed DTC archive contains 2,554 routes, 6,812 stops, 65,322 trips and 2,385,381 stop-time rows. In the previously measured realtime sample it matched 947 of 996 live route IDs (95.08%). The importer warns below 98% and refuses replacement below 90%.
+The importer checks the feed calendar and refuses expired or invalid calendar data by default.
 
-Metro topology
-The supplied Metro archive has 36 directional routes and 262 stops. Its calendar ended on 31 December 2025. Do not use it as a current timetable. To load topology only:
-
-   METRO_STATIC_FILE=./data/dmrc_static_gtfs_v1.zip METRO_STATIC_ALLOW_REPLACEMENT=true METRO_ALLOW_EXPIRED_CALENDAR=true npm run sync:metro
-
-Metro journey durations remain estimates. A current official schedule is needed before timetable-based claims can be made.
-
-After loading
-- Verify static_feed_meta and metro_feed_meta counts and source hashes.
-- Check /api/search, /api/routes/:id, /api/metro, /api/metro/routes/:id and /api/plan/multimodal.
-- Remove the temporary ZIP files from the repository and deploy the clean tree. No GTFS archive should remain in the production source tree.
+Operations
+- Do not use Render Shell; the free Render compute plan does not include it.
+- Do not put DATABASE_URL or deploy-hook URLs in the repository or in chat. Store them only in GitHub Actions secrets.
+- Keep the DTC ZIP at the exact path above. Updating it in main triggers a validated import before the Render deployment.
+- Keep Render auto-deploy disabled so a Render deployment cannot race ahead of the database update.
+- Review failed GitHub Actions logs before changing any safety thresholds.
