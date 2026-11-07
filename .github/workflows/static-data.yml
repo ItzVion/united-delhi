@@ -37,6 +37,9 @@ jobs:
       - name: Install importer dependencies
         run: npm ci
 
+      - name: Check server syntax and run tests
+        run: npm run check && npm test
+
       - name: Verify or repair DTC static data in Neon
         id: static
         run: npm run ensure:dtc
