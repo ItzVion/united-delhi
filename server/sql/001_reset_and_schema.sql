@@ -7,6 +7,6 @@ DO $$
 BEGIN
   RAISE EXCEPTION USING
     MESSAGE = 'Blocked: this legacy reset script is disabled because it destroys existing data.',
-    HINT = 'Read server/deploy/DATABASE-RECOVERY.md. Never run this file for deployment or recovery.';
+    HINT = 'Read server/deploy/DATABASE-RECOVERY.txt. Never run this file for deployment or recovery.';
 END
 $$;
