@@ -1,4 +1,7 @@
 import 'dotenv/config';
+import { createHash } from 'node:crypto';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createInflateRaw } from 'node:zlib';
 import { Readable } from 'node:stream';
 import fs from 'node:fs/promises';
@@ -12,7 +15,7 @@ const STATIC_URL_OVERRIDE = String(process.env.DTC_STATIC_URL || '').trim();
 const STATIC_FILE_OVERRIDE = String(process.env.DTC_STATIC_FILE || '').trim();
 const STATIC_FILE_PATH = STATIC_FILE_OVERRIDE ? resolveServerPath(STATIC_FILE_OVERRIDE) : '';
 const STATIC_URLS = STATIC_URL_OVERRIDE ? [STATIC_URL_OVERRIDE] : [];
-const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'uploaded-dtc-static-local-v1-20261013').trim();
+const SOURCE_KEY = String(process.env.DTC_STATIC_SOURCE_KEY || 'united-delhi-github-dtc-v1').trim();
 const MAX_COMPRESSED_BYTES = 100 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES = 300 * 1024 * 1024;
 
@@ -172,6 +175,32 @@ const batches = (items, size) => {
   return out;
 };
 
+const digestRows = (rows, fields) => {
+  const records = rows.map((row) => fields.map((field) => {
+    const value = row[field];
+    if (value === null || value === undefined) return null;
+    if (['latitude', 'longitude', 'stop_sequence'].includes(field)) return Number(value);
+    return String(value);
+  }));
+  records.sort((a, b) => {
+    const left = JSON.stringify(a);
+    const right = JSON.stringify(b);
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+  const hash = createHash('sha256');
+  for (const record of records) {
+    hash.update(JSON.stringify(record));
+    hash.update('\\n');
+  }
+  return hash.digest('hex');
+};
+
+const writeWorkflowOutput = async (key, value) => {
+  const outputPath = String(process.env.GITHUB_OUTPUT || '').trim();
+  if (!outputPath) return;
+  await fs.appendFile(outputPath, key + '=' + String(value) + '\\n', 'utf8');
+};
+
 async function downloadZip() {
   if (STATIC_FILE_PATH) {
     try {
@@ -236,7 +265,7 @@ async function downloadZip() {
   throw new Error('All DTC static sources failed: ' + (lastError?.message || lastError || 'unknown error'));
 }
 
-async function main() {
+export async function ensureDtcStaticData() {
   if (!DATABASE_URL) throw new Error('DATABASE_URL is required');
   const { default: pg } = await import('pg');
   const pool = new pg.Pool({
@@ -410,6 +439,21 @@ async function main() {
       const currentStops = Number(existingCounts.stops) || 0;
       const currentLinks = Number(existingCounts.route_stops) || 0;
       const populated = currentRoutes > 0 || currentStops > 0 || currentLinks > 0;
+      let databaseMatchesArchive = false;
+      if (currentRoutes === routes.length && currentStops === stops.length && currentLinks === validLinks.length) {
+        const [databaseRoutes, databaseStops, databaseLinks] = await Promise.all([
+          client.query('SELECT route_id,agency_id,short_name,long_name,route_color,route_text_color FROM routes'),
+          client.query('SELECT stop_id,name,latitude,longitude FROM stops'),
+          client.query('SELECT route_id,stop_id,stop_sequence FROM route_stops')
+        ]);
+        databaseMatchesArchive =
+          digestRows(databaseRoutes.rows, ['route_id','agency_id','short_name','long_name','route_color','route_text_color'])
+            === digestRows(routes, ['route_id','agency_id','short_name','long_name','route_color','route_text_color'])
+          && digestRows(databaseStops.rows, ['stop_id','name','latitude','longitude'])
+            === digestRows(stops, ['stop_id','name','latitude','longitude'])
+          && digestRows(databaseLinks.rows, ['route_id','stop_id','stop_sequence'])
+            === digestRows(validLinks, ['route_id','stop_id','stop_sequence']);
+      }
       const archiveAlreadyImported = existingMeta.source_key === sourceKey
         && sourceHasSha256(existingMeta.source_url, archiveHash)
         && currentRoutes === routes.length
@@ -417,10 +461,12 @@ async function main() {
         && currentLinks === validLinks.length
         && Number(existingMeta.imported_route_count) === routes.length
         && Number(existingMeta.imported_stop_count) === stops.length
-        && Number(existingMeta.imported_route_stop_count) === validLinks.length;
+        && Number(existingMeta.imported_route_stop_count) === validLinks.length
+        && databaseMatchesArchive;
       if (archiveAlreadyImported) {
-        console.log('DTC archive SHA-256 and all static counts match the database; no import is needed.');
-        return;
+        console.log('DTC archive SHA-256, all static counts and all database row fingerprints match; no import is needed.');
+        await writeWorkflowOutput('changed', 'false');
+        return { changed: false };
       }
       if ((coverage.invalidBaseRows || coverage.invalidExceptionRows)
         && String(process.env.DTC_ALLOW_INVALID_CALENDAR || '').toLowerCase() !== 'true') {
@@ -487,10 +533,29 @@ async function main() {
         await client.query('ANALYZE stops');
         await client.query('ANALYZE route_stops');
         await client.query('ANALYZE static_feed_meta');
+
+        const [persistedRoutes, persistedStops, persistedLinks] = await Promise.all([
+          client.query('SELECT route_id,agency_id,short_name,long_name,route_color,route_text_color FROM routes'),
+          client.query('SELECT stop_id,name,latitude,longitude FROM stops'),
+          client.query('SELECT route_id,stop_id,stop_sequence FROM route_stops')
+        ]);
+        if (persistedRoutes.rows.length !== routes.length
+          || persistedStops.rows.length !== stops.length
+          || persistedLinks.rows.length !== validLinks.length
+          || digestRows(persistedRoutes.rows, ['route_id','agency_id','short_name','long_name','route_color','route_text_color'])
+            !== digestRows(routes, ['route_id','agency_id','short_name','long_name','route_color','route_text_color'])
+          || digestRows(persistedStops.rows, ['stop_id','name','latitude','longitude'])
+            !== digestRows(stops, ['stop_id','name','latitude','longitude'])
+          || digestRows(persistedLinks.rows, ['route_id','stop_id','stop_sequence'])
+            !== digestRows(validLinks, ['route_id','stop_id','stop_sequence'])) {
+          throw new Error('Post-import database fingerprint verification failed; rolling back the entire import.');
+        }
         await client.query('COMMIT');
 
-        console.log('DTC static import complete: ' + routes.length + ' routes, ' + stops.length + ' stops, ' + validLinks.length + ' route-stop links.');
+        console.log('DTC static import complete and verified: ' + routes.length + ' routes, ' + stops.length + ' stops, ' + validLinks.length + ' route-stop links.');
         console.log('Source: ' + sourceUrl);
+        await writeWorkflowOutput('changed', 'true');
+        return { changed: true, routes: routes.length, stops: stops.length, routeStops: validLinks.length };
       } catch (error) {
         await client.query('ROLLBACK').catch(() => {});
         throw error;
@@ -506,7 +571,12 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error('DTC static import failed:', error?.message || error);
-  process.exitCode = 1;
-});
+const isDirectExecution = process.argv[1]
+  && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+
+if (isDirectExecution) {
+  ensureDtcStaticData().catch((error) => {
+    console.error('DTC static import failed:', error?.message || error);
+    process.exitCode = 1;
+  });
+}
