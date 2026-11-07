@@ -1,26 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {resolveVehicleColor,fleetLegendRows,hasApiVehicleColor,hasEvidenceBackedVehicleColor,defaultBusCategoryColor,BUS_CATEGORY_MARKER_COLORS,routeCategoryColor} from '../vehicleColor.ts';
+import {
+  resolveVehicleColor,fleetLegendRows,hasApiVehicleColor,hasEvidenceBackedVehicleColor,
+  defaultBusCategoryColor,BUS_CATEGORY_MARKER_COLORS
+} from '../vehicleColor.ts';
 
-test('native marker preserves exact upstream and reviewed colours',()=>{
+test('physical colours from the API or reviewed records take priority',()=>{
   assert.equal(resolveVehicleColor({serviceColor:'#F97316',fleetColorSource:'upstream-api'} as any).background,'#F97316');
-  assert.equal(resolveVehicleColor({serviceColor:'#1D4ED8',fleetColorSource:'upstream-api',routeColor:'#F97316'} as any).background,'#1D4ED8');
   assert.equal(resolveVehicleColor({serviceColor:'#16A34A',fleetColorSource:'verified-livery-record'} as any).background,'#16A34A');
 });
-test('route, type, registration, missing source, and neutral cache values do not prove physical colour',()=>{
+test('unverified physical colours do not override the neutral marker',()=>{
   for(const vehicle of [
     {serviceColor:'#2563EB',fleetColorSource:'estimated-fleet-type'},
-    {serviceColor:'#2563EB',fleetColorSource:'estimated-route-profile'},
     {serviceColor:'#2563EB',fleetColorSource:'not-provided-by-realtime-feed'},
     {serviceColor:'#2563EB'},
-    {serviceColor:'#64748B',fleetColorSource:'not-provided-by-realtime-feed'},
+    {markerColor:'#15803D',markerColorSource:'unclassified'}
   ] as any[]){
     assert.equal(resolveVehicleColor(vehicle).background,'#64748B');
     assert.equal(hasEvidenceBackedVehicleColor(vehicle),false);
     assert.equal(hasApiVehicleColor(vehicle),false);
   }
 });
-test('native legend includes only exact API and reviewed colours',()=>{
+test('legend lists only exact API and reviewed per-vehicle colours',()=>{
   assert.deepEqual(fleetLegendRows([
     {serviceColor:'#1D4ED8',fleetColorSource:'upstream-api'},
     {serviceColor:'#1D4ED8',fleetColorSource:'upstream-api'},
@@ -32,42 +33,34 @@ test('native legend includes only exact API and reviewed colours',()=>{
     {key:'verified-livery-record:#F97316',label:'Reviewed · #F97316 (1)',color:'#F97316',source:'verified-livery-record'}
   ]);
 });
-test('API colour and reviewed evidence source are distinguished',()=>{
+test('requested categories depend on both operator and bus class',()=>{
+  assert.equal(defaultBusCategoryColor('dtc','CNG NonAC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC);
+  assert.equal(defaultBusCategoryColor('dtc','CNG AC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.DTC_AC);
+  assert.equal(defaultBusCategoryColor('cluster','CNG NonAC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC);
+  assert.equal(defaultBusCategoryColor('cluster','CNG AC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
+  assert.equal(defaultBusCategoryColor('cluster','EV AC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
+  assert.equal(defaultBusCategoryColor('dtc','EV AC (12 mtr)'),null);
+  assert.equal(defaultBusCategoryColor('unknown','CNG AC (12 mtr)'),null);
+  assert.equal(defaultBusCategoryColor('cluster','Unknown'),null);
+});
+test('internal GTFS route ids never determine operator or category colour',()=>{
+  assert.equal(resolveVehicleColor({routeId:'772',routeShortName:'770ASTLUP2',operatorType:'cluster',busType:'CNG NonAC (12 mtr)'} as any).background,BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC);
+  assert.equal(resolveVehicleColor({routeId:'779',routeShortName:'772UP',operatorType:'cluster',busType:'CNG AC (12 mtr)'} as any).background,BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
+});
+test('the API category marker is accepted only when explicitly sourced as a fleet category',()=>{
+  assert.equal(resolveVehicleColor({
+    operatorType:'dtc',busType:'CNG AC (12 mtr)',
+    markerColor:'#C62828',markerColorSource:'fleet-category'
+  } as any).background,BUS_CATEGORY_MARKER_COLORS.DTC_AC);
+});
+test('exact physical API colours outrank category markers',()=>{
+  assert.equal(resolveVehicleColor({
+    serviceColor:'#1D4ED8',fleetColorSource:'upstream-api',
+    markerColor:'#15803D',markerColorSource:'fleet-category'
+  } as any).background,'#1D4ED8');
+});
+test('evidence helpers distinguish live API colours and reviewed livery',()=>{
   assert.equal(hasApiVehicleColor({serviceColor:'#2563EB',fleetColorSource:'verified-livery-record'} as any),false);
   assert.equal(hasEvidenceBackedVehicleColor({serviceColor:'#2563EB',fleetColorSource:'verified-livery-record'} as any),true);
   assert.equal(hasApiVehicleColor({serviceColor:'#2563EB',fleetColorSource:'upstream-api'} as any),true);
-});
-
-test('default marker colours match the requested CNG and Devi EV categories',()=>{
-  assert.equal(defaultBusCategoryColor('CNG NonAC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
-  assert.equal(defaultBusCategoryColor('CNG AC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CNG_AC);
-  assert.equal(defaultBusCategoryColor('EV DEVI AC (9 mtr)'),BUS_CATEGORY_MARKER_COLORS.EV_DEVI_AC);
-  assert.equal(resolveVehicleColor({busType:'CNG NonAC (12 mtr)'} as any).background,'#FDBA74');
-  assert.equal(resolveVehicleColor({busType:'CNG AC (12 mtr)'} as any).background,'#0077B6');
-  assert.equal(resolveVehicleColor({busType:'EV DEVI AC (9 mtr)'} as any).background,'#90EE90');
-  assert.equal(resolveVehicleColor({busType:'CNG AC (12 mtr)',serviceColor:'#FF0000',fleetColorSource:'upstream-api'} as any).background,'#FF0000');
-  assert.equal(defaultBusCategoryColor('EV AC (12 mtr)'),null);
-});
-
-test('routes 772 and 741 use the CNG AC blue display fallback when per-vehicle colour is unavailable',()=>{
-  assert.equal(routeCategoryColor('772',null),BUS_CATEGORY_MARKER_COLORS.CNG_AC);
-  assert.equal(routeCategoryColor(null,'741 UP'),BUS_CATEGORY_MARKER_COLORS.CNG_AC);
-  assert.equal(resolveVehicleColor({routeId:'772',routeShortName:'772',busType:'Unknown'} as any).background,BUS_CATEGORY_MARKER_COLORS.CNG_AC);
-  assert.equal(resolveVehicleColor({routeId:'route-741',routeShortName:'741',busType:'CNG NonAC (12 mtr)'} as any).background,BUS_CATEGORY_MARKER_COLORS.CNG_AC);
-  assert.equal(routeCategoryColor('773',null),null);
-  // Explicit per-vehicle API colours continue to take priority over inferred route category.
-  assert.equal(resolveVehicleColor({routeShortName:'772',serviceColor:'#FDBA74',fleetColorSource:'upstream-api'} as any).background,'#FDBA74');
-});
-
-test('routes 801 and 801STL default to CNG Non-AC orange, even if fleet metadata says CNG AC',()=>{
-  assert.equal(routeCategoryColor('801',null),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
-  assert.equal(routeCategoryColor(null,'801 - Inderlok - IGI Airport'),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
-  assert.equal(routeCategoryColor(null,'801STL'),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
-  assert.equal(routeCategoryColor('route-801STL-UP',null),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
-  assert.equal(resolveVehicleColor({routeId:'801',routeShortName:'801',busType:'CNG AC (12 mtr)'} as any).background,BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
-  assert.equal(resolveVehicleColor({routeId:'route-801STL',routeShortName:'801STL',busType:'CNG AC (12 mtr)'} as any).background,BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC);
-  assert.equal(routeCategoryColor('1801',null),null);
-  assert.equal(routeCategoryColor('8012',null),null);
-  // An explicitly provided per-vehicle colour remains authoritative.
-  assert.equal(resolveVehicleColor({routeShortName:'801',serviceColor:'#0077B6',fleetColorSource:'upstream-api'} as any).background,'#0077B6');
 });
