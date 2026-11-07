@@ -7,6 +7,10 @@ import {
   resolveEvidenceBackedColor,
   summarizeRouteLivery,
   classifyFleetTypeFromRegistration,
+  classifyOperatorType,
+  classifyBusType,
+  resolveFleetCategoryColor,
+  BUS_CATEGORY_MARKER_COLORS,
   scanEntities,
   extractColorsByVehicle,
   parseColorFieldSpec
@@ -159,4 +163,24 @@ test('physical colour prefers the upstream API and uses only an exact verified l
   assert.equal(resolveEvidenceBackedColor('orange','#2563EB'),'#2563EB');
   assert.equal(resolveEvidenceBackedColor(null,'blue'),null);
   assert.equal(resolveEvidenceBackedColor(null,null),null);
+});
+
+test('operator and bus class independently determine the category marker colour', () => {
+  assert.equal(classifyOperatorType('DTC'), 'dtc');
+  assert.equal(classifyOperatorType('DIMTS'), 'cluster');
+  assert.equal(classifyOperatorType('DOT'), 'cluster');
+  assert.equal(classifyOperatorType(null, 'DL1PD4080'), 'dtc');
+  assert.equal(classifyOperatorType(null, 'vehicle-unknown'), 'unknown');
+
+  assert.deepEqual(classifyBusType('CNG NonAC (12 mtr)'), { fuelType: 'cng', airConditioned: false });
+  assert.deepEqual(classifyBusType('CNG AC (12 mtr)'), { fuelType: 'cng', airConditioned: true });
+  assert.deepEqual(classifyBusType('EV AC (12 mtr)'), { fuelType: 'electric', airConditioned: true });
+
+  assert.equal(resolveFleetCategoryColor('dtc', 'CNG NonAC (12 mtr)'), BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC);
+  assert.equal(resolveFleetCategoryColor('dtc', 'CNG AC (12 mtr)'), BUS_CATEGORY_MARKER_COLORS.DTC_AC);
+  assert.equal(resolveFleetCategoryColor('cluster', 'CNG NonAC (12 mtr)'), BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC);
+  assert.equal(resolveFleetCategoryColor('cluster', 'CNG AC (12 mtr)'), BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
+  assert.equal(resolveFleetCategoryColor('cluster', 'EV AC (12 mtr)'), BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
+  assert.equal(resolveFleetCategoryColor('unknown', 'CNG AC (12 mtr)'), null);
+  assert.equal(resolveFleetCategoryColor('cluster', 'Unknown'), null);
 });
