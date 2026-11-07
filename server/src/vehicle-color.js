@@ -33,6 +33,56 @@ export function classifyFleetTypeFromRegistration(...values) {
   return {serviceType:'unknown',busType:'Unknown'};
 }
 
+
+export const BUS_CATEGORY_MARKER_COLORS = Object.freeze({
+  DTC_NON_AC: '#15803D',
+  DTC_AC: '#C62828',
+  CLUSTER_NON_AC: '#EA580C',
+  CLUSTER_AC: '#1565C0'
+});
+
+export function classifyOperatorType(agencyId, ...identifiers) {
+  const agency = String(agencyId ?? '').trim().toUpperCase();
+  if (agency === 'DTC') return 'dtc';
+  if (agency === 'DIMTS' || agency === 'DOT' || agency === 'CLUSTER') return 'cluster';
+  const values = identifiers.map(value =>
+    String(value ?? '').toUpperCase().replace(/[-_\\s]/g, '')
+  );
+  const knownDtc = value =>
+    value.startsWith('DL51EV') || value.startsWith('DL51GD') ||
+    ['DL1GD','DL2GD','DL5GD','DL7GD','DL11GD','DL12GD','DL13GD',
+     'DL3EV','DL6EV','DL8EV','DL9EV','DL10EV',
+     'DL1PB','DL1PC','DL1PD','DL1PE'].some(prefix => value.startsWith(prefix));
+  return values.some(knownDtc) ? 'dtc' : 'unknown';
+}
+
+export function classifyBusType(busType) {
+  const type = String(busType ?? '').trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\\s+/g, ' ');
+  if (/\\bCNG\\b/.test(type) && /\\bNON\\s*AC\\b/.test(type)) {
+    return { fuelType: 'cng', airConditioned: false };
+  }
+  if (/\\bCNG\\b/.test(type) && /\\bAC\\b/.test(type)) {
+    return { fuelType: 'cng', airConditioned: true };
+  }
+  if (/\\bEV\\b/.test(type) && /\\bAC\\b/.test(type)) {
+    return { fuelType: 'electric', airConditioned: true };
+  }
+  return { fuelType: 'unknown', airConditioned: null };
+}
+
+export function resolveFleetCategoryColor(operatorType, busType) {
+  const operator = String(operatorType ?? '').trim().toLowerCase();
+  const { fuelType, airConditioned } = classifyBusType(busType);
+  if (airConditioned === null || fuelType === 'unknown') return null;
+  if (operator === 'dtc') {
+    return airConditioned ? BUS_CATEGORY_MARKER_COLORS.DTC_AC : BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC;
+  }
+  if (operator === 'cluster') {
+    return airConditioned ? BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC : BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC;
+  }
+  return null;
+}
+
 // Physical-livery summaries include only exact per-vehicle upstream colours or reviewed records.
 // Route colours, registration families and fleet/service categories are not vehicle-paint evidence.
 export function summarizeRouteLivery(vehicles = []) {
