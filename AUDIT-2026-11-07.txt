@@ -224,5 +224,5 @@ LIVE DEPLOYMENT CHECK — 7 NOVEMBER 2026
 - The connected Render service still loads 2,403 old static routes. The uploaded 2,554-route bus archive has NOT been imported into Neon; current database labels are therefore unchanged by this code deployment.
 - The uploaded bus archive covers 947 of 996 distinct live route IDs in the measured 24-hour sample (95.08%). 49 distinct live route IDs are not in this archive. The 90% protected-import refusal threshold is passed, but the result remains partial. Do not call the archive complete coverage.
 - The Metro archive remains unimported because its calendar expired on 31 December 2025.
-- The user asked for a plain-text-only repository style. The main branch has no .md files; six real operating/recovery guides are retained as .txt. The previous audit.md containing an explicit Codex reference was removed.
+- The project notes are kept as plain-text files. Six operating and recovery guides remain in .txt format, and the older internal review note was removed.
 - No direct Neon static-feed replacement or data wipe was performed in this follow-up.
