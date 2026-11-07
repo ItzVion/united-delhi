@@ -3,6 +3,9 @@ GTFS NETWORK DATA
 Static DTC bus data is maintained from the reviewed ZIP committed at:
 server/data/delhi_buses_static_gtfs_v1.zip
 
+The committed archive must match this reviewed SHA-256:
+b5940afdaf6154880ec5652fd3e8465dd9183b68477c7c71a287685e0ef91ff8
+
 Automated maintenance
 - GitHub Actions runs on every push to main and every six hours.
 - The ensureDtcStaticData function validates the archive, computes its SHA-256, checks route/stop/link counts and fingerprints the actual Neon rows.
