@@ -102,3 +102,13 @@ export function inspectGtfsServiceCoverage({
     invalidExceptionRows: (Array.isArray(calendarDateRows) ? calendarDateRows.length : 0) - exceptions.length,
   };
 }
+
+export function publicGtfsRouteNames(row = {}) {
+  const value = input => {
+    const text = String(input ?? '').trim();
+    return text || null;
+  };
+  const shortName = value(row?.route_short_name);
+  const longName = value(row?.route_long_name) || shortName;
+  return { shortName, longName };
+}
