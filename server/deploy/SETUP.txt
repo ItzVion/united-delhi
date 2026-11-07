@@ -62,5 +62,5 @@ Keep PostgreSQL port 5432 private; never expose it publicly. Do not enable UFW w
 
 RECOVERY SAFETY NOTE
 - The legacy server/sql/001_reset_and_schema.sql has been neutralized; it now raises an exception instead of deleting tables.
-- Read server/deploy/DATABASE-RECOVERY.md and server/deploy/VPS-REBUILD.md before database recovery or VPS rebuild.
+- Read server/deploy/DATABASE-RECOVERY.txt and server/deploy/VPS-REBUILD.txt before database recovery or VPS rebuild.
 - The bootstrap keeps AUTODEPLOY_ENABLED=0, WEB_DEPLOY_ENABLED=0 and ANDROID_BUILD_ENABLED=0 by default. Enable each only after manual verification.
