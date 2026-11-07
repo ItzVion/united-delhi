@@ -3,7 +3,7 @@ import { createInflateRaw } from 'node:zlib';
 import { Readable } from 'node:stream';
 import fs from 'node:fs/promises';
 import { resolveServerPath } from '../src/runtime-paths.js';
-import { sha256Hex, sourceWithSha256, sourceHasSha256, inspectGtfsServiceCoverage } from '../src/gtfs-feed-utils.js';
+import { sha256Hex, sourceWithSha256, sourceHasSha256, inspectGtfsServiceCoverage, publicGtfsRouteNames } from '../src/gtfs-feed-utils.js';
 import { resolveGtfsRouteColors } from '../src/route-colors.js';
 import { snapshotStaticTables } from '../src/static-import.js';
 
@@ -272,7 +272,8 @@ async function main() {
       for await (const row of rows(zip, 'routes.txt')) {
         const routeId = clean(row.route_id, 160);
         if (!routeId) continue;
-        const shortName = clean(row.route_short_name, 160);
+        const labels = publicGtfsRouteNames(row);
+        const shortName = clean(labels.shortName, 160);
         const colors = resolveGtfsRouteColors({
           routeId,
           shortName,
@@ -283,11 +284,20 @@ async function main() {
           route_id: routeId,
           agency_id: clean(row.agency_id, 160),
           short_name: shortName,
-          long_name: clean(row.route_desc || row.route_long_name, 500),
+          long_name: clean(labels.longName, 500),
           route_color: colors.route_color,
           route_text_color: colors.route_text_color
         });
       }
+
+      const namelessRoutes = routes.filter(route => !route.short_name && !route.long_name).length;
+      const routesWithoutShortName = routes.filter(route => !route.short_name).length;
+      if (namelessRoutes > 0) {
+        throw new Error('DTC static feed contains routes without any public name; refusing replacement.');
+      }
+      console.log('DTC route labels: ' + routes.length + ' routes; ' +
+        (routes.length - routesWithoutShortName) + ' short names; ' +
+        (routes.length - namelessRoutes) + ' public names.');
 
       const stops = [];
       for await (const row of rows(zip, 'stops.txt')) {
@@ -312,6 +322,33 @@ async function main() {
       }
 
       const routeIds = new Set(routes.map((x) => x.route_id));
+      try {
+        const liveRouteCheck = (await client.query(`
+          WITH incoming AS (SELECT UNNEST($1::text[]) AS route_id),
+          active AS (
+            SELECT DISTINCT route_id FROM vehicle_positions
+            WHERE observed_at > NOW() - INTERVAL '24 hours'
+              AND route_id IS NOT NULL AND BTRIM(route_id) <> ''
+          )
+          SELECT COUNT(*)::int AS live_routes,
+            COUNT(*) FILTER (WHERE incoming.route_id IS NOT NULL)::int AS matched_routes
+          FROM active LEFT JOIN incoming USING (route_id)
+        `, [[...routeIds]])).rows[0] || {};
+        const liveRoutes = Number(liveRouteCheck.live_routes) || 0;
+        const matchedRoutes = Number(liveRouteCheck.matched_routes) || 0;
+        const coverage = liveRoutes ? matchedRoutes / liveRoutes : 1;
+        console.log('Live route ID coverage for this archive: ' + matchedRoutes + '/' +
+          liveRoutes + ' (' + (coverage * 100).toFixed(2) + '%).');
+        if (liveRoutes >= 100 && coverage < 0.90) {
+          throw new Error('DTC static feed route IDs match less than 90% of recent live route IDs; refusing replacement.');
+        }
+        if (liveRoutes >= 100 && coverage < 0.98) {
+          console.warn('Some recent live route IDs are absent from this static archive; those vehicles may still need a later static-feed refresh.');
+        }
+      } catch (error) {
+        if (String(error?.message || '').includes('match less than 90%')) throw error;
+        console.warn('Live route-ID coverage could not be checked: ' + (error?.message || error));
+      }
       const stopIds = new Set(stops.map((x) => x.stop_id));
       const links = new Map();
       for await (const row of rows(zip, 'stop_times.txt')) {
