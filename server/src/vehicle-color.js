@@ -57,14 +57,14 @@ export function classifyOperatorType(agencyId, ...identifiers) {
 }
 
 export function classifyBusType(busType) {
-  const type = String(busType ?? '').trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\\s+/g, ' ');
-  if (/\\bCNG\\b/.test(type) && /\\bNON\\s*AC\\b/.test(type)) {
+  const type = String(busType ?? '').trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+  if (/\bCNG\b/.test(type) && /\bNON\s*AC\b/.test(type)) {
     return { fuelType: 'cng', airConditioned: false };
   }
-  if (/\\bCNG\\b/.test(type) && /\\bAC\\b/.test(type)) {
+  if (/\bCNG\b/.test(type) && /\bAC\b/.test(type)) {
     return { fuelType: 'cng', airConditioned: true };
   }
-  if (/\\bEV\\b/.test(type) && /\\bAC\\b/.test(type)) {
+  if (/\bEV\b/.test(type) && /\bAC\b/.test(type)) {
     return { fuelType: 'electric', airConditioned: true };
   }
   return { fuelType: 'unknown', airConditioned: null };
