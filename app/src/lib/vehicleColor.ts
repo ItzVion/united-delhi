@@ -1,21 +1,23 @@
 import type { Vehicle, Arrival } from '../api/client';
 
 export type VehicleColor={background:string;text:string};
-type ApiVehicleColor={serviceColor?:string|null;busType?:string|null;fleetColorSource?:string|null;routeId?:string|null;routeShortName?:string|null};
+type ApiVehicleColor={
+  serviceColor?:string|null;
+  busType?:string|null;
+  fleetColorSource?:string|null;
+  operatorType?:'dtc'|'cluster'|'unknown'|null;
+  fuelType?:'cng'|'electric'|'unknown'|null;
+  airConditioned?:boolean|null;
+  markerColor?:string|null;
+  markerColorSource?:string|null;
+};
 const UNKNOWN_BUS_MARKER_COLOR='#64748B';
-// Display defaults by service category; these are not claims about verified physical paint.
 export const BUS_CATEGORY_MARKER_COLORS={
-  CNG_NON_AC:'#FDBA74', // light orange
-  CNG_AC:'#0077B6', // Blue Whale blue
-  EV_DEVI_AC:'#90EE90' // light green
+  DTC_NON_AC:'#15803D',
+  DTC_AC:'#C62828',
+  CLUSTER_NON_AC:'#EA5800',
+  CLUSTER_AC:'#1565C0'
 } as const;
-export function defaultBusCategoryColor(busType:string|null|undefined):string|null{
-  const type=String(busType||'').trim().toUpperCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
-  if(/\bEV\b/.test(type)&&/\bDEVI\b/.test(type)&&/\bAC\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_AC;
-  if(/\bCNG\b/.test(type)&&/\bNON\s*AC\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC;
-  if(/\bCNG\b/.test(type)&&/\bAC\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.CNG_AC;
-  return null;
-}
 
 function validApiColor(value:string|null|undefined):string|null{
   const color=String(value??'').trim();
@@ -25,6 +27,33 @@ function evidencedColor(v:ApiVehicleColor):string|null{
   const source=String(v.fleetColorSource||'');
   if(source!=='upstream-api'&&source!=='verified-livery-record')return null;
   return validApiColor(v.serviceColor);
+}
+function classifyBusType(busType:string|null|undefined):{fuelType:'cng'|'electric'|'unknown';airConditioned:boolean|null}{
+  const type=String(busType||'').trim().toUpperCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
+  if(/\bCNG\b/.test(type)&&/\bNON\s*AC\b/.test(type))return {fuelType:'cng',airConditioned:false};
+  if(/\bCNG\b/.test(type)&&/\bAC\b/.test(type))return {fuelType:'cng',airConditioned:true};
+  if(/\bEV\b/.test(type)&&/\bAC\b/.test(type))return {fuelType:'electric',airConditioned:true};
+  return {fuelType:'unknown',airConditioned:null};
+}
+export function defaultBusCategoryColor(operatorType:string|null|undefined,busType:string|null|undefined):string|null{
+  const {fuelType,airConditioned}=classifyBusType(busType);
+  const operator=String(operatorType||'').toLowerCase();
+  if(operator==='dtc'){
+    if(fuelType!=='cng'||airConditioned===null)return null;
+    return airConditioned?BUS_CATEGORY_MARKER_COLORS.DTC_AC:BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC;
+  }
+  if(operator==='cluster'){
+    if(airConditioned===true&&(fuelType==='cng'||fuelType==='electric'))return BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC;
+    if(airConditioned===false&&fuelType==='cng')return BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC;
+  }
+  return null;
+}
+function categoryColor(v:ApiVehicleColor):string|null{
+  if(String(v.markerColorSource||'')==='fleet-category'){
+    const marker=validApiColor(v.markerColor);
+    if(marker)return marker;
+  }
+  return defaultBusCategoryColor(v.operatorType,v.busType);
 }
 function textFor(bg:string){
   const h=bg.slice(1);
@@ -54,24 +83,9 @@ export function hasApiVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):boolean{
 export function hasEvidenceBackedVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):boolean{
   return evidencedColor(v as ApiVehicleColor)!==null;
 }
-// Route-level display defaults are fallbacks only; explicit per-vehicle API/reviewed
-// colour evidence takes priority. 801 and 801STL default to CNG Non-AC orange;
-// 772 and 741 default to CNG AC blue.
-export function routeCategoryColor(routeId?:string|null,routeShortName?:string|null):string|null{
-  const candidates=[routeShortName,routeId].map(value=>String(value??'').trim().toUpperCase()).filter(Boolean);
-  const isCngNonAcRoute=candidates.some(value=>
-    /^(?:ROUTE\s*[:#-]?\s*)?(?:D[-\s]?)?0*(?:801STL|801)(?=$|[\s\-_/|:])/i.test(value)
-  );
-  if(isCngNonAcRoute)return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC;
-  const isCngAcRoute=candidates.some(value=>
-    /^(?:ROUTE\s*[:#-]?\s*)?(?:D[-\s]?)?0*(?:772|741)(?=$|[\s\-_/|:])/i.test(value)
-  );
-  return isCngAcRoute?BUS_CATEGORY_MARKER_COLORS.CNG_AC:null;
-}
 export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{
-  const color=evidencedColor(v as ApiVehicleColor);
-  const routeColor=routeCategoryColor((v as any).routeId,(v as any).routeShortName);
-  const categoryColor=defaultBusCategoryColor(v.busType);
-  const background=color||routeColor||categoryColor||UNKNOWN_BUS_MARKER_COLOR;
+  const colour=evidencedColor(v as ApiVehicleColor);
+  const category=categoryColor(v as ApiVehicleColor);
+  const background=colour||category||UNKNOWN_BUS_MARKER_COLOR;
   return {background,text:textFor(background)};
 }
