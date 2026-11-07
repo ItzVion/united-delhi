@@ -11,7 +11,7 @@ import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
-import { fleetLegendRows, hasEvidenceBackedVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
+import { BUS_CATEGORY_MARKER_COLORS, fleetLegendRows, hasEvidenceBackedVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
 import { confirmLocationUse } from '../lib/locationConsent';
 import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 
@@ -50,7 +50,14 @@ export default function HomeScreen(){
   const vehiclesLoadingRef=useRef(false);
   const vehiclesRefreshPendingRef=useRef(false);
   const loadVehiclesRef=useRef<()=>void>(()=>{});
-const legendRows = [...fleetLegendRows(vehicles), { key:'unknown', label:'Unknown / no verified colour', color:UNKNOWN_BUS_MARKER_COLOR }];
+const legendRows = [
+    ...fleetLegendRows(vehicles),
+    { key:'dtc-non-ac', label:'DTC CNG non-AC · category marker', color:BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC },
+    { key:'dtc-ac', label:'DTC CNG AC · category marker', color:BUS_CATEGORY_MARKER_COLORS.DTC_AC },
+    { key:'cluster-non-ac', label:'DIMTS / Cluster CNG non-AC · category marker', color:BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC },
+    { key:'cluster-ac', label:'DIMTS / Cluster AC · category marker', color:BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC },
+    { key:'unknown', label:'Unknown category · neutral marker', color:UNKNOWN_BUS_MARKER_COLOR }
+  ];
 
   const requestLocation=useCallback(async()=>{
     try{
@@ -261,7 +268,7 @@ const legendRows = [...fleetLegendRows(vehicles), { key:'unknown', label:'Unknow
         <Modal visible={legendOpen} transparent animationType="fade" onRequestClose={()=>setLegendOpen(false)}>
           <Pressable style={styles.legendOverlay} onPress={()=>setLegendOpen(false)}>
             <Pressable style={styles.legendDialog} onPress={event=>event.stopPropagation()}>
-              <Text style={styles.legendTitle}>Bus Color Legend</Text>
+              <Text style={styles.legendTitle}>Bus Colour Legend</Text>
               <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Colour source</Text></View>
               {legendRows.map(row=><View key={row.key} style={styles.legendRow}><View style={styles.legendIcons}><View style={[styles.legendBus,{backgroundColor:row.color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View></View><Text style={styles.legendType}>{row.label}</Text></View>)}
               <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Understood!</Text></Pressable>
