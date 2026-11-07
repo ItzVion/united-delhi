@@ -15,7 +15,7 @@ import { sha256Hex, sourceHasSha256 } from './gtfs-feed-utils.js';
 import {syncMetroStatic} from './metro-sync.js';
 import {createRealtimeRequest} from './realtime-provider.js';
 import {publicRouteName} from './route-display.js';
-import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,classifyFleetTypeFromRegistration,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
+import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,classifyFleetTypeFromRegistration,classifyOperatorType,classifyBusType,resolveFleetCategoryColor,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
 const COLOR_FIELD=parseColorFieldSpec(process.env.OTD_COLOR_FIELD);
 
 const {Pool}=pg,app=express();
@@ -77,7 +77,12 @@ async function samePhysicalStopIds(stopId){
 
 const UNKNOWN_BUS_MARKER_COLOR='#64748B';
 const classifyFleet=(id,...aliases)=>classifyFleetTypeFromRegistration(id,...aliases);
-const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>classifyFleet(id,licensePlate,vehicleLabel);
+const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>{
+ const classified=classifyFleet(id,licensePlate,vehicleLabel);
+ const operatorType=classifyOperatorType(agency,id,licensePlate,vehicleLabel);
+ const operator=operatorType==='dtc'?'DTC':operatorType==='cluster'?'DIMTS / Cluster':null;
+ return {...classified,operator,agencyId:agency||null,operatorType};
+};
 const cache={vehicles:[],status:HAS_OTD_API_KEY?'STARTING':'UNAVAILABLE',reason:HAS_OTD_API_KEY?'United Delhi API is starting':'OTD_API_KEY is not configured',fetchedAt:null,source:'memory',persistedAt:null};
 let refreshing=null,poll=null,routeMetaLoadedAt=0,persistPromise=null,lastPersistAt=0,dtcAutoImportRunning=false;
 let staticImportRunning=null;
@@ -120,23 +125,31 @@ async function loadFleetRegistry(force=false){
 }
 async function registerFleetVehicles(vehicles){
  if(!pool||!vehicles.length)return;
- const seen=new Set(),missing=[];
+ const seen=new Set(),updates=[];
  for(const vehicle of vehicles){
   const vehicleId=String(vehicle.id||vehicle.vehicleLabel||vehicle.licensePlate||'').trim();
   const key=normalizeVehicleKey(vehicleId);
-  if(!vehicleId||!key||seen.has(key)||fleetRegistry.has(key))continue;
+  if(!vehicleId||!key||seen.has(key))continue;
   seen.add(key);
-  const initial=classifyFleet(vehicleId,vehicle.licensePlate,vehicle.vehicleLabel);
-  missing.push({vehicleId,busType:initial.busType,serviceType:initial.serviceType,colorHex:UNKNOWN_BUS_MARKER_COLOR});
+  const current=fleetRegistry.get(key);
+  if(current?.source==='manual')continue;
+  const next=classifyFleet(vehicleId,vehicle.licensePlate,vehicle.vehicleLabel);
+  if(next.busType==='Unknown')continue;
+  if(current&&current.busType!=='Unknown'&&current.busType===next.busType&&current.serviceType===next.serviceType)continue;
+  updates.push({vehicleId,busType:next.busType,serviceType:next.serviceType,colorHex:UNKNOWN_BUS_MARKER_COLOR});
  }
- for(let i=0;i<missing.length;i+=250){
-  const chunk=missing.slice(i,i+250),values=[];
+ for(let i=0;i<updates.length;i+=250){
+  const chunk=updates.slice(i,i+250),values=[];
   const placeholders=chunk.map((row,j)=>{
-   const b=j*5;values.push(row.vehicleId,row.busType,row.serviceType,row.colorHex,'auto');
-   return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+',$'+(b+5)+',NOW())';
+   const b=j*4;values.push(row.vehicleId,row.busType,row.serviceType,row.colorHex);
+   return '('+'$'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+',\'auto\',NOW())';
   }).join(',');
-  const inserted=(await pool.query('INSERT INTO vehicle_fleet_registry(vehicle_id,bus_type,service_type,color_hex,source,updated_at) VALUES '+placeholders+' ON CONFLICT(vehicle_id) DO NOTHING RETURNING vehicle_id,bus_type,service_type,color_hex,source,updated_at',values)).rows;
-  for(const row of inserted)rememberFleetRow(row);
+  const saved=(await pool.query(
+   'INSERT INTO vehicle_fleet_registry(vehicle_id,bus_type,service_type,color_hex,source,updated_at) VALUES '+placeholders+
+   " ON CONFLICT(vehicle_id) DO UPDATE SET bus_type=EXCLUDED.bus_type,service_type=EXCLUDED.service_type,updated_at=NOW() WHERE vehicle_fleet_registry.source='auto' AND EXCLUDED.bus_type<>'Unknown' RETURNING vehicle_id,bus_type,service_type,color_hex,source,updated_at",
+   values
+  )).rows;
+  for(const row of saved)rememberFleetRow(row);
  }
 }
 const applyFleetRegistry=v=>{
@@ -144,15 +157,25 @@ const applyFleetRegistry=v=>{
  const priorSource=String(v?.fleetColorSource||'');
  const upstreamColor=(!priorSource||priorSource==='upstream-api')?apiVehicleColorOnly(v?.serviceColor):null;
  const verified=vehicleIdentityKeys(v).map(key=>verifiedLiveryByKey.get(key)).find(Boolean)||null;
- const vehicle={...v,...(row?{busType:row.busType,serviceType:row.serviceType}:{})};
+ const busType=row?.busType&&row.busType!=='Unknown'?row.busType:v.busType||'Unknown';
+ const serviceType=row?.serviceType&&row.serviceType!=='unknown'?row.serviceType:v.serviceType||'unknown';
+ const operatorType=v.operatorType||classifyOperatorType(v.agencyId||v.operator,v.id,v.licensePlate,v.vehicleLabel);
+ const vehicle={...v,busType,serviceType,operatorType};
+ const category=classifyBusType(busType);
+ const markerColor=resolveFleetCategoryColor(operatorType,busType);
  const serviceColor=resolveEvidenceBackedColor(upstreamColor,verified?.colorHex);
  const fleetColorSource=upstreamColor?'upstream-api':verified?'verified-livery-record':'not-provided-by-realtime-feed';
- return {...vehicle,serviceColor,fleetColorSource,
+ return {...vehicle,
+  fuelType:category.fuelType,
+  airConditioned:category.airConditioned,
+  markerColor,
+  markerColorSource:markerColor?'fleet-category':'unclassified',
+  serviceColor,fleetColorSource,
   ...(verified?{liveryVerification:{status:'verified',colorName:verified.colorName||null,source:verified.sourceLabel||null,evidenceUrl:verified.evidenceUrl||null,verifiedAt:verified.verifiedAt}}:{})};
 };
 
 async function loadRouteMeta(){if(!pool)return;try{const rows=(await pool.query(`SELECT r.route_id,r.agency_id,r.short_name,r.long_name,r.route_color,r.route_text_color,first_stop.name AS from_stop,last_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.stop_id ASC LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true`)).rows;routeMeta.clear();for(const x of rows)routeMeta.set(String(x.route_id),x);routeMetaLoadedAt=Date.now();console.log('Loaded route metadata: '+routeMeta.size+' routes.')}catch(e){console.error('Route metadata load failed:',e?.message||e)}}
-const applyRouteMeta=v=>{const x=routeMeta.get(String(v.routeId||''));const svc=service(v.id,x?.agency_id,x?.short_name,v.routeId,v.licensePlate,v.vehicleLabel);return applyFleetRegistry({...v,routeShortName:publicRouteName(x,v.routeShortName||v.routeId),routeColor:x?.route_color||null,routeTextColor:x?.route_text_color||null,routeLongName:x?.long_name||null,fromStop:x?.from_stop||null,toStop:x?.to_stop||null,operator:x?.agency_id||null,...svc})};
+const applyRouteMeta=v=>{const x=routeMeta.get(String(v.routeId||''));const svc=service(v.id,x?.agency_id,x?.short_name,v.routeId,v.licensePlate,v.vehicleLabel);return applyFleetRegistry({...v,routeShortName:publicRouteName(x,v.routeShortName||v.routeId),routeColor:x?.route_color||null,routeTextColor:x?.route_text_color||null,routeLongName:x?.long_name||null,fromStop:x?.from_stop||null,toStop:x?.to_stop||null,...svc})};
 const busLiveryForRoute=routeId=>{
  const id=String(routeId||'').trim();
  if(!id)return {};
@@ -447,7 +470,7 @@ async function fetchLive(){
 async function enrich(vs){
  if(!pool||!vs.length)return vs.map(v=>{const svc=service(v.id,null,v.routeShortName,v.routeId,v.licensePlate,v.vehicleLabel);return applyFleetRegistry({...v,routeColor:null,routeLongName:null,...svc})});
  const ids=[...new Set(vs.map(v=>v.routeId).filter(Boolean))];if(!ids.length)return vs.map(v=>{const svc=service(v.id,null,v.routeShortName,v.routeId);return applyFleetRegistry({...v,routeColor:null,routeLongName:null,...svc})});
- try{const rows=(await pool.query('SELECT route_id,agency_id,short_name,long_name,route_color,route_text_color FROM routes WHERE route_id=ANY($1::text[])',[ids])).rows;const map=new Map(rows.map(x=>[String(x.route_id),x]));return vs.map(v=>{const x=map.get(String(v.routeId||'')),svc=service(v.id,x?.agency_id,x?.short_name,v.routeId);return applyFleetRegistry({...v,routeShortName:publicRouteName(x,v.routeId),routeColor:x?.route_color||null,routeTextColor:x?.route_text_color||null,routeLongName:x?.long_name||null,operator:x?.agency_id||null,...svc})})}catch{return vs.map(v=>{const svc=service(v.id,null,v.routeShortName,v.routeId);return applyFleetRegistry({...v,routeShortName:v.routeId||null,routeColor:null,routeTextColor:null,routeLongName:null,operator:null,...svc})})}
+ try{const rows=(await pool.query('SELECT route_id,agency_id,short_name,long_name,route_color,route_text_color FROM routes WHERE route_id=ANY($1::text[])',[ids])).rows;const map=new Map(rows.map(x=>[String(x.route_id),x]));return vs.map(v=>{const x=map.get(String(v.routeId||'')),svc=service(v.id,x?.agency_id,x?.short_name,v.routeId);return applyFleetRegistry({...v,routeShortName:publicRouteName(x,v.routeId),routeColor:x?.route_color||null,routeTextColor:x?.route_text_color||null,routeLongName:x?.long_name||null,...svc})})}catch{return vs.map(v=>{const svc=service(v.id,null,v.routeShortName,v.routeId);return applyFleetRegistry({...v,routeShortName:v.routeId||null,routeColor:null,routeTextColor:null,routeLongName:null,...svc})})}
 }
 async function persist(vs){if(!pool||!vs.length)return false;const c=await pool.connect();try{await c.query('BEGIN');await c.query("SET LOCAL statement_timeout='10000'");for(let i=0;i<Math.min(vs.length,5000);i+=250){const chunk=vs.slice(i,i+250),values=[];const p=chunk.map((v,j)=>{const b=j*8;values.push(v.id,v.routeId,v.tripId,v.stopId,v.latitude,v.longitude,v.bearing,v.observedAt);return '($'+(b+1)+',$'+(b+2)+',$'+(b+3)+',$'+(b+4)+',$'+(b+5)+',$'+(b+6)+',$'+(b+7)+',$'+(b+8)+',NOW())'}).join(',');await c.query('INSERT INTO vehicle_positions(vehicle_id,route_id,trip_id,stop_id,latitude,longitude,bearing,observed_at,updated_at) VALUES '+p+' ON CONFLICT(vehicle_id) DO UPDATE SET route_id=EXCLUDED.route_id,trip_id=EXCLUDED.trip_id,stop_id=EXCLUDED.stop_id,latitude=EXCLUDED.latitude,longitude=EXCLUDED.longitude,bearing=EXCLUDED.bearing,observed_at=EXCLUDED.observed_at,updated_at=NOW()',values)}await c.query("DELETE FROM vehicle_positions WHERE observed_at < NOW() - INTERVAL '24 hours'");await c.query('COMMIT');return true}catch(e){await c.query('ROLLBACK').catch(()=>{});console.error('Vehicle persistence failed:',e.message);return false}finally{c.release()}}
 
@@ -569,7 +592,7 @@ app.get('/api/stops/:id',async(q,r)=>{
   r.status(500).json({status:'ERROR',reason:'Failed to load stop'});
  }
 });
-app.get('/api/stops/:id/arrivals',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',arrivals:[],reason:'Database is not configured'});try{const st=(await pool.query('SELECT latitude,longitude FROM stops WHERE stop_id=$1',[str(q.params.id)])).rows[0];if(!st)return r.status(404).json({status:'NOT_FOUND',arrivals:[],reason:'Stop not found'});const a=cache.vehicles.map(v=>({...v,distanceMeters:Math.round(dist(Number(st.latitude),Number(st.longitude),v.latitude,v.longitude))})).filter(v=>v.distanceMeters<=2500).sort((a,b)=>a.distanceMeters-b.distanceMeters).slice(0,20).map(v=>({vehicleId:v.id,routeId:v.routeId,routeShortName:v.routeShortName||v.routeId||null,routeName:v.routeShortName||v.routeId||'Bus',routeColor:v.routeColor,routeTextColor:v.routeTextColor,serviceType:v.serviceType,serviceColor:v.serviceColor,busType:v.busType,fleetColorSource:v.fleetColorSource,distanceMeters:v.distanceMeters,observedAt:v.observedAt,observedAgeSeconds:Math.max(0,Math.round((Date.now()-Date.parse(v.observedAt))/1000)),toStop:v.toStop||null,tripHeadsign:v.tripHeadsign||null}));r.json({status:a.length?'OK':'UNAVAILABLE',arrivals:a,reason:a.length?null:'No nearby live buses are available right now.'})}catch{r.status(500).json({status:'ERROR',arrivals:[],reason:'Failed to load arrivals'})}});
+app.get('/api/stops/:id/arrivals',async(q,r)=>{if(!pool)return r.status(503).json({status:'UNAVAILABLE',arrivals:[],reason:'Database is not configured'});try{const st=(await pool.query('SELECT latitude,longitude FROM stops WHERE stop_id=$1',[str(q.params.id)])).rows[0];if(!st)return r.status(404).json({status:'NOT_FOUND',arrivals:[],reason:'Stop not found'});const a=cache.vehicles.map(v=>({...v,distanceMeters:Math.round(dist(Number(st.latitude),Number(st.longitude),v.latitude,v.longitude))})).filter(v=>v.distanceMeters<=2500).sort((a,b)=>a.distanceMeters-b.distanceMeters).slice(0,20).map(v=>({vehicleId:v.id,routeId:v.routeId,routeShortName:v.routeShortName||v.routeId||null,routeName:v.routeShortName||v.routeId||'Bus',routeColor:v.routeColor,routeTextColor:v.routeTextColor,serviceType:v.serviceType,serviceColor:v.serviceColor,busType:v.busType,fleetColorSource:v.fleetColorSource,operator:v.operator,agencyId:v.agencyId,operatorType:v.operatorType,fuelType:v.fuelType,airConditioned:v.airConditioned,markerColor:v.markerColor,markerColorSource:v.markerColorSource,distanceMeters:v.distanceMeters,observedAt:v.observedAt,observedAgeSeconds:Math.max(0,Math.round((Date.now()-Date.parse(v.observedAt))/1000)),toStop:v.toStop||null,tripHeadsign:v.tripHeadsign||null}));r.json({status:a.length?'OK':'UNAVAILABLE',arrivals:a,reason:a.length?null:'No nearby live buses are available right now.'})}catch{r.status(500).json({status:'ERROR',arrivals:[],reason:'Failed to load arrivals'})}});
 app.post('/api/stops/nearby',async(q,r)=>{
  if(!pool)return r.status(503).json({status:'UNAVAILABLE',stops:[],reason:'Database is not configured'});
  const lat=coord(q.body?.lat,-90,90),lon=coord(q.body?.lon,-180,180),limit=Math.min(50,Math.max(1,Number(q.body?.limit)||30));
