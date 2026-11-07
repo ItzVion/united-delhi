@@ -215,3 +215,14 @@ Production data and validation status
 - The uploaded Metro archive has not been imported because its calendar is expired.
 - Render's deploy-time check/test pipeline and Vercel's deployment state must be checked after the final source commits. Do not treat a commit as proof that a production deploy succeeded.
 - No SQL reset or direct Neon mutation was executed as part of this follow-up.
+
+
+LIVE DEPLOYMENT CHECK — 7 NOVEMBER 2026
+- Render deployment for commit ad5e3a3eb57df2d25ef14e27221aa4a222cd29cd is LIVE. Startup logs confirm the API is listening, database schema verified, fleet registry loaded, route metadata loaded, cached positions loaded, and the Delhi OTD feed continues decoding vehicles.
+- Vercel deployment for commit a8591908cdb6bfbd440a2145745622367f56977f is READY. TypeScript check and Vite production build succeeded. The minified main JavaScript chunk is 573.26 kB and still triggers the 500 kB chunk-size warning.
+- The earlier Render and Vercel build failures were intermediate commits during the multi-file integration. The final deployed commits above are successful.
+- The connected Render service still loads 2,403 old static routes. The uploaded 2,554-route bus archive has NOT been imported into Neon; current database labels are therefore unchanged by this code deployment.
+- The uploaded bus archive covers 947 of 996 distinct live route IDs in the measured 24-hour sample (95.08%). 49 distinct live route IDs are not in this archive. The 90% protected-import refusal threshold is passed, but the result remains partial. Do not call the archive complete coverage.
+- The Metro archive remains unimported because its calendar expired on 31 December 2025.
+- The user asked for a plain-text-only repository style. The main branch has no .md files; six real operating/recovery guides are retained as .txt. The previous audit.md containing an explicit Codex reference was removed.
+- No direct Neon static-feed replacement or data wipe was performed in this follow-up.
