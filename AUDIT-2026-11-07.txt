@@ -226,3 +226,12 @@ LIVE DEPLOYMENT CHECK — 7 NOVEMBER 2026
 - The Metro archive remains unimported because its calendar expired on 31 December 2025.
 - The project notes are kept as plain-text files. Six operating and recovery guides remain in .txt format, and the older internal review note was removed.
 - No direct Neon static-feed replacement or data wipe was performed in this follow-up.
+
+
+FINAL VALIDATION NOTES — 7 NOVEMBER 2026
+- Render deployment ad5e3a3eb57df2d25ef14e27221aa4a222cd29cd is live. The deployment build ran npm ci, npm run check, and npm test. The exact test summary was 40 passed, 0 failed.
+- The Render npm ci log reports 4 dependency audit findings: 2 moderate and 2 high. The available log output provides only the totals, not the affected package names, paths, advisory IDs or fixed versions. No blind dependency overrides or breaking upgrades were applied. A full npm audit report is still required to identify and safely fix these findings.
+- Vercel web deployment 67c3e2bd228a032d2e240776770a360199fa1682 is READY with the operator-category help/legend copy. A later cancelled production-target build was for the Android-only source update and did not replace the last READY web deployment.
+- Android source changes include the category legend and About copy, but no APK build or device/emulator test was run in this environment.
+- The main branch contains no Markdown files and the repository review note no longer contains tool attribution. The remaining operational/recovery material is kept in plain-text files.
+- The production Neon network still has the previous 2,403-route snapshot. The 26 MB uploaded bus archive was inspected locally but could not be transferred into the authenticated Render import endpoint through the connected tool actions available in this session. No production database rows were replaced. The new archive matches 947/996 distinct live route IDs in the measured sample; 49 are still unmatched, so do not claim complete route-label coverage.
