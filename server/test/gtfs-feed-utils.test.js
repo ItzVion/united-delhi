@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  sha256Hex, sourceWithSha256, sourceHasSha256, currentGtfsDate, inspectGtfsServiceCoverage
+  sha256Hex, sourceWithSha256, sourceHasSha256, currentGtfsDate, inspectGtfsServiceCoverage, publicGtfsRouteNames
 } from '../src/gtfs-feed-utils.js';
 
 test('archive SHA-256 is stable and source metadata records exact content', () => {
@@ -55,4 +55,22 @@ test('invalid dates, inverted ranges, and invalid weekday flags are rejected', (
   assert.equal(result.status,'unknown');
   assert.equal(result.invalidBaseRows,3);
   assert.equal(result.invalidExceptionRows,1);
+});
+
+test('GTFS public route labels use route_long_name, never route_desc', () => {
+  assert.deepEqual(publicGtfsRouteNames({
+    route_short_name: 'D-018STLDOWN',
+    route_long_name: 'D-018STLDOWN',
+    route_desc: 'CGO Complex to Kushak Nallah Depot'
+  }), { shortName: 'D-018STLDOWN', longName: 'D-018STLDOWN' });
+  assert.deepEqual(publicGtfsRouteNames({
+    route_short_name: '',
+    route_long_name: 'AIRPORT-05UP',
+    route_desc: 'Azadpur to IGI Airport'
+  }), { shortName: null, longName: 'AIRPORT-05UP' });
+  assert.deepEqual(publicGtfsRouteNames({
+    route_short_name: '801STLUP',
+    route_long_name: '',
+    route_desc: 'Description is not a public route name'
+  }), { shortName: '801STLUP', longName: '801STLUP' });
 });
