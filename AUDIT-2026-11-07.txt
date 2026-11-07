@@ -85,7 +85,7 @@ GITHUB
 - Current main tree SHA: bbe66ed55975edeff996886ef0c5110656a8ea32.
 - The CI workflow is intentionally manual-only (workflow_dispatch). No Actions workflow was started for this audit, consistent with the project's preference to avoid unnecessary Actions minutes.
 - Existing test files cover route display, vehicle classification, web marker colours, GTFS parsing and API helpers. No fresh full local install/typecheck/test/build was run through the connected GitHub tools in this audit.
-- The existing audit.md records a previous app dependency audit of 15 HIGH findings and 0 critical findings (16 October 2026), in the Expo/Metro/React Native dependency tree. That result is historical, not a fresh 7 November npm audit. Re-run npm audit for app, web and server with npm registry access; do not use npm audit fix --force or downgrade Expo/React Native without compatibility review.
+- The existing the earlier repository review records a previous app dependency audit of 15 HIGH findings and 0 critical findings (16 October 2026), in the Expo/Metro/React Native dependency tree. That result is historical, not a fresh 7 November npm audit. Re-run npm audit for app, web and server with npm registry access; do not use npm audit fix --force or downgrade Expo/React Native without compatibility review.
 - Previous audit recorded web bundle size warning (570.22 kB > 500 kB). Recheck current build output and consider code splitting if still present.
 - No source secrets were found/confirmed in this audit pass, but a complete current secret-scanning run was not available. Continue keeping OTD_API_KEY, DATABASE_URL and STATIC_IMPORT_TOKEN in server-side environment variables only.
 
@@ -131,7 +131,7 @@ B. Bus colours and fleet data
 - Add a test for EV AC (12 mtr), which currently resolves to no category default.
 
 C. Legal and documentation staleness
-- legal/TERMS_OF_SERVICE.txt says "See THIRD_PARTY_NOTICES.md", but the repository tree contains legal/THIRD_PARTY_NOTICES.txt. Correct the broken reference.
+- The Terms of Service link to THIRD_PARTY_NOTICES.txt has been corrected.
 - Terms of Service effective/last-updated date is 4 October 2026; Privacy Policy is 16 October 2026. Review and align dates when the legal text is next revised.
 - The prior audit already noted legal and deployment docs can become stale as providers/data sources change. Reconcile all setup/deployment/provider statements with the current Render + Neon + Vercel + Delhi OTD architecture when editing them.
 - Legal copy is an engineering review, not legal advice.
@@ -144,7 +144,7 @@ D. Operational / UX hardening
 - Validate route planner estimates against real-world travel times and label all estimates clearly; previous project notes state planner durations are estimates.
 
 E. Test/verification gaps
-- This audit did not execute npm ci, npm audit, typecheck, test suites, web build, APK build, device/emulator tests, or a live browser smoke test. Existing historical test results in audit.md must not be represented as a fresh pass.
+- This audit did not execute npm ci, npm audit, typecheck, test suites, web build, APK build, device/emulator tests, or a live browser smoke test. Existing historical test results in the earlier repository review must not be represented as a fresh pass.
 - CI remains manual-only by design. Render's latest live deployment uses the configured server check/test build command, but this does not validate Android or web tests.
 - A full production static import was deliberately not run. The supplied newer DTC ZIP was not available in this audit.
 - Render log retrieval had a 503 for the filtered error-level request.
@@ -175,3 +175,43 @@ AUDIT CHANGE LOG
 - No Render or Vercel settings/environment variables were changed.
 - No deployment was manually triggered.
 - No GitHub Actions workflow was run.
+
+
+FOLLOW-UP WORK — 7 NOVEMBER 2026
+
+Uploaded bus static archive
+- Archive: delhi_buses_static_gtfs_v1.zip
+- SHA-256: b5940afdaf6154880ec5652fd3e8465dd9183b68477c7c71a287685e0ef91ff8
+- Parsed counts: 2,554 routes; 6,812 stops; 65,322 trips; 2,385,381 stop-time rows.
+- Every route row has a public route_short_name and route_long_name.
+- Agencies in this source: DTC (1,619 routes) and DOT (935 routes).
+- Calendar coverage: 1 January 2025 through 1 January 2040.
+- Recent live route coverage against the uploaded archive: 947 of 996 distinct live route IDs (95.08%). The remaining 49 live route IDs still need a compatible static source or verified crosswalk.
+- The uploaded archive is a substantially better match than the previously imported network, but it does not cover every current realtime route ID. This is partial route-ID reconciliation, not full coverage.
+
+Uploaded Metro archive
+- Archive: dmrc_static_gtfs_v1 (2).zip
+- SHA-256: bd184a7e13907a223032b3b7886babe52ac16b6149f8404f508712b87492fc1b
+- Contains 36 directional route records and 262 stops.
+- Calendar ends 31 December 2025. It was not imported as current timetable data. Keep Metro topology marked as timetable-stale until a current schedule is supplied.
+
+Code changes committed to main
+- Added public GTFS route-label extraction, preferring route_short_name and route_long_name. route_desc is no longer substituted for route_long_name.
+- The DTC importer now checks route-label completeness and compares candidate archive route IDs with recent live route IDs before replacing existing tables. It refuses replacement below 90% coverage and warns below 98%.
+- Added separate operator, fuel/propulsion, AC, and fleet-category classification.
+- Category marker mapping: DTC CNG non-AC green; DTC CNG AC red; DIMTS/DOT cluster CNG non-AC orange; cluster CNG or electric AC blue. This is a category display, not verified physical paint. Exact upstream/reviewed livery remains higher priority.
+- Removed route-ID-based bus category rules. GTFS route_id is an internal key; route_short_name carries the public route label.
+- Automatic fleet records can now improve when better registration data appears, while manual rows are protected.
+- Updated Android and web category markers and regression tests.
+- Updated Android map descriptions so category markers do not claim verified physical paint.
+
+Plain-text source cleanup
+- Removed the old tool-attributed repository review note.
+- Renamed six operating and recovery guides to matching .txt files and updated their references. Their contents were retained.
+- Corrected the Terms of Service reference to THIRD_PARTY_NOTICES.txt.
+
+Production data and validation status
+- The uploaded DTC archive has not yet been imported into Neon. The protected import replaces the live static tables inside a transaction and creates a backup first; production replacement requires explicit approval.
+- The uploaded Metro archive has not been imported because its calendar is expired.
+- Render's deploy-time check/test pipeline and Vercel's deployment state must be checked after the final source commits. Do not treat a commit as proof that a production deploy succeeded.
+- No SQL reset or direct Neon mutation was executed as part of this follow-up.
