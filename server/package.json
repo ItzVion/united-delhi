@@ -13,7 +13,8 @@
     "inspect:realtime": "node scripts/inspect-realtime.mjs",
     "test": "node --test test/*.test.js",
     "sync:metro": "node scripts/sync-dmrc-static.mjs",
-    "backfill:route-colors": "node scripts/backfill-route-colors.mjs"
+    "backfill:route-colors": "node scripts/backfill-route-colors.mjs",
+    "ensure:dtc": "node scripts/import-dtc-static.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
