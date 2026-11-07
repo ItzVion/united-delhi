@@ -47,6 +47,7 @@ jobs:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           DTC_STATIC_FILE: ./data/delhi_buses_static_gtfs_v1.zip
           DTC_STATIC_SOURCE_KEY: united-delhi-github-dtc-v1
+          DTC_STATIC_EXPECTED_SHA256: b5940afdaf6154880ec5652fd3e8465dd9183b68477c7c71a287685e0ef91ff8
           DTC_STATIC_ALLOW_REPLACEMENT: "true"
           DTC_ALLOW_EXPIRED_CALENDAR: "false"
           DTC_ALLOW_INVALID_CALENDAR: "false"
