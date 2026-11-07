@@ -1,0 +1,60 @@
+name: Static GTFS integrity and deploy gate
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-gtfs-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-import-and-deploy:
+    name: Verify or repair Neon static data, then deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Check out this main-branch revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install importer dependencies
+        run: npm ci
+
+      - name: Verify or repair DTC static data in Neon
+        id: static
+        run: npm run ensure:dtc
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          DTC_STATIC_FILE: ./data/delhi_buses_static_gtfs_v1.zip
+          DTC_STATIC_SOURCE_KEY: united-delhi-github-dtc-v1
+          DTC_STATIC_ALLOW_REPLACEMENT: "true"
+          DTC_ALLOW_EXPIRED_CALENDAR: "false"
+          DTC_ALLOW_INVALID_CALENDAR: "false"
+
+      - name: Trigger Render deployment after successful verification
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || steps.static.outputs.changed == 'true'
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "::error::GitHub Actions secret RENDER_DEPLOY_HOOK_URL is not configured."
+            exit 1
+          fi
+          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK_URL"
