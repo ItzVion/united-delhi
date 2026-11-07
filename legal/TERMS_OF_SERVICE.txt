@@ -55,7 +55,7 @@ United Delhi depends on third-party data and services. Their availability, accur
 
 Open Transit Data and OpenStreetMap have their own terms and usage requirements. Users and operators must comply with applicable third-party terms.
 
-See THIRD_PARTY_NOTICES.md.
+See THIRD_PARTY_NOTICES.txt.
 
 ## 7. Intellectual property
 
