@@ -190,7 +190,7 @@ const digestRows = (rows, fields) => {
   const hash = createHash('sha256');
   for (const record of records) {
     hash.update(JSON.stringify(record));
-    hash.update('\\n');
+    hash.update('\n');
   }
   return hash.digest('hex');
 };
@@ -198,7 +198,7 @@ const digestRows = (rows, fields) => {
 const writeWorkflowOutput = async (key, value) => {
   const outputPath = String(process.env.GITHUB_OUTPUT || '').trim();
   if (!outputPath) return;
-  await fs.appendFile(outputPath, key + '=' + String(value) + '\\n', 'utf8');
+  await fs.appendFile(outputPath, key + '=' + String(value) + '\n', 'utf8');
 };
 
 async function downloadZip() {
