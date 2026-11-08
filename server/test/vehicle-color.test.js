@@ -165,6 +165,19 @@ test('physical colour prefers the upstream API and uses only an exact verified l
   assert.equal(resolveEvidenceBackedColor(null,null),null);
 });
 
+test('malformed bytes never throw', () => {
+  assert.deepEqual(scanEntities(new Uint8Array([0x12, 0xff, 0xff])), []);
+});
+
+test('physical colour prefers exact upstream API colour, then exact reviewed livery',()=>{
+  assert.equal(resolveEvidenceBackedColor('#F97316','#2563EB'),'#F97316');
+  assert.equal(resolveEvidenceBackedColor(null,'#2563EB'),'#2563EB');
+  assert.equal(resolveEvidenceBackedColor(undefined,'#2563EB'),'#2563EB');
+  assert.equal(resolveEvidenceBackedColor('orange','#2563EB'),'#2563EB');
+  assert.equal(resolveEvidenceBackedColor(null,'blue'),null);
+  assert.equal(resolveEvidenceBackedColor(null,null),null);
+});
+
 test('DTC and DIMTS/Cluster marker colours depend only on operator', () => {
   assert.equal(classifyOperatorType('DTC'), 'dtc');
   assert.equal(classifyOperatorType('DIMTS'), 'cluster');

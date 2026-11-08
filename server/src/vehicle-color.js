@@ -42,9 +42,9 @@ export const BUS_OPERATOR_MARKER_COLORS = Object.freeze({
 export function classifyOperatorType(agencyId, ...identifiers) {
   const agency = String(agencyId ?? '').trim().toUpperCase();
   const values = identifiers.map(value =>
-    String(value ?? '').toUpperCase().replace(/[-_\\s]/g, '')
+    String(value ?? '').trim().toUpperCase().replace(/\s+/g, '')
   );
-  if (values.some(value => /^D9\\d{3}[A-Z]?$/.test(value))) return 'dtc';
+  if (values.some(value => /^D-?9\d{3}[A-Z]?(?:\([^)]*\))?$/.test(value))) return 'dtc';
   if (agency === 'DTC') return 'dtc';
   if (agency === 'DIMTS' || agency === 'DOT' || agency === 'CLUSTER') return 'cluster';
   const knownDtc = value =>
