@@ -8,6 +8,8 @@ import {
 test('DEVI route D-9905 keeps its D prefix in its public map label',()=>{
   assert.equal(routeName('D-9905'),'D-9905');
   assert.equal(routeName('D-9905 UP'),'D-9905');
+  assert.equal(routeName('D-9905DOWN'),'D-9905');
+  assert.equal(routeName('D-9905UP'),'D-9905');
 });
 test('exact individual physical colour has priority over operator marker',()=>{
   const v={serviceColor:'#F97316',fleetColorSource:'upstream-api',operatorType:'dtc'};

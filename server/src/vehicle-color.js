@@ -44,7 +44,7 @@ export function classifyOperatorType(agencyId, ...identifiers) {
   const values = identifiers.map(value =>
     String(value ?? '').trim().toUpperCase().replace(/\s+/g, '')
   );
-  if (values.some(value => /^D-?9\d{3}[A-Z]?(?:\([^)]*\))?$/.test(value))) return 'dtc';
+  if (values.some(value => /^D-?9\d{3}[A-Z]?(?:UP|DOWN|DWN)?(?:\([^)]*\))?$/.test(value))) return 'dtc';
   if (agency === 'DTC') return 'dtc';
   if (agency === 'DIMTS' || agency === 'DOT' || agency === 'CLUSTER') return 'cluster';
   const knownDtc = value =>

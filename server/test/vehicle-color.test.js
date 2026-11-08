@@ -184,6 +184,8 @@ test('DTC and DIMTS/Cluster marker colours depend only on operator', () => {
   assert.equal(classifyOperatorType('DOT'), 'cluster');
   assert.equal(classifyOperatorType(null, 'DL1PD4080'), 'dtc');
   assert.equal(classifyOperatorType(null, 'D-9905'), 'dtc');
+  assert.equal(classifyOperatorType(null, 'D-9905DOWN'), 'dtc');
+  assert.equal(classifyOperatorType(null, 'D-9905UP'), 'dtc');
   assert.equal(classifyOperatorType('DOT', 'D-9905'), 'dtc');
   assert.equal(classifyOperatorType(null, 'vehicle-unknown'), 'unknown');
 
