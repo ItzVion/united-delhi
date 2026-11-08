@@ -6,7 +6,7 @@ import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { rateLimit } from 'express-rate-limit';
 import {createRealtimeRequest} from './realtime-provider.js';
 import {publicRouteName} from './route-display.js';
-import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,classifyFleetTypeFromRegistration,classifyOperatorType,classifyBusType,resolveFleetCategoryColor,summarizeRouteLivery,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
+import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,classifyFleetTypeFromRegistration,classifyOperatorType,classifyBusType,resolveOperatorMarkerColor,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
 const COLOR_FIELD=parseColorFieldSpec(process.env.OTD_COLOR_FIELD);
 
 const {Pool}=pg,app=express();
@@ -69,7 +69,7 @@ const UNKNOWN_BUS_MARKER_COLOR='#64748B';
 const classifyFleet=(id,...aliases)=>classifyFleetTypeFromRegistration(id,...aliases);
 const service=(id,agency,routeShortName,routeId,licensePlate,vehicleLabel)=>{
  const classified=classifyFleet(id,licensePlate,vehicleLabel);
- const operatorType=classifyOperatorType(agency,id,licensePlate,vehicleLabel);
+ const operatorType=classifyOperatorType(agency,routeShortName,routeId,id,licensePlate,vehicleLabel);
  const operator=operatorType==='dtc'?'DTC':operatorType==='cluster'?'DIMTS / Cluster':null;
  return {...classified,operator,agencyId:agency||null,operatorType};
 };
@@ -150,7 +150,7 @@ const applyFleetRegistry=v=>{
  const operatorType=v.operatorType||classifyOperatorType(v.agencyId||v.operator,v.id,v.licensePlate,v.vehicleLabel);
  const vehicle={...v,busType,serviceType,operatorType};
  const category=classifyBusType(busType);
- const markerColor=resolveFleetCategoryColor(operatorType,busType,v.routeShortName);
+ const markerColor=resolveOperatorMarkerColor(operatorType);
  const serviceColor=resolveEvidenceBackedColor(upstreamColor,verified?.colorHex);
  const fleetColorSource=upstreamColor?'upstream-api':verified?'verified-livery-record':'not-provided-by-realtime-feed';
  return {...vehicle,
@@ -164,13 +164,8 @@ const applyFleetRegistry=v=>{
 
 async function loadRouteMeta(){if(!pool)return;try{const rows=(await pool.query(`SELECT r.route_id,r.agency_id,r.short_name,r.long_name,r.route_color,r.route_text_color,first_stop.name AS from_stop,last_stop.name AS to_stop FROM routes r LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence ASC,s.stop_id ASC LIMIT 1) first_stop ON true LEFT JOIN LATERAL (SELECT s.name FROM route_stops rs JOIN stops s ON s.stop_id=rs.stop_id WHERE rs.route_id=r.route_id ORDER BY rs.stop_sequence DESC,s.stop_id DESC LIMIT 1) last_stop ON true`)).rows;routeMeta.clear();for(const x of rows)routeMeta.set(String(x.route_id),x);routeMetaLoadedAt=Date.now();console.log('Loaded route metadata: '+routeMeta.size+' routes.')}catch(e){console.error('Route metadata load failed:',e?.message||e)}}
 const applyRouteMeta=v=>{const x=routeMeta.get(String(v.routeId||''));const svc=service(v.id,x?.agency_id,x?.short_name,v.routeId,v.licensePlate,v.vehicleLabel);return applyFleetRegistry({...v,routeShortName:publicRouteName(x,v.routeShortName||v.routeId),routeColor:x?.route_color||null,routeTextColor:x?.route_text_color||null,routeLongName:x?.long_name||null,fromStop:x?.from_stop||null,toStop:x?.to_stop||null,...svc})};
-const busLiveryForRoute=routeId=>{
- const id=String(routeId||'').trim();
- if(!id)return {};
- const active=cache.vehicles.filter(v=>String(v.routeId||'')===id);
- return summarizeRouteLivery(active)||{};
-};
-const decoratePlannerOptions=options=>(Array.isArray(options)?options:[]).map(option=>({...option,legs:(Array.isArray(option.legs)?option.legs:[]).map(leg=>!leg.mode||leg.mode==='bus'?{...leg,...busLiveryForRoute(leg.routeId)}:leg)}));
+const decoratePlannerOptions=options=>(Array.isArray(options)?options:[]);
+
 async function loadDatabaseVehicleCache(){
  if(!pool)return;
  try{
@@ -674,7 +669,7 @@ app.get('/api/plan/multimodal',async(q,r)=>{
    if(!previous||(Number(option.durationMinutes)||999)<(Number(previous.durationMinutes)||999))uniqueOptions.set(key,option);
   }
   const ranked=[...uniqueOptions.values()].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
-  return r.json({status:'OK',origin:{type:fromType,id:fromId},destination:{type:toType,id:toId},originStopIds:fromIds,destinationStopIds:toIds,options:decoratePlannerOptions(ranked.slice(0,8)),reason:ranked.length?null:'No journey could be found in the correct direction in the current static network data.'});
+  return r.json({status:'OK',origin:{type:fromType,id:fromId},destination:{type:toType,id:toId},originStopIds:fromIds,destinationStopIds:toIds,options:ranked.slice(0,8),reason:ranked.length?null:'No journey could be found in the correct direction in the current static network data.'});
  }catch(error){
   console.error('Multimodal planner failed:',error?.message||error);
   return r.status(500).json({status:'ERROR',options:[],reason:'Trip planning is temporarily unavailable. Please try again.'});
@@ -716,7 +711,7 @@ app.get('/api/plan',async(q,r)=>{
    if(!previous||(Number(option.durationMinutes)||999)<(Number(previous.durationMinutes)||999))uniqueOptions.set(key,option);
   }
   const ranked=[...uniqueOptions.values()].sort((a,b)=>(a.durationMinutes||999)-(b.durationMinutes||999));
-  return r.json({status:'OK',origin,destination,originStopIds:fromIds,destinationStopIds:toIds,options:decoratePlannerOptions(ranked.slice(0,10)),reason:ranked.length?null:'No bus journey was found between the selected stops.'});
+  return r.json({status:'OK',origin,destination,originStopIds:fromIds,destinationStopIds:toIds,options:ranked.slice(0,10),reason:ranked.length?null:'No bus journey was found between the selected stops.'});
  }catch(e){console.error('Journey planner failed:',e?.message||e);return r.status(500).json({status:'ERROR',options:[],reason:'Journey planner is temporarily unavailable. Please try again.'})}
 });
 app.use((_q,r)=>r.status(404).json({status:'NOT_FOUND',reason:'Endpoint not found'}));

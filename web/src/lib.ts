@@ -17,21 +17,11 @@ export const METRO_LINE_COLORS={RED:'#D83B3B',YELLOW:'#E5B12C',BLUE:'#2F63B7',GR
 export const metroColor=(value)=>{const t=String(value||'').toUpperCase();for(const k of Object.keys(METRO_LINE_COLORS))if(t.includes(k))return METRO_LINE_COLORS[k];return '#1F3D36';};
 
 export const isHex=(v:unknown):v is string=>/^#[0-9a-f]{6}$/i.test(String(v||''));
-// Only exact upstream per-vehicle colours and reviewed livery evidence may colour a bus.
-// Fleet type, route colour and registration-based guesses are not paint evidence.
 export const UNKNOWN_BUS_MARKER_COLOR='#64748B';
-export const busColor=(v:{serviceColor?:string|null;busType?:string|null;fleetColorSource?:string|null})=>{
-  const source=String(v?.fleetColorSource||'');
-  if(source!=='upstream-api'&&source!=='verified-livery-record')return UNKNOWN_BUS_MARKER_COLOR;
-  const color=String(v?.serviceColor??'').trim();
-  return isHex(color)?color:UNKNOWN_BUS_MARKER_COLOR;
-};
-
-// These colours are for visual route distinction only, never evidence of physical bus paint.
-export const ROUTE_MARKER_PALETTE=[
-  '#2563EB','#0F766E','#C2410C','#7E22CE','#BE123C','#047857',
-  '#A16207','#0369A1','#6D28D9','#B91C1C','#0E7490','#4D7C0F'
-] as const;
+export const BUS_OPERATOR_MARKER_COLORS={
+  DTC:'#15803D',
+  DIMTS:'#EA580C'
+} as const;
 type BusMarkerInput={
   id?:string|null;routeId?:string|null;routeShortName?:string|null;routeColor?:string|null;
   serviceColor?:string|null;fleetColorSource?:string|null;busType?:string|null;
@@ -43,63 +33,26 @@ const verifiedVehicleColour=(v:BusMarkerInput)=>{
   const colour=String(v?.serviceColor??'').trim();
   return (source==='upstream-api'||source==='verified-livery-record')&&isHex(colour)?colour:null;
 };
-export const BUS_CATEGORY_MARKER_COLORS={
-  DTC_NON_AC:'#15803D',
-  DTC_AC:'#C62828',
-  CLUSTER_NON_AC:'#EA5800',
-  CLUSTER_AC:'#1565C0'
-} as const;
-export function defaultBusCategoryColor(operatorType?:string|null,busType?:string|null,routeShortName?:string|null):string|null{
-  const type=String(busType||'').trim().toUpperCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
+export const defaultBusOperatorColor=(operatorType?:string|null):string|null=>{
   const operator=String(operatorType||'').trim().toLowerCase();
-  const routeName=String(routeShortName||'').trim().toUpperCase().replace(/\s+/g,'');
-  const isNonAc=/\bNON\s*AC\b/.test(type);
-  const isAc=/\bAC\b/.test(type);
-  const isCng=/\bCNG\b/.test(type);
-  const isElectric=/\bEV\b/.test(type)||/\bELECTRIC\b/.test(type);
-  if(/^801(?:-|STL(?:-|$)|$)/.test(routeName)){
-    if(isNonAc&&isCng)return BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC;
-    if(isAc&&(isCng||isElectric))return BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC;
-  }
-  if(operator==='dtc'){
-    if(!isCng||(!isNonAc&&!isAc))return null;
-    return isAc?BUS_CATEGORY_MARKER_COLORS.DTC_AC:BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC;
-  }
-  if(operator==='cluster'){
-    if(isAc&&(isCng||isElectric))return BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC;
-    if(isNonAc&&isCng)return BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC;
-  }
+  if(operator==='dtc')return BUS_OPERATOR_MARKER_COLORS.DTC;
+  if(operator==='cluster')return BUS_OPERATOR_MARKER_COLORS.DIMTS;
   return null;
-}
-export type BusMarkerKind='physical'|'category-default'|'route'|'distinctive';
-const categoryVehicleColor=(v:BusMarkerInput)=>{
-  const routeName=String(v?.routeShortName||'').trim().toUpperCase().replace(/\s+/g,'');
-  const routeOverride=defaultBusCategoryColor(v?.operatorType,v?.busType,v?.routeShortName);
-  if(routeOverride&&/^801(?:-|STL(?:-|$)|$)/.test(routeName))return routeOverride;
-  if(String(v?.markerColorSource||'')==='fleet-category'&&isHex(v?.markerColor))return v.markerColor;
-  return routeOverride||defaultBusCategoryColor(v?.operatorType,v?.busType);
 };
+export const busColor=(v:{serviceColor?:string|null;fleetColorSource?:string|null;operatorType?:'dtc'|'cluster'|'unknown'|null})=>{
+  return verifiedVehicleColour(v)||defaultBusOperatorColor(v.operatorType)||UNKNOWN_BUS_MARKER_COLOR;
+};
+export type BusMarkerKind='physical'|'operator'|'unknown';
 export const busMarkerKind=(v:BusMarkerInput):BusMarkerKind=>{
   if(verifiedVehicleColour(v))return 'physical';
-  if(categoryVehicleColor(v))return 'category-default';
-  if(isHex(v?.routeColor))return 'route';
-  return 'distinctive';
+  return defaultBusOperatorColor(v?.operatorType)?'operator':'unknown';
 };
 export const busMarkerColor=(v:BusMarkerInput)=>{
-  const physical=verifiedVehicleColour(v);
-  if(physical)return physical;
-  const category=categoryVehicleColor(v);
-  if(category)return category;
-  const route=String(v?.routeColor??'').trim();
-  if(isHex(route))return route;
-  const key=String(v?.routeId||v?.routeShortName||v?.id||'unassigned').trim().toUpperCase();
-  let hash=2166136261;
-  for(let i=0;i<key.length;i++){hash^=key.charCodeAt(i);hash=Math.imul(hash,16777619);}
-  return ROUTE_MARKER_PALETTE[(hash>>>0)%ROUTE_MARKER_PALETTE.length];
+  return verifiedVehicleColour(v)||defaultBusOperatorColor(v?.operatorType)||UNKNOWN_BUS_MARKER_COLOR;
 };
 export function routePageBusMarkerColor(v:BusMarkerInput):string{
   return busMarkerColor(v);
-}
+};
 export const textOn=(bg:string)=>{if(!isHex(bg))return '#14211B';const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.179?'#14211B':'#FFFFFF'};
 
 export const routeName=(value:unknown)=>{
@@ -108,6 +61,7 @@ export const routeName=(value:unknown)=>{
   t=t.replace(/^route\s*[:#-]?\s*/i,'').trim();
   t=t.split(/\s*[|:–—]\s*/)[0].trim();
   t=t.replace(/(?:\s*[-_\/|:]?\s*)(?:UP|DOWN|DWN)$/i,'').replace(/\b(?:UP|DOWN|DWN)\b/gi,'').replace(/\s+/g,' ').trim();
+  const devi=t.match(/^D[-\\s]?0*(9\\d{3}[A-Z]?)(?=$|[\\s\\-_\\/])/i);if(devi)return 'D-'+devi[1].toUpperCase();
   const air=t.match(/^(?:AIRPORT|AIR)[-_ ]*0*(\d+[A-Z]?)/i);if(air)return 'AIR-'+air[1].toUpperCase();
   const num=t.match(/^(?:D[-\s]?)?(\d{1,5}[A-Z]?)(?=$|[\s\-_\/])/i);if(num)return num[1].toUpperCase();
   return t.length<=14?t:null;

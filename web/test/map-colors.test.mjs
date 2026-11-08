@@ -1,51 +1,37 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  busMarkerColor,busMarkerKind,routePageBusMarkerColor,ROUTE_MARKER_PALETTE,
-  defaultBusCategoryColor,BUS_CATEGORY_MARKER_COLORS
+  busMarkerColor,busMarkerKind,routePageBusMarkerColor,busColor,
+  defaultBusOperatorColor,BUS_OPERATOR_MARKER_COLORS,UNKNOWN_BUS_MARKER_COLOR,routeName
 } from '../src/lib.ts';
 
-test('reviewed physical vehicle colour takes priority over category and route colours',()=>{
-  const vehicle={id:'DL1PD4669',routeId:'801',routeColor:'#2563EB',serviceColor:'#F97316',fleetColorSource:'upstream-api',operatorType:'dtc',busType:'CNG NonAC (12 mtr)'};
-  assert.equal(busMarkerKind(vehicle),'physical');
-  assert.equal(busMarkerColor(vehicle),'#F97316');
+test('DEVI route D-9905 keeps its D prefix in its public map label',()=>{
+  assert.equal(routeName('D-9905'),'D-9905');
+  assert.equal(routeName('D-9905 UP'),'D-9905');
 });
-test('category markers use operator and bus class, not internal GTFS route id',()=>{
-  assert.equal(defaultBusCategoryColor('dtc','CNG NonAC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC);
-  assert.equal(defaultBusCategoryColor('dtc','CNG AC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.DTC_AC);
-  assert.equal(defaultBusCategoryColor('cluster','CNG NonAC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC);
-  assert.equal(defaultBusCategoryColor('cluster','CNG AC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
-  assert.equal(defaultBusCategoryColor('cluster','EV AC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
-  assert.equal(defaultBusCategoryColor('dtc','EV AC (12 mtr)'),null);
-  assert.equal(defaultBusCategoryColor('unknown','CNG AC (12 mtr)'),null);
-  assert.equal(defaultBusCategoryColor('dtc','CNG NonAC (12 mtr)','801-KAP-UTTDOWN'),BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC);
-  assert.equal(defaultBusCategoryColor('dtc','CNG AC (12 mtr)','801-KAP-UTTDOWN'),BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
-  assert.equal(defaultBusCategoryColor('dtc','EV AC (12 mtr)','801STL-KAP-DWS-22DOWN'),BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
-  assert.equal(defaultBusCategoryColor('dtc','CNG NonAC (12 mtr)','801AUP'),BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC);
-  assert.equal(busMarkerColor({routeId:'3762',routeShortName:'801-KAP-UTTDOWN',routeColor:'#15803D',operatorType:'dtc',busType:'CNG NonAC (12 mtr)',markerColor:'#15803D',markerColorSource:'fleet-category'}),BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC);
-  assert.equal(busMarkerColor({routeId:'3762',routeShortName:'801-KAP-UTTDOWN',operatorType:'dtc',busType:'CNG AC (12 mtr)'}),BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
-  assert.equal(busMarkerColor({routeId:'772',routeShortName:'770ASTLUP2',operatorType:'cluster',busType:'CNG NonAC (12 mtr)'}),BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC);
-  assert.equal(busMarkerColor({routeId:'779',routeShortName:'772UP',operatorType:'cluster',busType:'CNG AC (12 mtr)'}),BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
+test('exact individual physical colour has priority over operator marker',()=>{
+  const v={serviceColor:'#F97316',fleetColorSource:'upstream-api',operatorType:'dtc'};
+  assert.equal(busMarkerKind(v),'physical');
+  assert.equal(busMarkerColor(v),'#F97316');
 });
-test('the backend category marker is used only with the fleet-category source',()=>{
-  assert.equal(busMarkerColor({markerColor:'#C62828',markerColorSource:'fleet-category'}),BUS_CATEGORY_MARKER_COLORS.DTC_AC);
-  assert.notEqual(busMarkerColor({markerColor:'#C62828',markerColorSource:'unclassified'}),'#C62828');
+test('DTC markers stay green for CNG, EV, AC and DEVI vehicles',()=>{
+  assert.equal(defaultBusOperatorColor('dtc'),BUS_OPERATOR_MARKER_COLORS.DTC);
+  for(const busType of ['CNG NonAC (12 mtr)','CNG AC (12 mtr)','EV AC (9 mtr)','Unknown']){
+    assert.equal(busMarkerColor({operatorType:'dtc',busType,routeShortName:'D-9905'}),BUS_OPERATOR_MARKER_COLORS.DTC);
+  }
 });
-test('unknown service classes use a stable display palette, not guessed physical paint',()=>{
-  const vehicle={id:'vehicle-2',routeId:'0901(NS)DOWN',routeColor:null,serviceColor:null,fleetColorSource:'not-provided-by-realtime-feed'};
-  assert.equal(busMarkerKind(vehicle),'distinctive');
-  assert.equal(busMarkerColor(vehicle),busMarkerColor(vehicle));
-  assert.equal(busMarkerColor({...vehicle,id:'another-bus'}),busMarkerColor(vehicle));
-  assert.ok(ROUTE_MARKER_PALETTE.includes(busMarkerColor(vehicle)));
+test('DIMTS / Cluster marker stays orange regardless of bus type',()=>{
+  for(const busType of ['CNG NonAC (12 mtr)','CNG AC (12 mtr)','EV AC (9 mtr)','Unknown']){
+    assert.equal(busMarkerColor({operatorType:'cluster',busType,routeShortName:'D-9905'}),BUS_OPERATOR_MARKER_COLORS.DIMTS);
+  }
 });
-test('GTFS route colour remains a route fallback, not a physical paint claim',()=>{
-  const vehicle={id:'vehicle-1',routeId:'801',routeColor:'#2563EB',serviceColor:null,fleetColorSource:'not-provided-by-realtime-feed'};
-  assert.equal(busMarkerKind(vehicle),'route');
-  assert.equal(busMarkerColor(vehicle),'#2563EB');
-  assert.equal(routePageBusMarkerColor(vehicle),'#2563EB');
+test('same route can show different operator markers for different vehicles',()=>{
+  assert.notEqual(busMarkerColor({operatorType:'dtc',routeShortName:'D-9905'}),busMarkerColor({operatorType:'cluster',routeShortName:'D-9905'}));
 });
-test('unverified serviceColor never overrides category or fallback marker',()=>{
-  const vehicle={id:'vehicle-3',routeId:'101',serviceColor:'#FF0000',fleetColorSource:'not-provided-by-realtime-feed',operatorType:'cluster',busType:'CNG NonAC (12 mtr)'};
-  assert.equal(busMarkerKind(vehicle),'category-default');
-  assert.equal(busMarkerColor(vehicle),BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC);
+test('unknown operator uses neutral grey even when route metadata contains a colour',()=>{
+  const v={operatorType:'unknown',routeShortName:'D-9905',routeColor:'#2563EB'};
+  assert.equal(busMarkerKind(v),'unknown');
+  assert.equal(busMarkerColor(v),UNKNOWN_BUS_MARKER_COLOR);
+  assert.equal(routePageBusMarkerColor(v),UNKNOWN_BUS_MARKER_COLOR);
+  assert.equal(busColor(v),UNKNOWN_BUS_MARKER_COLOR);
 });
