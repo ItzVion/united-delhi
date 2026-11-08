@@ -70,9 +70,16 @@ export function classifyBusType(busType) {
   return { fuelType: 'unknown', airConditioned: null };
 }
 
-export function resolveFleetCategoryColor(operatorType, busType) {
+export function resolveFleetCategoryColor(operatorType, busType, routeShortName = null) {
   const operator = String(operatorType ?? '').trim().toLowerCase();
   const { fuelType, airConditioned } = classifyBusType(busType);
+  const routeName = String(routeShortName ?? '').trim().toUpperCase().replace(/\s+/g, '');
+  // Route 801 uses the orange non-AC / blue AC fleet palette despite inconsistent
+  // DTC/DOT agency tags in the static feed. This remains a category marker, not paint evidence.
+  if (/^801(?:-|STL(?:-|$)|$)/.test(routeName)) {
+    if (fuelType === 'cng' && airConditioned === false) return BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC;
+    if ((fuelType === 'cng' || fuelType === 'electric') && airConditioned === true) return BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC;
+  }
   if (operator === 'dtc') {
     if (fuelType !== 'cng' || airConditioned === null) return null;
     return airConditioned ? BUS_CATEGORY_MARKER_COLORS.DTC_AC : BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC;

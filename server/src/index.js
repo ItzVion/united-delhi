@@ -150,7 +150,7 @@ const applyFleetRegistry=v=>{
  const operatorType=v.operatorType||classifyOperatorType(v.agencyId||v.operator,v.id,v.licensePlate,v.vehicleLabel);
  const vehicle={...v,busType,serviceType,operatorType};
  const category=classifyBusType(busType);
- const markerColor=resolveFleetCategoryColor(operatorType,busType);
+ const markerColor=resolveFleetCategoryColor(operatorType,busType,v.routeShortName);
  const serviceColor=resolveEvidenceBackedColor(upstreamColor,verified?.colorHex);
  const fleetColorSource=upstreamColor?'upstream-api':verified?'verified-livery-record':'not-provided-by-realtime-feed';
  return {...vehicle,

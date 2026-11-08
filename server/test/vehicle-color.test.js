@@ -183,4 +183,8 @@ test('operator and bus class independently determine the category marker colour'
   assert.equal(resolveFleetCategoryColor('cluster', 'EV AC (12 mtr)'), BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
   assert.equal(resolveFleetCategoryColor('unknown', 'CNG AC (12 mtr)'), null);
   assert.equal(resolveFleetCategoryColor('cluster', 'Unknown'), null);
+  assert.equal(resolveFleetCategoryColor('dtc', 'CNG NonAC (12 mtr)', '801-KAP-UTTDOWN'), BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC);
+  assert.equal(resolveFleetCategoryColor('dtc', 'CNG AC (12 mtr)', '801-KAP-UTTDOWN'), BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
+  assert.equal(resolveFleetCategoryColor('dtc', 'EV AC (12 mtr)', '801STL-KAP-DWS-22DOWN'), BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
+  assert.equal(resolveFleetCategoryColor('dtc', 'CNG NonAC (12 mtr)', '801AUP'), BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC);
 });

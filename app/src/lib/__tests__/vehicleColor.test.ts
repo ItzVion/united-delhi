@@ -42,6 +42,11 @@ test('requested categories depend on both operator and bus class',()=>{
   assert.equal(defaultBusCategoryColor('dtc','EV AC (12 mtr)'),null);
   assert.equal(defaultBusCategoryColor('unknown','CNG AC (12 mtr)'),null);
   assert.equal(defaultBusCategoryColor('cluster','Unknown'),null);
+  assert.equal(defaultBusCategoryColor('dtc','CNG NonAC (12 mtr)','801-KAP-UTTDOWN'),BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC);
+  assert.equal(defaultBusCategoryColor('dtc','CNG AC (12 mtr)','801-KAP-UTTDOWN'),BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
+  assert.equal(defaultBusCategoryColor('dtc','EV AC (12 mtr)','801STL-KAP-DWS-22DOWN'),BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC);
+  assert.equal(defaultBusCategoryColor('dtc','CNG NonAC (12 mtr)','801AUP'),BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC);
+  assert.equal(resolveVehicleColor({routeShortName:'801-KAP-UTTDOWN',operatorType:'dtc',busType:'CNG NonAC (12 mtr)',markerColor:'#15803D',markerColorSource:'fleet-category'} as any).background,BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC);
 });
 test('internal GTFS route ids never determine operator or category colour',()=>{
   assert.equal(resolveVehicleColor({routeId:'772',routeShortName:'770ASTLUP2',operatorType:'cluster',busType:'CNG NonAC (12 mtr)'} as any).background,BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC);

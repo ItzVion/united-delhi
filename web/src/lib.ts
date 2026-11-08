@@ -49,13 +49,18 @@ export const BUS_CATEGORY_MARKER_COLORS={
   CLUSTER_NON_AC:'#EA5800',
   CLUSTER_AC:'#1565C0'
 } as const;
-export function defaultBusCategoryColor(operatorType?:string|null,busType?:string|null):string|null{
+export function defaultBusCategoryColor(operatorType?:string|null,busType?:string|null,routeShortName?:string|null):string|null{
   const type=String(busType||'').trim().toUpperCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
   const operator=String(operatorType||'').trim().toLowerCase();
+  const routeName=String(routeShortName||'').trim().toUpperCase().replace(/\s+/g,'');
   const isNonAc=/\bNON\s*AC\b/.test(type);
   const isAc=/\bAC\b/.test(type);
   const isCng=/\bCNG\b/.test(type);
   const isElectric=/\bEV\b/.test(type)||/\bELECTRIC\b/.test(type);
+  if(/^801(?:-|STL(?:-|$)|$)/.test(routeName)){
+    if(isNonAc&&isCng)return BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC;
+    if(isAc&&(isCng||isElectric))return BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC;
+  }
   if(operator==='dtc'){
     if(!isCng||(!isNonAc&&!isAc))return null;
     return isAc?BUS_CATEGORY_MARKER_COLORS.DTC_AC:BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC;
@@ -68,8 +73,11 @@ export function defaultBusCategoryColor(operatorType?:string|null,busType?:strin
 }
 export type BusMarkerKind='physical'|'category-default'|'route'|'distinctive';
 const categoryVehicleColor=(v:BusMarkerInput)=>{
+  const routeName=String(v?.routeShortName||'').trim().toUpperCase().replace(/\s+/g,'');
+  const routeOverride=defaultBusCategoryColor(v?.operatorType,v?.busType,v?.routeShortName);
+  if(routeOverride&&/^801(?:-|STL(?:-|$)|$)/.test(routeName))return routeOverride;
   if(String(v?.markerColorSource||'')==='fleet-category'&&isHex(v?.markerColor))return v.markerColor;
-  return defaultBusCategoryColor(v?.operatorType,v?.busType);
+  return routeOverride||defaultBusCategoryColor(v?.operatorType,v?.busType);
 };
 export const busMarkerKind=(v:BusMarkerInput):BusMarkerKind=>{
   if(verifiedVehicleColour(v))return 'physical';

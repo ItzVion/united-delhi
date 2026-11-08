@@ -4,6 +4,7 @@ export type VehicleColor={background:string;text:string};
 type ApiVehicleColor={
   serviceColor?:string|null;
   busType?:string|null;
+  routeShortName?:string|null;
   fleetColorSource?:string|null;
   operatorType?:'dtc'|'cluster'|'unknown'|null;
   fuelType?:'cng'|'electric'|'unknown'|null;
@@ -35,9 +36,14 @@ function classifyBusType(busType:string|null|undefined):{fuelType:'cng'|'electri
   if(/\bEV\b/.test(type)&&/\bAC\b/.test(type))return {fuelType:'electric',airConditioned:true};
   return {fuelType:'unknown',airConditioned:null};
 }
-export function defaultBusCategoryColor(operatorType:string|null|undefined,busType:string|null|undefined):string|null{
+export function defaultBusCategoryColor(operatorType:string|null|undefined,busType:string|null|undefined,routeShortName?:string|null):string|null{
   const {fuelType,airConditioned}=classifyBusType(busType);
   const operator=String(operatorType||'').toLowerCase();
+  const routeName=String(routeShortName||'').trim().toUpperCase().replace(/\s+/g,'');
+  if(/^801(?:-|STL(?:-|$)|$)/.test(routeName)){
+    if(fuelType==='cng'&&airConditioned===false)return BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC;
+    if((fuelType==='cng'||fuelType==='electric')&&airConditioned===true)return BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC;
+  }
   if(operator==='dtc'){
     if(fuelType!=='cng'||airConditioned===null)return null;
     return airConditioned?BUS_CATEGORY_MARKER_COLORS.DTC_AC:BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC;
@@ -49,11 +55,14 @@ export function defaultBusCategoryColor(operatorType:string|null|undefined,busTy
   return null;
 }
 function categoryColor(v:ApiVehicleColor):string|null{
+  const routeName=String(v.routeShortName||'').trim().toUpperCase().replace(/\s+/g,'');
+  const routeOverride=defaultBusCategoryColor(v.operatorType,v.busType,v.routeShortName);
+  if(routeOverride&&/^801(?:-|STL(?:-|$)|$)/.test(routeName))return routeOverride;
   if(String(v.markerColorSource||'')==='fleet-category'){
     const marker=validApiColor(v.markerColor);
     if(marker)return marker;
   }
-  return defaultBusCategoryColor(v.operatorType,v.busType);
+  return routeOverride||defaultBusCategoryColor(v.operatorType,v.busType);
 }
 function textFor(bg:string){
   const h=bg.slice(1);
