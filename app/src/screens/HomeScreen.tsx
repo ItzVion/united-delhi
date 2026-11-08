@@ -11,7 +11,7 @@ import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
-import { BUS_OPERATOR_MARKER_COLORS, fleetLegendRows, hasEvidenceBackedVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
+import { BUS_TYPE_COLOR_LEGEND, hasKnownBusCategory, resolveVehicleColor } from '../lib/vehicleColor';
 import { confirmLocationUse } from '../lib/locationConsent';
 import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 
@@ -50,12 +50,7 @@ export default function HomeScreen(){
   const vehiclesLoadingRef=useRef(false);
   const vehiclesRefreshPendingRef=useRef(false);
   const loadVehiclesRef=useRef<()=>void>(()=>{});
-const legendRows = [
-    ...fleetLegendRows(vehicles),
-    { key:'dtc', label:'DTC · operator marker', color:BUS_OPERATOR_MARKER_COLORS.DTC },
-    { key:'dimts', label:'DIMTS / Cluster · operator marker', color:BUS_OPERATOR_MARKER_COLORS.DIMTS },
-    { key:'unknown', label:'Unknown operator · neutral marker', color:UNKNOWN_BUS_MARKER_COLOR }
-  ];
+const legendRows = BUS_TYPE_COLOR_LEGEND;
 
   const requestLocation=useCallback(async()=>{
     try{
@@ -167,7 +162,7 @@ const legendRows = [
       buses:visible.map(v=>{
         const route=displayRouteName(v.routeShortName) || displayRouteName(v.routeId) || 'BUS';
         const c=resolveVehicleColor(v);
-        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,colourKnown:hasEvidenceBackedVehicleColor(v),colourEstimated:v.markerColorSource==='fleet-category',lat:v.latitude,lon:v.longitude}];
+        return [{id:v.id,routeId:v.routeId,route,color:c.background,textColor:c.text,categoryKnown:hasKnownBusCategory(v),lat:v.latitude,lon:v.longitude}];
       }).flat(),
       location:location?{lat:location.coords.latitude,lon:location.coords.longitude}:null
     };
@@ -239,7 +234,7 @@ const legendRows = [
           <Text style={styles.mapTopText}>{fresh==='ok'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'just now'}`):fresh==='stale'?(`${vehicles.length} buses · updated ${realtimeAgeLabel||'earlier'}`):fresh==='unavailable'?'Live data unavailable':'Checking live buses'}</Text>
         </View>
         {mapError?<View style={styles.mapErrorOverlay}><Text style={styles.mapErrorTitle}>Map couldn't load</Text><Text style={styles.mapErrorText}>Check your connection and try loading the map again.</Text><Pressable style={styles.mapRetry} onPress={()=>{setMapReady(false);setMapError(false);mapRef.current?.reload();}}><Text style={styles.mapRetryText}>Retry map</Text></Pressable></View>:null}
-        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}>{legendRows.map(row=><View key={row.key} style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:row.color}]}/><Text style={styles.legendText}>{row.label}</Text></View>)}</View>
+        <View pointerEvents="none" style={styles.mapAttribution}><Text style={styles.mapAttributionText}>© OpenStreetMap contributors</Text></View><View pointerEvents="none" style={styles.mapLegend}>{legendRows.map(row=><View key={row.key} style={styles.legendItem}><View style={styles.legendSwatches}>{row.colors.map((color,index)=><View key={color+index} style={[styles.legendDot,{backgroundColor:color}]}/>)}</View><Text style={styles.legendText}>{row.shortLabel}</Text></View>)}</View>
         {locationStatus?<Pressable style={styles.locationNotice} onPress={requestLocation}><Text style={styles.locationNoticeText}>{locationStatus}</Text><Text style={styles.retry}>Retry</Text></Pressable>:null}
         {selectedBus ? (() => {
           const name=displayRouteName(selectedBus.routeShortName) || displayRouteName(selectedBus.routeId) || 'Bus';
@@ -256,7 +251,7 @@ const legendRows = [
               <View style={styles.busPreviewCopy}>
                 <Text style={styles.busPreviewEyebrow}>LIVE BUS</Text>
                 <Text style={styles.busPreviewTitle} numberOfLines={1}>To {selectedBus.toStop || 'Destination'}</Text>
-                <Text style={styles.busPreviewMeta} numberOfLines={2}>{selectedBus.vehicleLabel || selectedBus.licensePlate || selectedBus.id} · {freshness} · View route{hasEvidenceBackedVehicleColor(selectedBus)?'':' · colour unavailable'}</Text>
+                <Text style={styles.busPreviewMeta} numberOfLines={2}>{selectedBus.vehicleLabel || selectedBus.licensePlate || selectedBus.id} · {freshness} · View route{hasKnownBusCategory(selectedBus)?'':' · category unknown'}</Text>
               </View>
               <Text style={styles.busPreviewArrow}>›</Text>
             </Pressable>
@@ -267,8 +262,8 @@ const legendRows = [
           <Pressable style={styles.legendOverlay} onPress={()=>setLegendOpen(false)}>
             <Pressable style={styles.legendDialog} onPress={event=>event.stopPropagation()}>
               <Text style={styles.legendTitle}>Bus Colour Legend</Text>
-              <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Colour source</Text></View>
-              {legendRows.map(row=><View key={row.key} style={styles.legendRow}><View style={styles.legendIcons}><View style={[styles.legendBus,{backgroundColor:row.color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View></View><Text style={styles.legendType}>{row.label}</Text></View>)}
+              <View style={styles.legendHeader}><Text style={styles.legendHeaderText}>Bus Icon</Text><Text style={styles.legendHeaderText}>Type</Text></View>
+              {legendRows.map(row=><View key={row.key} style={styles.legendRow}><View style={styles.legendIcons}>{row.colors.map((color,index)=><View key={color+index} style={[styles.legendBus,{backgroundColor:color}]}><View style={styles.legendBusWindow}/><View style={styles.legendBusWindshield}/><View style={styles.legendBusLightRow}><View style={styles.legendBusLight}/><View style={styles.legendBusLight}/></View></View>)}</View><Text style={styles.legendType}>{row.label}</Text></View>)}
               <Pressable style={styles.legendClose} onPress={()=>setLegendOpen(false)}><Text style={styles.legendCloseText}>Understood!</Text></Pressable>
             </Pressable>
           </Pressable>
@@ -333,8 +328,8 @@ map.on('moveend',reportBounds);map.on('zoomend',reportBounds);setTimeout(reportB
 function markerFor(v){
  const bg=validColor(v.color)?v.color:'transparent';
  const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
- const knownColour=v.colourKnown===true,estimatedColour=v.colourEstimated===true,displayableColour=knownColour||estimatedColour;
- const markerTitle=estimatedColour?'Operator marker; physical paint may differ':knownColour?'Colour supplied by the API or a reviewed vehicle record':'Operator unknown; neutral marker used';
+ const knownCategory=v.categoryKnown===true,displayableColour=knownCategory;
+ const markerTitle=knownCategory?'Bus type category from the Bus Color Legend':'Bus type or operator unknown; neutral marker used';
  const width=label?Math.max(48,Math.min(96,label.length*6.5+29)):28;
  const html='<div class="ud-mobile-bus'+(displayableColour?'':' unknown-colour')+'" title="'+markerTitle+'" style="background:'+bg+';color:#FFFFFF">'+
    '<span class="ud-mobile-bus-glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V7.5A3.5 3.5 0 0 1 8.5 4h7A3.5 3.5 0 0 1 19 7.5V19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M5 10h14M8 7h8M7.5 15h.01M16.5 15h.01M7 19v2m10-2v2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>'+
@@ -374,12 +369,12 @@ function renderBuses(){
    if(existing){
      animateMarker(existing,[Number(v.lat),Number(v.lon)]);
 
-     if(existing._udLabel!==label||existing._udBg!==bg||existing._udKnown!==(v.colourKnown===true)||existing._udEstimated!==(v.colourEstimated===true)){
-       const next=markerFor(v);next.on('click',()=>openBus(v.id));next._udLabel=label;next._udBg=bg;next._udKnown=v.colourKnown===true;next._udEstimated=v.colourEstimated===true;
+     if(existing._udLabel!==label||existing._udBg!==bg||existing._udKnown!==(v.categoryKnown===true)){
+       const next=markerFor(v);next.on('click',()=>openBus(v.id));next._udLabel=label;next._udBg=bg;next._udKnown=v.categoryKnown===true;
        busLayer.removeLayer(existing);busMarkers.set(id,next);next.addTo(busLayer);
      }
    }else{
-     const marker=markerFor(v);marker._udLabel=label;marker._udBg=bg;marker._udKnown=v.colourKnown===true;marker._udEstimated=v.colourEstimated===true;marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);busMarkers.set(id,marker);
+     const marker=markerFor(v);marker._udLabel=label;marker._udBg=bg;marker._udKnown=v.categoryKnown===true;marker.on('click',()=>openBus(v.id));marker.addTo(busLayer);busMarkers.set(id,marker);
    }
  }
 }
@@ -422,7 +417,7 @@ const styles=StyleSheet.create({
  legendHeader:{flexDirection:'row',justifyContent:'flex-start',paddingBottom:7,borderBottomWidth:0,borderBottomColor:colors.border},
  legendHeaderText:{width:160,fontSize:13,fontWeight:'500',color:colors.textMuted},
  legendRow:{flexDirection:'row',alignItems:'center',justifyContent:'flex-start',minHeight:32,borderBottomWidth:0},
- legendIcons:{flexDirection:'row',gap:8,width:160,flexGrow:0,flexShrink:0},
+ legendIcons:{flexDirection:'row',gap:5,width:160,flexGrow:0,flexShrink:0},
  legendBus:{width:36,height:26,borderRadius:0,alignItems:'center',justifyContent:'center'},
  legendBusWindow:{position:'absolute',left:4,right:4,top:3,height:3,backgroundColor:'rgba(255,255,255,.22)'},
  legendBusWindshield:{position:'absolute',left:5,right:5,top:8,height:3,backgroundColor:'rgba(255,255,255,.9)'},
@@ -432,7 +427,7 @@ const styles=StyleSheet.create({
  legendType:{flex:1,fontSize:14,fontWeight:'500',color:colors.text,textAlign:'left'},
  legendClose:{marginTop:8,minHeight:44,alignItems:'center',justifyContent:'center',backgroundColor:'#C7352C',paddingHorizontal:16},
  legendCloseText:{fontSize:14,fontWeight:'800',color:'#fff'},
- mapTop:{position:'absolute',left:10,top:10,flexDirection:'row',alignItems:'center',backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:9,paddingVertical:6,borderRadius:0},liveDot:{width:7,height:7,borderRadius:0,backgroundColor:colors.success,marginRight:6},mapTopText:{fontSize:10,fontWeight:'900',color:colors.text},mapAttribution:{position:'absolute',right:7,bottom:6,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:5,paddingVertical:2,borderRadius:0},mapAttributionText:{fontSize:7,color:'#52625f'},mapLegend:{position:'absolute',left:7,bottom:7,flexDirection:'row',gap:7,backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:7,paddingVertical:5,borderRadius:0,borderWidth:1,borderColor:colors.border},legendItem:{flexDirection:'row',alignItems:'center',gap:3},legendDot:{width:7,height:7,borderRadius:0},legendText:{fontSize:8,fontWeight:'800',color:colors.text},
+ mapTop:{position:'absolute',left:10,top:10,flexDirection:'row',alignItems:'center',backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:9,paddingVertical:6,borderRadius:0},liveDot:{width:7,height:7,borderRadius:0,backgroundColor:colors.success,marginRight:6},mapTopText:{fontSize:10,fontWeight:'900',color:colors.text},mapAttribution:{position:'absolute',right:7,bottom:6,backgroundColor:'rgba(255,255,255,.9)',paddingHorizontal:5,paddingVertical:2,borderRadius:0},mapAttributionText:{fontSize:7,color:'#52625f'},mapLegend:{position:'absolute',left:7,bottom:7,flexDirection:'row',gap:7,backgroundColor:'rgba(255,255,255,.94)',paddingHorizontal:7,paddingVertical:5,borderRadius:0,borderWidth:1,borderColor:colors.border},legendItem:{flexDirection:'row',alignItems:'center',gap:3},legendDot:{width:7,height:7,borderRadius:0},legendSwatches:{flexDirection:'row',gap:3},legendText:{fontSize:8,fontWeight:'800',color:colors.text},
  locationNotice:{position:'absolute',left:10,right:10,bottom:10,padding:9,borderRadius:0,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,flexDirection:'row',justifyContent:'space-between'},
  busPreview:{position:'absolute',left:9,right:9,bottom:9,borderRadius:0,backgroundColor:'#fff',borderWidth:1,borderColor:colors.border,shadowColor:'#17312F',shadowOpacity:.14,shadowRadius:12,shadowOffset:{width:0,height:4},elevation:6},
  busPreviewBody:{minHeight:72,padding:11,paddingRight:28,flexDirection:'row',alignItems:'center'},
