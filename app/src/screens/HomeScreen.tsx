@@ -11,7 +11,7 @@ import { StatusPill } from '../components/StatusPill';
 import type { RootStackParamList } from '../navigation/types';
 import { displayRouteName } from '../lib/routeDisplay';
 import { resolveRouteColor } from '../lib/routeColor';
-import { BUS_CATEGORY_MARKER_COLORS, fleetLegendRows, hasEvidenceBackedVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
+import { BUS_OPERATOR_MARKER_COLORS, fleetLegendRows, hasEvidenceBackedVehicleColor, resolveVehicleColor } from '../lib/vehicleColor';
 import { confirmLocationUse } from '../lib/locationConsent';
 import { UnitedDelhiMark } from '../components/UnitedDelhiMark';
 
@@ -52,11 +52,9 @@ export default function HomeScreen(){
   const loadVehiclesRef=useRef<()=>void>(()=>{});
 const legendRows = [
     ...fleetLegendRows(vehicles),
-    { key:'dtc-non-ac', label:'DTC CNG non-AC · category marker', color:BUS_CATEGORY_MARKER_COLORS.DTC_NON_AC },
-    { key:'dtc-ac', label:'DTC CNG AC · category marker', color:BUS_CATEGORY_MARKER_COLORS.DTC_AC },
-    { key:'cluster-non-ac', label:'DIMTS / Cluster CNG non-AC · category marker', color:BUS_CATEGORY_MARKER_COLORS.CLUSTER_NON_AC },
-    { key:'cluster-ac', label:'DIMTS / Cluster AC · category marker', color:BUS_CATEGORY_MARKER_COLORS.CLUSTER_AC },
-    { key:'unknown', label:'Unknown category · neutral marker', color:UNKNOWN_BUS_MARKER_COLOR }
+    { key:'dtc', label:'DTC · operator marker', color:BUS_OPERATOR_MARKER_COLORS.DTC },
+    { key:'dimts', label:'DIMTS / Cluster · operator marker', color:BUS_OPERATOR_MARKER_COLORS.DIMTS },
+    { key:'unknown', label:'Unknown operator · neutral marker', color:UNKNOWN_BUS_MARKER_COLOR }
   ];
 
   const requestLocation=useCallback(async()=>{
@@ -336,7 +334,7 @@ function markerFor(v){
  const bg=validColor(v.color)?v.color:'transparent';
  const label=map.getZoom()>=12?String(v.route||'LIVE').slice(0,10):'';
  const knownColour=v.colourKnown===true,estimatedColour=v.colourEstimated===true,displayableColour=knownColour||estimatedColour;
- const markerTitle=estimatedColour?'Fleet category marker; physical paint is unverified':knownColour?'Colour supplied by the API or a reviewed vehicle record':'Physical bus colour unknown';
+ const markerTitle=estimatedColour?'Operator marker; physical paint may differ':knownColour?'Colour supplied by the API or a reviewed vehicle record':'Operator unknown; neutral marker used';
  const width=label?Math.max(48,Math.min(96,label.length*6.5+29)):28;
  const html='<div class="ud-mobile-bus'+(displayableColour?'':' unknown-colour')+'" title="'+markerTitle+'" style="background:'+bg+';color:#FFFFFF">'+
    '<span class="ud-mobile-bus-glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V7.5A3.5 3.5 0 0 1 8.5 4h7A3.5 3.5 0 0 1 19 7.5V19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M5 10h14M8 7h8M7.5 15h.01M16.5 15h.01M7 19v2m10-2v2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>'+

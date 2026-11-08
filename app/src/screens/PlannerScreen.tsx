@@ -114,7 +114,7 @@ export default function PlannerScreen() {
             </View>
             {option.legs.map((leg:any, legIndex) => (
               <View key={`${leg.mode||'bus'}-${leg.routeId||'walk'}-${legIndex}`} style={styles.leg}>
-                {leg.mode==='walk' ? <View style={[styles.routeBadge,{backgroundColor:'#64748B'}]}><Text style={styles.routeBadgeText}>WALK</Text></View> : (() => { const name=displayRouteName(leg.routeName)||(leg.mode==='metro'?'Metro':'Bus'); const rc=resolveRouteColor(name,leg.routeColor,leg.routeTextColor); return <View style={[styles.routeBadge,{backgroundColor:rc.background}]}><Text style={[styles.routeBadgeText,{color:rc.text}]}>{leg.mode==='metro'?'M ':''}{name}</Text></View>; })()}
+                {leg.mode==='walk' ? <View style={[styles.routeBadge,{backgroundColor:'#64748B'}]}><Text style={styles.routeBadgeText}>WALK</Text></View> : (() => { const name=displayRouteName(leg.routeName)||(leg.mode==='metro'?'Metro':'Bus'); const rc=leg.mode==='metro'?resolveRouteColor(name,leg.routeColor,leg.routeTextColor):{background:'#64748B',text:'#FFFFFF'}; return <View style={[styles.routeBadge,{backgroundColor:rc.background}]}><Text style={[styles.routeBadgeText,{color:rc.text}]}>{leg.mode==='metro'?'M ':''}{name}</Text></View>; })()}
                 <View style={styles.legCopy}>
                   <Text style={styles.legRoute}>{leg.mode==='walk'?'Walk':leg.mode==='metro'?'Metro':'Bus'}{leg.mode==='walk'?'':' · '+(displayRouteName(leg.routeName)||leg.routeName||'Bus')}{leg.mode==='walk'&&leg.walkingMinutes?' · '+leg.walkingMinutes+' min':''}</Text>
                   <Text style={styles.legStops} numberOfLines={2}>{leg.fromStop} → {leg.toStop}{leg.mode==='walk'&&leg.walkMeters?' · '+Math.round(leg.walkMeters)+' m':''}</Text>
