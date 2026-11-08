@@ -34,6 +34,22 @@ export function classifyFleetTypeFromRegistration(...values) {
 }
 
 
+export function classifyOperatorType(agencyId, ...identifiers) {
+  const agency = String(agencyId ?? '').trim().toUpperCase();
+  const values = identifiers.map(value =>
+    String(value ?? '').trim().toUpperCase().replace(/\s+/g, '')
+  );
+  if (values.some(value => /^D-?9\d{3}[A-Z]?(?:UP|DOWN|DWN)?(?:\([^)]*\))?$/.test(value))) return 'dtc';
+  if (agency === 'DTC') return 'dtc';
+  if (agency === 'DIMTS' || agency === 'DOT' || agency === 'CLUSTER') return 'cluster';
+  const knownDtc = value =>
+    value.startsWith('DL51EV') || value.startsWith('DL51GD') ||
+    ['DL1GD','DL2GD','DL5GD','DL7GD','DL11GD','DL12GD','DL13GD',
+     'DL3EV','DL6EV','DL8EV','DL9EV','DL10EV',
+     'DL1PB','DL1PC','DL1PD','DL1PE'].some(prefix => value.startsWith(prefix));
+  return values.some(knownDtc) ? 'dtc' : 'unknown';
+}
+
 export const BUS_CATEGORY_MARKER_COLORS = Object.freeze({
   EV_AC_12: '#56B8C2',
   EV_DEVI_DTC: '#43B783',
