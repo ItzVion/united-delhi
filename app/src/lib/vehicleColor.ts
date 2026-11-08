@@ -1,63 +1,23 @@
 import type { Vehicle, Arrival } from '../api/client';
-
 export type VehicleColor={background:string;text:string};
-type ApiVehicleColor={
-  serviceColor?:string|null;
-  fleetColorSource?:string|null;
-  operatorType?:'dtc'|'cluster'|'unknown'|null;
-};
-const UNKNOWN_BUS_MARKER_COLOR='#64748B';
-export const BUS_OPERATOR_MARKER_COLORS={
-  DTC:'#15803D',
-  DIMTS:'#EA580C'
-} as const;
-
-function validApiColor(value:string|null|undefined):string|null{
-  const color=String(value??'').trim();
-  return /^#[0-9a-f]{6}$/i.test(color)?color:null;
+type Input={busType?:string|null;operatorType?:'dtc'|'cluster'|'unknown'|null};
+export const UNKNOWN_BUS_MARKER_COLOR='#64748B';
+export const BUS_CATEGORY_MARKER_COLORS={EV_AC_12:'#56B8C2',EV_DEVI_DTC:'#43B783',EV_DEVI_CLUSTER:'#E9874B',CNG_AC_DTC:'#D96878',CNG_AC_CLUSTER:'#477CC5',CNG_NON_AC_DTC:'#4DB98B',CNG_NON_AC_CLUSTER:'#DDA174'} as const;
+export const BUS_TYPE_COLOR_LEGEND=[
+ {key:'ev-ac-12',label:'EV AC (12 mtr)',shortLabel:'EV AC 12m',colors:[BUS_CATEGORY_MARKER_COLORS.EV_AC_12]},
+ {key:'ev-devi-ac-9',label:'EV DEVI AC (9 mtr)',shortLabel:'EV DEVI',colors:[BUS_CATEGORY_MARKER_COLORS.EV_DEVI_CLUSTER,BUS_CATEGORY_MARKER_COLORS.EV_DEVI_DTC]},
+ {key:'cng-ac-12',label:'CNG AC (12 mtr)',shortLabel:'CNG AC',colors:[BUS_CATEGORY_MARKER_COLORS.CNG_AC_CLUSTER,BUS_CATEGORY_MARKER_COLORS.CNG_AC_DTC]},
+ {key:'cng-non-ac-12',label:'CNG NonAC (12 mtr)',shortLabel:'CNG NonAC',colors:[BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER,BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC]}
+] as const;
+export function resolveFleetCategoryColor(operatorType:Input['operatorType'],busType:Input['busType']):string|null{
+ const operator=String(operatorType||'').trim().toLowerCase();
+ const type=String(busType||'').trim().toUpperCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
+ if(/\bEV\b/.test(type)&&/\bDEVI\b/.test(type)&&/\bAC\b/.test(type)&&/\b9\s*MTR\b/.test(type)){if(operator==='dtc')return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_DTC;if(operator==='cluster')return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_CLUSTER;return null;}
+ if(/\bEV\b/.test(type)&&/\bAC\b/.test(type)&&/\b12\s*MTR\b/.test(type)&&!/\bDEVI\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.EV_AC_12;
+ if(/\bCNG\b/.test(type)&&/\bNON\s*AC\b/.test(type)&&/\b12\s*MTR\b/.test(type)){if(operator==='dtc')return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC;if(operator==='cluster')return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER;return null;}
+ if(/\bCNG\b/.test(type)&&/\bAC\b/.test(type)&&/\b12\s*MTR\b/.test(type)){if(operator==='dtc')return BUS_CATEGORY_MARKER_COLORS.CNG_AC_DTC;if(operator==='cluster')return BUS_CATEGORY_MARKER_COLORS.CNG_AC_CLUSTER;return null;}
+ return null;
 }
-function evidencedColor(v:ApiVehicleColor):string|null{
-  const source=String(v.fleetColorSource||'');
-  if(source!=='upstream-api'&&source!=='verified-livery-record')return null;
-  return validApiColor(v.serviceColor);
-}
-function operatorColor(operatorType:ApiVehicleColor['operatorType']):string|null{
-  const operator=String(operatorType||'').toLowerCase();
-  if(operator==='dtc')return BUS_OPERATOR_MARKER_COLORS.DTC;
-  if(operator==='cluster')return BUS_OPERATOR_MARKER_COLORS.DIMTS;
-  return null;
-}
-function textFor(bg:string){
-  const h=bg.slice(1);
-  const rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255);
-  const lin=rgb.map(c=>c<=0.03928?c/12.92:((c+0.055)/1.055)**2.4);
-  const y=.2126*lin[0]+.7152*lin[1]+.0722*lin[2];
-  return y>.179?'#17313B':'#FFFFFF';
-}
-export function fleetLegendRows(vehicles:ApiVehicleColor[]){
-  const counts=new Map<string,{color:string;source:'upstream-api'|'verified-livery-record';count:number}>();
-  for(const vehicle of vehicles){
-    const color=evidencedColor(vehicle);
-    if(!color)continue;
-    const source=String(vehicle.fleetColorSource) as 'upstream-api'|'verified-livery-record';
-    const key=source+':'+color.toUpperCase(),previous=counts.get(key);
-    if(previous)previous.count++;
-    else counts.set(key,{color:color.toUpperCase(),source,count:1});
-  }
-  const labels={'upstream-api':'Live API','verified-livery-record':'Reviewed'};
-  return [...counts.values()]
-    .sort((a,b)=>a.source.localeCompare(b.source)||b.count-a.count||a.color.localeCompare(b.color))
-    .map(row=>({key:row.source+':'+row.color,label:labels[row.source]+' · '+row.color+' ('+row.count+')',color:row.color,source:row.source}));
-}
-export function hasApiVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):boolean{
-  return String((v as any).fleetColorSource||'')==='upstream-api'&&validApiColor(v.serviceColor)!==null;
-}
-export function hasEvidenceBackedVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):boolean{
-  return evidencedColor(v as ApiVehicleColor)!==null;
-}
-export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{
-  const colour=evidencedColor(v as ApiVehicleColor);
-  const operator=operatorColor((v as ApiVehicleColor).operatorType);
-  const background=colour||operator||UNKNOWN_BUS_MARKER_COLOR;
-  return {background,text:textFor(background)};
-}
+export function hasKnownBusCategory(v:Partial<Vehicle>|Partial<Arrival>):boolean{return resolveFleetCategoryColor(v.operatorType,v.busType)!==null;}
+function textFor(bg:string){const h=bg.slice(1),rgb=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255),lin=rgb.map(c=>c<=0.03928?c/12.92:((c+0.055)/1.055)**2.4);return .2126*lin[0]+.7152*lin[1]+.0722*lin[2]>.179?'#17313B':'#FFFFFF';}
+export function resolveVehicleColor(v:Partial<Vehicle>|Partial<Arrival>):VehicleColor{const background=resolveFleetCategoryColor(v.operatorType,v.busType)||UNKNOWN_BUS_MARKER_COLOR;return{background,text:textFor(background)};}
