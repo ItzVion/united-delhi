@@ -19,7 +19,7 @@ export function resolveEvidenceBackedColor(upstreamColor, verifiedLiveryColor) {
 // Classify known registration families for vehicle category only.
 // Registration alone never proves a vehicle's physical paint colour.
 export function classifyFleetTypeFromRegistration(...values) {
-  const candidates=values.map(value=>String(value||'').toUpperCase().replace(/[-_\\s]/g,'')).filter(Boolean);
+  const candidates=values.map(value=>String(value||'').toUpperCase().replace(/[-_\s]/g,'')).filter(Boolean);
   const electricNine=['DL1GD','DL2GD','DL5GD','DL7GD','DL11GD','DL12GD','DL13GD'];
   const electricTwelve=['DL3EV','DL6EV','DL8EV','DL9EV','DL10EV'];
   const knownPrefix=value=>value.startsWith('DL51EV')||value.startsWith('DL51GD')||electricNine.some(prefix=>value.startsWith(prefix))||electricTwelve.some(prefix=>value.startsWith(prefix))||value.startsWith('DL1PB')||value.startsWith('DL1PC')||value.startsWith('DL1PD')||value.startsWith('DL1PE');
@@ -46,21 +46,21 @@ export const BUS_CATEGORY_MARKER_COLORS = Object.freeze({
 
 export function resolveFleetCategoryColor(operatorType, busType) {
   const operator = String(operatorType ?? '').trim().toLowerCase();
-  const type = String(busType ?? '').trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\\s+/g, ' ');
-  if (/\\bEV\\b/.test(type) && /\\bDEVI\\b/.test(type) && /\\bAC\\b/.test(type) && /\\b9\\s*MTR\\b/.test(type)) {
+  const type = String(busType ?? '').trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+  if (/\bEV\b/.test(type) && /\bDEVI\b/.test(type) && /\bAC\b/.test(type) && /\b9\s*MTR\b/.test(type)) {
     if (operator === 'dtc') return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_DTC;
     if (operator === 'cluster') return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_CLUSTER;
     return null;
   }
-  if (/\\bEV\\b/.test(type) && /\\bAC\\b/.test(type) && /\\b12\\s*MTR\\b/.test(type) && !/\\bDEVI\\b/.test(type)) {
+  if (/\bEV\b/.test(type) && /\bAC\b/.test(type) && /\b12\s*MTR\b/.test(type) && !/\bDEVI\b/.test(type)) {
     return BUS_CATEGORY_MARKER_COLORS.EV_AC_12;
   }
-  if (/\\bCNG\\b/.test(type) && /\\bNON\\s*AC\\b/.test(type) && /\\b12\\s*MTR\\b/.test(type)) {
+  if (/\bCNG\b/.test(type) && /\bNON\s*AC\b/.test(type) && /\b12\s*MTR\b/.test(type)) {
     if (operator === 'dtc') return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC;
     if (operator === 'cluster') return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER;
     return null;
   }
-  if (/\\bCNG\\b/.test(type) && /\\bAC\\b/.test(type) && /\\b12\\s*MTR\\b/.test(type)) {
+  if (/\bCNG\b/.test(type) && /\bAC\b/.test(type) && /\b12\s*MTR\b/.test(type)) {
     if (operator === 'dtc') return BUS_CATEGORY_MARKER_COLORS.CNG_AC_DTC;
     if (operator === 'cluster') return BUS_CATEGORY_MARKER_COLORS.CNG_AC_CLUSTER;
     return null;
