@@ -167,7 +167,7 @@ body,#root{background:var(--bg)}
 .timeline{margin-bottom:24px!important}
 @media(max-width:600px){.metro-directions{flex-direction:column}.metro-directions button{padding:10px 12px}}
 
-/* Unknown physical bus colour: visibly neutral, explicitly unverified, never guessed. */
+/* Unknown bus type/operator: neutral marker; known categories follow the bus colour legend. */
 .bus-pill.unknown-colour{outline:1.5px dashed rgba(255,255,255,.95);outline-offset:1px;box-shadow:0 0 0 1px #64748b,0 1px 4px #0006}
 .bus-colour-unknown{display:inline-grid;place-items:center;flex:0 0 auto;width:10px;height:10px;margin:0 1px;border:1px solid #475569;border-radius:50%;background:#fff;color:#475569;font:900 8px/8px system-ui,sans-serif}
 .bp-colour-note{margin-top:8px;font-size:11px;line-height:15px;color:var(--mut)}
@@ -328,7 +328,7 @@ body,#root{background:var(--bg)}
  .planner-page .trip{transition:none!important}
 }
 
-/* Map colour legend: distinguish real vehicle-livery evidence from display-only route colours. */
+/* Bus colour legend: four type rows with paired operator colour swatches. */
 .legend-modal .legend-card,.legend-modal .modal-card{max-height:min(82dvh,720px);overflow:auto;gap:12px}
 .legend-colour-note{font-size:13px;line-height:1.5;color:#53616b;background:#F3F6F8;border:1px solid #DDE4E8;border-radius:12px;padding:10px 12px}
 .legend-section-title{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#697783;margin-top:4px}

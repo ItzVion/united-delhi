@@ -1,39 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  busMarkerColor,busMarkerKind,routePageBusMarkerColor,busColor,
-  defaultBusOperatorColor,BUS_OPERATOR_MARKER_COLORS,UNKNOWN_BUS_MARKER_COLOR,routeName
-} from '../src/lib.ts';
-
-test('DEVI route D-9905 keeps its D prefix in its public map label',()=>{
-  assert.equal(routeName('D-9905'),'D-9905');
-  assert.equal(routeName('D-9905 UP'),'D-9905');
-  assert.equal(routeName('D-9905DOWN'),'D-9905');
-  assert.equal(routeName('D-9905UP'),'D-9905');
-});
-test('exact individual physical colour has priority over operator marker',()=>{
-  const v={serviceColor:'#F97316',fleetColorSource:'upstream-api',operatorType:'dtc'};
-  assert.equal(busMarkerKind(v),'physical');
-  assert.equal(busMarkerColor(v),'#F97316');
-});
-test('DTC markers stay green for CNG, EV, AC and DEVI vehicles',()=>{
-  assert.equal(defaultBusOperatorColor('dtc'),BUS_OPERATOR_MARKER_COLORS.DTC);
-  for(const busType of ['CNG NonAC (12 mtr)','CNG AC (12 mtr)','EV AC (9 mtr)','Unknown']){
-    assert.equal(busMarkerColor({operatorType:'dtc',busType,routeShortName:'D-9905'}),BUS_OPERATOR_MARKER_COLORS.DTC);
-  }
-});
-test('DIMTS / Cluster marker stays orange regardless of bus type',()=>{
-  for(const busType of ['CNG NonAC (12 mtr)','CNG AC (12 mtr)','EV AC (9 mtr)','Unknown']){
-    assert.equal(busMarkerColor({operatorType:'cluster',busType,routeShortName:'D-9905'}),BUS_OPERATOR_MARKER_COLORS.DIMTS);
-  }
-});
-test('same route can show different operator markers for different vehicles',()=>{
-  assert.notEqual(busMarkerColor({operatorType:'dtc',routeShortName:'D-9905'}),busMarkerColor({operatorType:'cluster',routeShortName:'D-9905'}));
-});
-test('unknown operator uses neutral grey even when route metadata contains a colour',()=>{
-  const v={operatorType:'unknown',routeShortName:'D-9905',routeColor:'#2563EB'};
-  assert.equal(busMarkerKind(v),'unknown');
-  assert.equal(busMarkerColor(v),UNKNOWN_BUS_MARKER_COLOR);
-  assert.equal(routePageBusMarkerColor(v),UNKNOWN_BUS_MARKER_COLOR);
-  assert.equal(busColor(v),UNKNOWN_BUS_MARKER_COLOR);
-});
+import {busMarkerColor,busMarkerKind,routePageBusMarkerColor,busColor,BUS_CATEGORY_MARKER_COLORS,UNKNOWN_BUS_MARKER_COLOR,routeName} from '../src/lib.ts';
+test('DEVI D-9905 route labels preserve D- prefix and strip direction suffix',()=>{for(const value of ['D-9905','D-9905 UP','D-9905DOWN','D-9905UP'])assert.equal(routeName(value),'D-9905')});
+test('EV AC 12 m uses the single cyan legend colour',()=>{assert.equal(busMarkerColor({busType:'EV AC (12 mtr)',operatorType:'dtc'}),BUS_CATEGORY_MARKER_COLORS.EV_AC_12);assert.equal(busMarkerColor({busType:'EV AC (12 mtr)',operatorType:'cluster'}),BUS_CATEGORY_MARKER_COLORS.EV_AC_12)});
+test('EV DEVI AC 9 m uses orange for DIMTS and green for DTC',()=>{assert.equal(busMarkerColor({busType:'EV DEVI AC (9 mtr)',operatorType:'cluster'}),BUS_CATEGORY_MARKER_COLORS.EV_DEVI_CLUSTER);assert.equal(busMarkerColor({busType:'EV DEVI AC (9 mtr)',operatorType:'dtc'}),BUS_CATEGORY_MARKER_COLORS.EV_DEVI_DTC)});
+test('CNG AC 12 m uses blue for DIMTS and pink for DTC',()=>{assert.equal(busMarkerColor({busType:'CNG AC (12 mtr)',operatorType:'cluster'}),BUS_CATEGORY_MARKER_COLORS.CNG_AC_CLUSTER);assert.equal(busMarkerColor({busType:'CNG AC (12 mtr)',operatorType:'dtc'}),BUS_CATEGORY_MARKER_COLORS.CNG_AC_DTC)});
+test('CNG NonAC 12 m uses tan for DIMTS and green for DTC',()=>{assert.equal(busMarkerColor({busType:'CNG NonAC (12 mtr)',operatorType:'cluster'}),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER);assert.equal(busMarkerColor({busType:'CNG NonAC (12 mtr)',operatorType:'dtc'}),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC)});
+test('unknown/unlisted categories use neutral grey, never route or raw service colours',()=>{const v={busType:'EV AC (9 mtr)',operatorType:'unknown',routeColor:'#2563EB',serviceColor:'#F97316',fleetColorSource:'upstream-api'};assert.equal(busMarkerKind(v),'unknown');assert.equal(busMarkerColor(v),UNKNOWN_BUS_MARKER_COLOR);assert.equal(routePageBusMarkerColor(v),UNKNOWN_BUS_MARKER_COLOR);assert.equal(busColor(v),UNKNOWN_BUS_MARKER_COLOR)});

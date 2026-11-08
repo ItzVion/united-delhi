@@ -18,41 +18,49 @@ export const metroColor=(value)=>{const t=String(value||'').toUpperCase();for(co
 
 export const isHex=(v:unknown):v is string=>/^#[0-9a-f]{6}$/i.test(String(v||''));
 export const UNKNOWN_BUS_MARKER_COLOR='#64748B';
-export const BUS_OPERATOR_MARKER_COLORS={
-  DTC:'#15803D',
-  DIMTS:'#EA580C'
+export const BUS_CATEGORY_MARKER_COLORS={
+  EV_AC_12:'#56B8C2',EV_DEVI_DTC:'#43B783',EV_DEVI_CLUSTER:'#E9874B',
+  CNG_AC_DTC:'#D96878',CNG_AC_CLUSTER:'#477CC5',
+  CNG_NON_AC_DTC:'#4DB98B',CNG_NON_AC_CLUSTER:'#DDA174'
 } as const;
+export const BUS_TYPE_COLOR_LEGEND=[
+  {key:'ev-ac-12',label:'EV AC (12 mtr)',colors:[BUS_CATEGORY_MARKER_COLORS.EV_AC_12]},
+  {key:'ev-devi-ac-9',label:'EV DEVI AC (9 mtr)',colors:[BUS_CATEGORY_MARKER_COLORS.EV_DEVI_CLUSTER,BUS_CATEGORY_MARKER_COLORS.EV_DEVI_DTC]},
+  {key:'cng-ac-12',label:'CNG AC (12 mtr)',colors:[BUS_CATEGORY_MARKER_COLORS.CNG_AC_CLUSTER,BUS_CATEGORY_MARKER_COLORS.CNG_AC_DTC]},
+  {key:'cng-non-ac-12',label:'CNG NonAC (12 mtr)',colors:[BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER,BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC]}
+] as const;
 type BusMarkerInput={
   id?:string|null;routeId?:string|null;routeShortName?:string|null;routeColor?:string|null;
   serviceColor?:string|null;fleetColorSource?:string|null;busType?:string|null;
   operatorType?:'dtc'|'cluster'|'unknown'|null;fuelType?:'cng'|'electric'|'unknown'|null;
   airConditioned?:boolean|null;markerColor?:string|null;markerColorSource?:string|null;
 };
-const verifiedVehicleColour=(v:BusMarkerInput)=>{
-  const source=String(v?.fleetColorSource||'');
-  const colour=String(v?.serviceColor??'').trim();
-  return (source==='upstream-api'||source==='verified-livery-record')&&isHex(colour)?colour:null;
-};
-export const defaultBusOperatorColor=(operatorType?:string|null):string|null=>{
+export const resolveFleetCategoryColor=(operatorType?:string|null,busType?:string|null):string|null=>{
   const operator=String(operatorType||'').trim().toLowerCase();
-  if(operator==='dtc')return BUS_OPERATOR_MARKER_COLORS.DTC;
-  if(operator==='cluster')return BUS_OPERATOR_MARKER_COLORS.DIMTS;
+  const type=String(busType||'').trim().toUpperCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
+  if(/\bEV\b/.test(type)&&/\bDEVI\b/.test(type)&&/\bAC\b/.test(type)&&/\b9\s*MTR\b/.test(type)){
+    if(operator==='dtc')return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_DTC;
+    if(operator==='cluster')return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_CLUSTER;
+    return null;
+  }
+  if(/\bEV\b/.test(type)&&/\bAC\b/.test(type)&&/\b12\s*MTR\b/.test(type)&&!/\bDEVI\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.EV_AC_12;
+  if(/\bCNG\b/.test(type)&&/\bNON\s*AC\b/.test(type)&&/\b12\s*MTR\b/.test(type)){
+    if(operator==='dtc')return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC;
+    if(operator==='cluster')return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER;
+    return null;
+  }
+  if(/\bCNG\b/.test(type)&&/\bAC\b/.test(type)&&/\b12\s*MTR\b/.test(type)){
+    if(operator==='dtc')return BUS_CATEGORY_MARKER_COLORS.CNG_AC_DTC;
+    if(operator==='cluster')return BUS_CATEGORY_MARKER_COLORS.CNG_AC_CLUSTER;
+    return null;
+  }
   return null;
 };
-export const busColor=(v:{serviceColor?:string|null;fleetColorSource?:string|null;operatorType?:'dtc'|'cluster'|'unknown'|null})=>{
-  return verifiedVehicleColour(v)||defaultBusOperatorColor(v.operatorType)||UNKNOWN_BUS_MARKER_COLOR;
-};
-export type BusMarkerKind='physical'|'operator'|'unknown';
-export const busMarkerKind=(v:BusMarkerInput):BusMarkerKind=>{
-  if(verifiedVehicleColour(v))return 'physical';
-  return defaultBusOperatorColor(v?.operatorType)?'operator':'unknown';
-};
-export const busMarkerColor=(v:BusMarkerInput)=>{
-  return verifiedVehicleColour(v)||defaultBusOperatorColor(v?.operatorType)||UNKNOWN_BUS_MARKER_COLOR;
-};
-export function routePageBusMarkerColor(v:BusMarkerInput):string{
-  return busMarkerColor(v);
-};
+export type BusMarkerKind='category'|'unknown';
+export const busMarkerKind=(v:BusMarkerInput):BusMarkerKind=>resolveFleetCategoryColor(v?.operatorType,v?.busType)?'category':'unknown';
+export const busMarkerColor=(v:BusMarkerInput)=>resolveFleetCategoryColor(v?.operatorType,v?.busType)||UNKNOWN_BUS_MARKER_COLOR;
+export const busColor=(v:BusMarkerInput)=>busMarkerColor(v);
+export function routePageBusMarkerColor(v:BusMarkerInput):string{return busMarkerColor(v);}
 export const textOn=(bg:string)=>{if(!isHex(bg))return '#14211B';const h=bg.replace('#','');const c=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]>.179?'#14211B':'#FFFFFF'};
 
 export const routeName=(value:unknown)=>{
