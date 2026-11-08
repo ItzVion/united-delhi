@@ -68,6 +68,20 @@ export function resolveFleetCategoryColor(operatorType, busType) {
   return null;
 }
 
+export function classifyBusType(busType) {
+  const type = String(busType ?? '').trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\\s+/g, ' ');
+  if (/\\bCNG\\b/.test(type) && /\\bNON\\s*AC\\b/.test(type)) {
+    return { fuelType: 'cng', airConditioned: false };
+  }
+  if (/\\bCNG\\b/.test(type) && /\\bAC\\b/.test(type)) {
+    return { fuelType: 'cng', airConditioned: true };
+  }
+  if (/\\bEV\\b/.test(type) && /\\bAC\\b/.test(type)) {
+    return { fuelType: 'electric', airConditioned: true };
+  }
+  return { fuelType: 'unknown', airConditioned: null };
+}
+
 // Physical-livery summaries// Physical-livery summaries include only exact per-vehicle upstream colours or reviewed records.
 // Route colours, registration families and fleet/service categories are not vehicle-paint evidence.
 export function summarizeRouteLivery(vehicles = []) {
