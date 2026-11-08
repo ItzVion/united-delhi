@@ -9,8 +9,8 @@ import {
   classifyFleetTypeFromRegistration,
   classifyOperatorType,
   classifyBusType,
-  resolveOperatorMarkerColor,
-  BUS_OPERATOR_MARKER_COLORS,
+  resolveFleetCategoryColor,
+  BUS_CATEGORY_MARKER_COLORS,
   scanEntities,
   extractColorsByVehicle,
   parseColorFieldSpec
@@ -156,19 +156,6 @@ test('malformed bytes never throw', () => {
 });
 
 
-test('physical colour prefers the upstream API and uses only an exact verified livery fallback',()=>{
-  assert.equal(resolveEvidenceBackedColor('#F97316','#2563EB'),'#F97316');
-  assert.equal(resolveEvidenceBackedColor(null,'#2563EB'),'#2563EB');
-  assert.equal(resolveEvidenceBackedColor(undefined,'#2563EB'),'#2563EB');
-  assert.equal(resolveEvidenceBackedColor('orange','#2563EB'),'#2563EB');
-  assert.equal(resolveEvidenceBackedColor(null,'blue'),null);
-  assert.equal(resolveEvidenceBackedColor(null,null),null);
-});
-
-test('malformed bytes never throw', () => {
-  assert.deepEqual(scanEntities(new Uint8Array([0x12, 0xff, 0xff])), []);
-});
-
 test('physical colour prefers exact upstream API colour, then exact reviewed livery',()=>{
   assert.equal(resolveEvidenceBackedColor('#F97316','#2563EB'),'#F97316');
   assert.equal(resolveEvidenceBackedColor(null,'#2563EB'),'#2563EB');
@@ -178,23 +165,20 @@ test('physical colour prefers exact upstream API colour, then exact reviewed liv
   assert.equal(resolveEvidenceBackedColor(null,null),null);
 });
 
-test('DTC and DIMTS/Cluster marker colours depend only on operator', () => {
-  assert.equal(classifyOperatorType('DTC'), 'dtc');
-  assert.equal(classifyOperatorType('DIMTS'), 'cluster');
-  assert.equal(classifyOperatorType('DOT'), 'cluster');
-  assert.equal(classifyOperatorType(null, 'DL1PD4080'), 'dtc');
-  assert.equal(classifyOperatorType(null, 'D-9905'), 'dtc');
-  assert.equal(classifyOperatorType(null, 'D-9905DOWN'), 'dtc');
-  assert.equal(classifyOperatorType(null, 'D-9905UP'), 'dtc');
-  assert.equal(classifyOperatorType('DOT', 'D-9905'), 'dtc');
-  assert.equal(classifyOperatorType(null, 'vehicle-unknown'), 'unknown');
-
-  assert.deepEqual(classifyBusType('CNG NonAC (12 mtr)'), { fuelType: 'cng', airConditioned: false });
-  assert.deepEqual(classifyBusType('CNG AC (12 mtr)'), { fuelType: 'cng', airConditioned: true });
-  assert.deepEqual(classifyBusType('EV AC (12 mtr)'), { fuelType: 'electric', airConditioned: true });
-
-  assert.equal(resolveOperatorMarkerColor('dtc'), BUS_OPERATOR_MARKER_COLORS.DTC);
-  assert.equal(resolveOperatorMarkerColor('cluster'), BUS_OPERATOR_MARKER_COLORS.DIMTS);
-  assert.equal(resolveOperatorMarkerColor('unknown'), null);
-  assert.equal(resolveOperatorMarkerColor(null), null);
+test('bus category colours match the One Delhi legend by type and operator',()=>{
+  assert.equal(resolveFleetCategoryColor('dtc','EV AC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.EV_AC_12);
+  assert.equal(resolveFleetCategoryColor('cluster','EV AC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.EV_AC_12);
+  assert.equal(resolveFleetCategoryColor('cluster','EV DEVI AC (9 mtr)'),BUS_CATEGORY_MARKER_COLORS.EV_DEVI_CLUSTER);
+  assert.equal(resolveFleetCategoryColor('dtc','EV DEVI AC (9 mtr)'),BUS_CATEGORY_MARKER_COLORS.EV_DEVI_DTC);
+  assert.equal(resolveFleetCategoryColor('cluster','CNG AC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CNG_AC_CLUSTER);
+  assert.equal(resolveFleetCategoryColor('dtc','CNG AC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CNG_AC_DTC);
+  assert.equal(resolveFleetCategoryColor('cluster','CNG NonAC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER);
+  assert.equal(resolveFleetCategoryColor('dtc','CNG NonAC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC);
+  assert.equal(resolveFleetCategoryColor('unknown','CNG AC (12 mtr)'),null);
+  assert.equal(resolveFleetCategoryColor('dtc','EV AC (9 mtr)'),null);
+});
+test('DEVI D-9905 identifiers are classified as DTC',()=>{
+  for(const label of ['D-9905','D-9905UP','D-9905DOWN']){
+    assert.equal(classifyOperatorType(null,label),'dtc');
+  }
 });

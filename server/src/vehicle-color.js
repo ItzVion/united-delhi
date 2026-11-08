@@ -34,45 +34,37 @@ export function classifyFleetTypeFromRegistration(...values) {
 }
 
 
-export const BUS_OPERATOR_MARKER_COLORS = Object.freeze({
-  DTC: '#15803D',
-  DIMTS: '#EA580C'
+export const BUS_CATEGORY_MARKER_COLORS = Object.freeze({
+  EV_AC_12: '#56B8C2',
+  EV_DEVI_DTC: '#43B783',
+  EV_DEVI_CLUSTER: '#E9874B',
+  CNG_AC_DTC: '#D96878',
+  CNG_AC_CLUSTER: '#477CC5',
+  CNG_NON_AC_DTC: '#4DB98B',
+  CNG_NON_AC_CLUSTER: '#DDA174'
 });
 
-export function classifyOperatorType(agencyId, ...identifiers) {
-  const agency = String(agencyId ?? '').trim().toUpperCase();
-  const values = identifiers.map(value =>
-    String(value ?? '').trim().toUpperCase().replace(/\s+/g, '')
-  );
-  if (values.some(value => /^D-?9\d{3}[A-Z]?(?:UP|DOWN|DWN)?(?:\([^)]*\))?$/.test(value))) return 'dtc';
-  if (agency === 'DTC') return 'dtc';
-  if (agency === 'DIMTS' || agency === 'DOT' || agency === 'CLUSTER') return 'cluster';
-  const knownDtc = value =>
-    value.startsWith('DL51EV') || value.startsWith('DL51GD') ||
-    ['DL1GD','DL2GD','DL5GD','DL7GD','DL11GD','DL12GD','DL13GD',
-     'DL3EV','DL6EV','DL8EV','DL9EV','DL10EV',
-     'DL1PB','DL1PC','DL1PD','DL1PE'].some(prefix => value.startsWith(prefix));
-  return values.some(knownDtc) ? 'dtc' : 'unknown';
-}
-
-export function classifyBusType(busType) {
-  const type = String(busType ?? '').trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
-  if (/\bCNG\b/.test(type) && /\bNON\s*AC\b/.test(type)) {
-    return { fuelType: 'cng', airConditioned: false };
-  }
-  if (/\bCNG\b/.test(type) && /\bAC\b/.test(type)) {
-    return { fuelType: 'cng', airConditioned: true };
-  }
-  if (/\bEV\b/.test(type) && /\bAC\b/.test(type)) {
-    return { fuelType: 'electric', airConditioned: true };
-  }
-  return { fuelType: 'unknown', airConditioned: null };
-}
-
-export function resolveOperatorMarkerColor(operatorType) {
+export function resolveFleetCategoryColor(operatorType, busType) {
   const operator = String(operatorType ?? '').trim().toLowerCase();
-  if (operator === 'dtc') return BUS_OPERATOR_MARKER_COLORS.DTC;
-  if (operator === 'cluster') return BUS_OPERATOR_MARKER_COLORS.DIMTS;
+  const type = String(busType ?? '').trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\\s+/g, ' ');
+  if (/\\bEV\\b/.test(type) && /\\bDEVI\\b/.test(type) && /\\bAC\\b/.test(type) && /\\b9\\s*MTR\\b/.test(type)) {
+    if (operator === 'dtc') return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_DTC;
+    if (operator === 'cluster') return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_CLUSTER;
+    return null;
+  }
+  if (/\\bEV\\b/.test(type) && /\\bAC\\b/.test(type) && /\\b12\\s*MTR\\b/.test(type) && !/\\bDEVI\\b/.test(type)) {
+    return BUS_CATEGORY_MARKER_COLORS.EV_AC_12;
+  }
+  if (/\\bCNG\\b/.test(type) && /\\bNON\\s*AC\\b/.test(type) && /\\b12\\s*MTR\\b/.test(type)) {
+    if (operator === 'dtc') return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC;
+    if (operator === 'cluster') return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER;
+    return null;
+  }
+  if (/\\bCNG\\b/.test(type) && /\\bAC\\b/.test(type) && /\\b12\\s*MTR\\b/.test(type)) {
+    if (operator === 'dtc') return BUS_CATEGORY_MARKER_COLORS.CNG_AC_DTC;
+    if (operator === 'cluster') return BUS_CATEGORY_MARKER_COLORS.CNG_AC_CLUSTER;
+    return null;
+  }
   return null;
 }
 

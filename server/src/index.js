@@ -6,7 +6,7 @@ import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import { rateLimit } from 'express-rate-limit';
 import {createRealtimeRequest} from './realtime-provider.js';
 import {publicRouteName} from './route-display.js';
-import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,classifyFleetTypeFromRegistration,classifyOperatorType,classifyBusType,resolveOperatorMarkerColor,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
+import {validHexColor,apiVehicleColorOnly,resolveEvidenceBackedColor,classifyFleetTypeFromRegistration,classifyOperatorType,classifyBusType,resolveFleetCategoryColor,extractColorsByVehicle,parseColorFieldSpec} from './vehicle-color.js';
 const COLOR_FIELD=parseColorFieldSpec(process.env.OTD_COLOR_FIELD);
 
 const {Pool}=pg,app=express();
@@ -150,7 +150,7 @@ const applyFleetRegistry=v=>{
  const operatorType=v.operatorType||classifyOperatorType(v.agencyId||v.operator,v.id,v.licensePlate,v.vehicleLabel);
  const vehicle={...v,busType,serviceType,operatorType};
  const category=classifyBusType(busType);
- const markerColor=resolveOperatorMarkerColor(operatorType);
+ const markerColor=resolveFleetCategoryColor(operatorType,busType);
  const serviceColor=resolveEvidenceBackedColor(upstreamColor,verified?.colorHex);
  const fleetColorSource=upstreamColor?'upstream-api':verified?'verified-livery-record':'not-provided-by-realtime-feed';
  return {...vehicle,
