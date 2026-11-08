@@ -178,8 +178,14 @@ test('bus category colours match the One Delhi legend by type and operator',()=>
   assert.equal(resolveFleetCategoryColor('unknown','CNG AC (12 mtr)'),null);
   assert.equal(resolveFleetCategoryColor('dtc','EV AC (9 mtr)'),null);
 });
-test('DEVI D-9905 identifiers are classified as DTC',()=>{
+test('DEVI D-9905 identifies as DTC and its DL1PD fleet marker follows the CNG NonAC legend',()=>{
   for(const label of ['D-9905','D-9905UP','D-9905DOWN']){
     assert.equal(classifyOperatorType(null,label),'dtc');
   }
+  const fleet=classifyFleetTypeFromRegistration('DL1PD7915');
+  assert.equal(fleet.busType,'CNG NonAC (12 mtr)');
+  assert.equal(
+    resolveFleetCategoryColor(classifyOperatorType('DTC','D-9905'),fleet.busType),
+    BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC
+  );
 });
