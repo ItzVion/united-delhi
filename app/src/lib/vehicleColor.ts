@@ -14,7 +14,7 @@ export function resolveFleetCategoryColor(operatorType:Input['operatorType'],bus
  const type=String(busType||'').trim().toUpperCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
  if(/\bEV\b/.test(type)&&/\bDEVI\b/.test(type)&&/\bAC\b/.test(type)&&/\b9\s*MTR\b/.test(type)){if(operator==='dtc')return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_DTC;if(operator==='cluster')return BUS_CATEGORY_MARKER_COLORS.EV_DEVI_CLUSTER;return null;}
  if(/\bEV\b/.test(type)&&/\bAC\b/.test(type)&&/\b12\s*MTR\b/.test(type)&&!/\bDEVI\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.EV_AC_12;
- if(/\bCNG\b/.test(type)&&/\bNON\s*AC\b/.test(type)&&/\b12\s*MTR\b/.test(type)){if(operator==='dtc')return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC;if(operator==='cluster')return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER;return null;}
+ if(/\bCNG\b/.test(type)&&/\b(?:NON\s*AC|NONAC)\b/.test(type)&&/\b12\s*MTR\b/.test(type)){if(operator==='dtc')return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC;if(operator==='cluster')return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER;return null;}
  if(/\bCNG\b/.test(type)&&/\bAC\b/.test(type)&&/\b12\s*MTR\b/.test(type)){if(operator==='dtc')return BUS_CATEGORY_MARKER_COLORS.CNG_AC_DTC;if(operator==='cluster')return BUS_CATEGORY_MARKER_COLORS.CNG_AC_CLUSTER;return null;}
  return null;
 }

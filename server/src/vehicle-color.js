@@ -71,7 +71,7 @@ export function resolveFleetCategoryColor(operatorType, busType) {
   if (/\bEV\b/.test(type) && /\bAC\b/.test(type) && /\b12\s*MTR\b/.test(type) && !/\bDEVI\b/.test(type)) {
     return BUS_CATEGORY_MARKER_COLORS.EV_AC_12;
   }
-  if (/\bCNG\b/.test(type) && /\bNON\s*AC\b/.test(type) && /\b12\s*MTR\b/.test(type)) {
+  if (/\bCNG\b/.test(type) && /\b(?:NON\s*AC|NONAC)\b/.test(type) && /\b12\s*MTR\b/.test(type)) {
     if (operator === 'dtc') return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC;
     if (operator === 'cluster') return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER;
     return null;
@@ -86,7 +86,7 @@ export function resolveFleetCategoryColor(operatorType, busType) {
 
 export function classifyBusType(busType) {
   const type = String(busType ?? '').trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
-  if (/\bCNG\b/.test(type) && /\bNON\s*AC\b/.test(type)) {
+  if (/\bCNG\b/.test(type) && /\b(?:NON\s*AC|NONAC)\b/.test(type)) {
     return { fuelType: 'cng', airConditioned: false };
   }
   if (/\bCNG\b/.test(type) && /\bAC\b/.test(type)) {

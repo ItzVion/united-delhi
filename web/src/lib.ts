@@ -44,7 +44,7 @@ export const resolveFleetCategoryColor=(operatorType?:string|null,busType?:strin
     return null;
   }
   if(/\bEV\b/.test(type)&&/\bAC\b/.test(type)&&/\b12\s*MTR\b/.test(type)&&!/\bDEVI\b/.test(type))return BUS_CATEGORY_MARKER_COLORS.EV_AC_12;
-  if(/\bCNG\b/.test(type)&&/\bNON\s*AC\b/.test(type)&&/\b12\s*MTR\b/.test(type)){
+  if(/\bCNG\b/.test(type)&&/\b(?:NON\s*AC|NONAC)\b/.test(type)&&/\b12\s*MTR\b/.test(type)){
     if(operator==='dtc')return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC;
     if(operator==='cluster')return BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER;
     return null;

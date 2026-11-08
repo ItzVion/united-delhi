@@ -174,6 +174,7 @@ test('bus category colours match the One Delhi legend by type and operator',()=>
   assert.equal(resolveFleetCategoryColor('dtc','CNG AC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CNG_AC_DTC);
   assert.equal(resolveFleetCategoryColor('cluster','CNG NonAC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_CLUSTER);
   assert.equal(resolveFleetCategoryColor('dtc','CNG NonAC (12 mtr)'),BUS_CATEGORY_MARKER_COLORS.CNG_NON_AC_DTC);
+  assert.deepEqual(classifyBusType('CNG NonAC (12 mtr)'), { fuelType: 'cng', airConditioned: false });
   assert.equal(resolveFleetCategoryColor('unknown','CNG AC (12 mtr)'),null);
   assert.equal(resolveFleetCategoryColor('dtc','EV AC (9 mtr)'),null);
 });
