@@ -1,34 +1,40 @@
 GTFS NETWORK DATA
 
-Static DTC bus data is maintained from the reviewed ZIP committed at:
+The reviewed DTC bus archive is committed at:
 server/data/delhi_buses_static_gtfs_v1.zip
 
-The committed archive must match this reviewed SHA-256:
+Pinned archive SHA-256:
 b5940afdaf6154880ec5652fd3e8465dd9183b68477c7c71a287685e0ef91ff8
 
-Automated maintenance
-- GitHub Actions runs on every push to main and every six hours.
-- The ensureDtcStaticData function validates the archive, computes its SHA-256, checks route/stop/link counts and fingerprints the actual Neon rows.
-- If the database is already an exact match, it exits without writing data.
-- If data is missing or differs, it validates the source first, snapshots the old static tables, replaces the data in one transaction, then verifies every persisted row fingerprint before commit.
-- If validation or post-import verification fails, the transaction rolls back and the GitHub workflow fails.
-- On a main push, Render is deployed only after the database check/import succeeds. On scheduled runs, Render is redeployed only if data had to be repaired.
-- Render auto-deploy must remain disabled. Do not manually deploy code changes that have not passed the static-data workflow.
+AUTOMATED MAINTENANCE
+- The Static GTFS integrity and deploy gate has a daily scheduled entry point. It runs the actual database verification only when at least 48 hours have elapsed since the last successful verification.
+- A skipped daily gate does not update the successful-verification marker.
+- Manual workflow dispatch from main runs immediately.
+- Pushes to main do not trigger this workflow.
+- The ensureDtcStaticData function verifies the pinned archive hash, static route/stop/link data, and fingerprints of the actual Neon rows.
+- If Neon already matches the archive, the importer exits without changing data.
+- If data is missing or differs, it validates the source, snapshots the current static tables, imports in one transaction, and verifies persisted row fingerprints before commit.
+- Failed validation or post-import checks roll back the transaction and fail the workflow.
+- Render auto-deploy must remain disabled. The workflow triggers the Render deploy hook after a manual run, or after a scheduled run that repaired data.
+- The separate CI workflow is manual-only.
 
-Required GitHub Actions secrets
-- NEON_DATABASE_URL: the Neon connection string for the production database.
-- RENDER_DEPLOY_HOOK_URL: a Render deploy hook URL for united-delhi-api, configured for the main branch.
+GITHUB ACTIONS SECRETS
+- NEON_DATABASE_URL: production Neon connection string.
+- RENDER_DEPLOY_HOOK_URL: deploy hook URL for united-delhi-api.
 
-Required repository file
+REQUIRED REPOSITORY FILE
 - server/data/delhi_buses_static_gtfs_v1.zip
 
-Source archive checks
-The reviewed DTC archive contains 2,554 routes, 6,812 stops, 65,322 trips and 2,385,381 stop-time rows. In the previously measured realtime sample it matched 947 of 996 live route IDs (95.08%). The importer warns below 98% and refuses replacement below 90%.
-The importer checks the feed calendar and refuses expired or invalid calendar data by default.
+SOURCE ARCHIVE CHECKS
+The reviewed DTC archive contains 2,554 routes, 6,812 stops, 65,322 trips and 2,385,381 stop-time rows. A historical sample matched 947 of 996 distinct realtime route IDs (95.08%). This is not a guarantee of current live-route coverage.
+The importer checks the feed calendar and refuses expired or invalid calendar data by default. It warns below 98% route-ID coverage and refuses replacement below 90%.
 
-Operations
+OPERATIONS
 - Do not use Render Shell; the free Render compute plan does not include it.
-- Do not put DATABASE_URL or deploy-hook URLs in the repository or in chat. Store them only in GitHub Actions secrets.
-- Keep the DTC ZIP at the exact path above. Updating it in main triggers a validated import before the Render deployment.
-- Keep Render auto-deploy disabled so a Render deployment cannot race ahead of the database update.
-- Review failed GitHub Actions logs before changing any safety thresholds.
+- Do not use the retired browser upload page or old temporary upload-token settings.
+- Keep the reviewed DTC ZIP at the exact repository path above.
+- To run a manual verification/import, open GitHub Actions, select "Static GTFS integrity and deploy gate", choose "Run workflow", select main, and start it.
+- A normal push to main does not run the static-data workflow. For backend changes, run the static-data workflow manually when a backend deployment is required.
+- Render auto-deploy must remain disabled so deployment cannot race ahead of database verification.
+- Never put DATABASE_URL or deploy-hook URLs in the repository or chat. Store them only in GitHub Actions secrets.
+- Review failed workflow logs before changing validation thresholds.
