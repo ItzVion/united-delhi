@@ -1,8 +1,8 @@
 name: Static GTFS integrity and deploy gate
 
 on:
-  # GitHub cron has no native 48-hour interval. Run this lightweight gate daily;
-  # the job proceeds only when 48 hours have elapsed since the last successful run.
+  # The daily gate keeps timing reliable without running the database importer daily.
+  # The importer runs only after 48 hours have elapsed since the last successful check.
   # 22:17 UTC is 03:47 Asia/Kolkata.
   schedule:
     - cron: "17 22 * * *"
@@ -25,37 +25,42 @@ jobs:
       run:
         working-directory: server
     steps:
-      - name: Enforce 48-hour interval (manual runs bypass the wait)
+      - name: Enforce 48-hour interval
         id: interval
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
         run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::This workflow must run from main."
+            exit 1
+          fi
+
           if [[ "$GITHUB_EVENT_NAME" != "schedule" ]]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "Manual run: proceeding immediately."
             exit 0
           fi
 
-          last_success="$(gh api \
+          last_verified="$(gh api \
             -H "Accept: application/vnd.github+json" \
-            "repos/${REPOSITORY}/actions/workflows/static-data.yml/runs?branch=main&per_page=100" \
-            --jq '.workflow_runs | map(select(.status == "completed" and .conclusion == "success" and .run_started_at != null)) | sort_by(.run_started_at) | last | .run_started_at // empty')"
+            "repos/${REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '.artifacts | map(select(.name == "static-data-verification-marker" and .expired == false)) | sort_by(.created_at) | last | .created_at // empty')"
 
-          if [[ -z "$last_success" ]]; then
+          if [[ -z "$last_verified" ]]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
-            echo "No previous successful static-data run found; proceeding."
+            echo "No successful verification marker found; proceeding."
             exit 0
           fi
 
-          last_epoch="$(date -u -d "$last_success" +%s)"
+          last_epoch="$(date -u -d "$last_verified" +%s)"
           now_epoch="$(date -u +%s)"
           elapsed=$((now_epoch - last_epoch))
           interval=172800
 
           if (( elapsed >= interval )); then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
-            echo "48-hour interval elapsed; checking the reviewed DTC archive."
+            echo "At least 48 hours have elapsed; checking the reviewed DTC archive."
           else
             remaining=$((interval - elapsed))
             hours=$((remaining / 3600))
@@ -96,6 +101,19 @@ jobs:
           DTC_STATIC_ALLOW_REPLACEMENT: "true"
           DTC_ALLOW_EXPIRED_CALENDAR: "false"
           DTC_ALLOW_INVALID_CALENDAR: "false"
+
+      - name: Record successful verification time
+        if: steps.interval.outputs.should_run == 'true'
+        run: printf 'Verified at %s\\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > static-data-verification-marker.txt
+
+      - name: Save successful verification marker
+        if: steps.interval.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-data-verification-marker
+          path: server/static-data-verification-marker.txt
+          retention-days: 90
+          if-no-files-found: error
 
       - name: Trigger Render deployment after a verified data change
         if: steps.interval.outputs.should_run == 'true' && (github.event_name == 'workflow_dispatch' || steps.static.outputs.changed == 'true')
