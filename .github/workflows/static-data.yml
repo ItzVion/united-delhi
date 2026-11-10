@@ -1,15 +1,16 @@
 name: Static GTFS integrity and deploy gate
 
 on:
-  push:
-    branches:
-      - main
+  # GitHub cron has no native 48-hour interval. Run this lightweight gate daily;
+  # the job proceeds only when 48 hours have elapsed since the last successful run.
+  # 22:17 UTC is 03:47 Asia/Kolkata.
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "17 22 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: static-gtfs-${{ github.ref }}
@@ -24,10 +25,51 @@ jobs:
       run:
         working-directory: server
     steps:
+      - name: Enforce 48-hour interval (manual runs bypass the wait)
+        id: interval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" != "schedule" ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "Manual run: proceeding immediately."
+            exit 0
+          fi
+
+          last_success="$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${REPOSITORY}/actions/workflows/static-data.yml/runs?branch=main&per_page=100" \
+            --jq '.workflow_runs | map(select(.status == "completed" and .conclusion == "success" and .run_started_at != null)) | sort_by(.run_started_at) | last | .run_started_at // empty')"
+
+          if [[ -z "$last_success" ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "No previous successful static-data run found; proceeding."
+            exit 0
+          fi
+
+          last_epoch="$(date -u -d "$last_success" +%s)"
+          now_epoch="$(date -u +%s)"
+          elapsed=$((now_epoch - last_epoch))
+          interval=172800
+
+          if (( elapsed >= interval )); then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "48-hour interval elapsed; checking the reviewed DTC archive."
+          else
+            remaining=$((interval - elapsed))
+            hours=$((remaining / 3600))
+            minutes=$(((remaining % 3600) / 60))
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping this daily gate; approximately ${hours}h ${minutes}m remain before the next 48-hour check."
+          fi
+
       - name: Check out this main-branch revision
+        if: steps.interval.outputs.should_run == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Node.js
+        if: steps.interval.outputs.should_run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22.13.0
@@ -35,12 +77,15 @@ jobs:
           cache-dependency-path: server/package-lock.json
 
       - name: Install importer dependencies
+        if: steps.interval.outputs.should_run == 'true'
         run: npm ci
 
       - name: Check server syntax and run tests
+        if: steps.interval.outputs.should_run == 'true'
         run: npm run check && npm test
 
       - name: Verify or repair DTC static data in Neon
+        if: steps.interval.outputs.should_run == 'true'
         id: static
         run: npm run ensure:dtc
         env:
@@ -52,8 +97,8 @@ jobs:
           DTC_ALLOW_EXPIRED_CALENDAR: "false"
           DTC_ALLOW_INVALID_CALENDAR: "false"
 
-      - name: Trigger Render deployment after successful verification
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || steps.static.outputs.changed == 'true'
+      - name: Trigger Render deployment after a verified data change
+        if: steps.interval.outputs.should_run == 'true' && (github.event_name == 'workflow_dispatch' || steps.static.outputs.changed == 'true')
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
