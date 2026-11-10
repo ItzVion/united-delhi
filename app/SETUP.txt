@@ -1,59 +1,74 @@
 UNITED DELHI — DEVELOPMENT AND DEPLOYMENT
 
-Current production
+CURRENT PRODUCTION
 - Website: https://united-delhi.vercel.app (Vercel, root directory web/)
 - API: https://united-delhi-api.onrender.com (Render, root directory server/)
 - PostgreSQL: Neon, database neondb
-- GitHub branch: main only
-- GitHub Actions is manual-only. Routine deploys use Render and Vercel integrations.
+- Git branch: main
+- Render auto-deploy is disabled. Backend deployments are triggered by the static-data workflow after its verification step.
+- Vercel handles the web project through its Git integration.
 
-Static transit network
+STATIC TRANSIT NETWORK
 - Android and web both read bus and Metro network data from Neon.
-- Static GTFS data is loaded manually with one-shot commands from the Render Shell. The backend does not expose a browser file upload or public admin loading endpoint.
-- The DTC loader validates the archive, route labels, references, route-stop links and recent live-route ID coverage. It creates hash-named snapshots and replaces the tables inside one database transaction.
-- Keep GTFS ZIPs out of the repository except for the short deployment used for a data load. Remove them from the repository immediately after the load and deploy the clean tree.
-- The reviewed DTC feed contains 2,554 routes and 6,812 stops. It matched 947 of 996 distinct live route IDs (95.08%) in the measured sample; 49 remain unmatched. The loader warns below 98% and refuses below 90%.
-- The supplied Metro feed calendar ended 31 December 2025. It may only be loaded for topology; Metro journey durations remain estimates until a current timetable is supplied.
+- The reviewed DTC GTFS archive is committed at server/data/delhi_buses_static_gtfs_v1.zip.
+- Its pinned SHA-256 is b5940afdaf6154880ec5652fd3e8465dd9183b68477c7c71a287685e0ef91ff8.
+- The Static GTFS integrity and deploy gate checks the production data on a 48-hour cadence. A daily scheduled gate checks whether 48 hours have elapsed; skipped gates do not change the last successful verification marker.
+- A manual workflow dispatch runs the check immediately. A push to main does not trigger this workflow.
+- The importer validates the archive and live route-ID coverage, snapshots the previous static tables, imports within a transaction, and verifies persisted row fingerprints before commit.
+- If Neon already matches the archive, the importer exits without replacing data.
+- Do not use Render Shell or the retired browser uploader for static imports.
+- The historical review of this archive measured 947 matches among 996 distinct realtime route IDs (95.08%). This was a sample at the time of review, not a guarantee of current coverage.
+- The supplied Metro feed calendar ended 31 December 2025. Treat it as topology-only until a current authoritative calendar/timetable is available; journey durations remain estimates.
 
-Live vehicle feed
-- Delhi OTD GTFS-Realtime is used for live vehicle positions.
-- OTD access requires an authorised private key. The backend reads OTD_API_KEY and sends it only to the official endpoint. Keep it in Render secrets only.
+LIVE VEHICLE FEED
+- Delhi OTD GTFS-Realtime supplies live vehicle positions.
+- OTD_API_KEY is private and belongs only in the Render backend environment. Never include it in the Android app, website bundle, repository, or chat.
 
-Android app
+ANDROID APP
   cd app
   npm ci
   npm run typecheck
   npm test
   npx expo start
 
-Local Windows APK
-  npm run build:apk
-Requirements: Node 22, JDK 17, Android SDK/platform-tools and PowerShell. Prefer local APK builds; no EAS or GitHub Actions build is required.
+Requirements:
+- Node.js 22.13.x (22.x; below 23), as declared by app/package.json.
+- For local APK builds: JDK 17, Android SDK/platform-tools, and PowerShell.
+- EAS project: @itzvion/united-delhi
+- EAS project ID: a071b353-9f0b-4e78-8c1a-6e0fd36ced4e
+- EAS preview profile produces an internal Android APK:
+  npx eas-cli@latest build --platform android --profile preview
+- Do not start repeated cloud builds for routine checks. Run a build only when an installable APK is needed.
 
-Website
+WEBSITE
   cd web
   npm ci
   npm run dev
-Vite, Vercel and Android configurations use https://united-delhi-api.onrender.com.
 
-Vercel settings
+Vercel settings:
 - Root Directory: web
 - Framework: Vite
 - Install Command: npm ci
 - Build Command: npm run build
 - Output Directory: dist
 
-Backend
+BACKEND
   cd server
   npm ci
   npm run check
   npm test
   npm start
 
-Render environment
+RENDER ENVIRONMENT
 - DATABASE_URL
 - OTD_API_KEY
 - APP_ORIGINS=https://united-delhi.vercel.app
 
-Security
-Never commit DATABASE_URL or OTD_API_KEY. Use only the backend's private environment for these values.
+GITHUB ACTIONS
+- .github/workflows/static-data.yml: scheduled 48-hour data verification/import gate, plus manual dispatch.
+- .github/workflows/ci.yml: manual-only checks for server, web, and Android.
+- Required repository secrets for the static-data workflow: NEON_DATABASE_URL and RENDER_DEPLOY_HOOK_URL.
+- Keep production credentials and deploy-hook URLs in GitHub secrets or provider secret stores only. Never commit them.
+
+SECURITY
+Never commit DATABASE_URL, OTD_API_KEY, EXPO_TOKEN, deploy-hook URLs, keystores, or other credentials. Keep private values in the relevant provider's secret storage.
