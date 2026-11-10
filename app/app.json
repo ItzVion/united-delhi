@@ -17,7 +17,9 @@
       "package": "com.uniteddelhi.app",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "backgroundColor": "#F4F7F4",
       "icon": "./assets/icon.png",
@@ -49,6 +51,12 @@
       "backgroundColor": "#000000",
       "barStyle": "light-content",
       "enforceContrast": false
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a071b353-9f0b-4e78-8c1a-6e0fd36ced4e"
+      }
+    },
+    "owner": "itzvion"
   }
 }
