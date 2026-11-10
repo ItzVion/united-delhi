@@ -13,7 +13,7 @@ ARCHITECTURE
 - GTFS archives live at /opt/united-delhi/data/dtc-static.zip and /opt/united-delhi/data/metro-static.zip, outside code releases.
 
 DEPLOYMENT AUTOMATION
-GitHub Actions is manual-only and is not used for routine builds. The active production path uses Render's main-branch auto-deploy and Vercel's native Git integration. The optional VPS flow fetches origin/main only if its systemd timer is explicitly enabled; it must remain disabled in the current setup.
+The active production path is Vercel + Render + Neon. Render auto-deploy is disabled. The separate Static GTFS integrity and deploy gate runs a daily schedule check and verifies/imports the reviewed DTC archive only when 48 hours have elapsed, or immediately when manually dispatched from main. It triggers the Render deploy hook only after the verification step. The general CI workflow is manual-only. The optional VPS flow fetches origin/main only if its systemd timer is explicitly enabled; it must remain disabled in the current setup.
 Vercel's Git integration can independently build source on main unless its Ignored Build Step is configured after a successful VPS prebuilt deployment. See the supplied AutoBuild Kit instructions.
 
 ONE-TIME VPS KIT
